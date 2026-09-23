@@ -1,0 +1,30 @@
+{
+  "mapDisplay": {
+    "mode": "all",
+    "chain": "",
+    "includeCold": true
+  },
+  "notifications": {
+    "soundEnabled": true,
+    "pushEnabled": true,
+    "notifyInStock": true,
+    "notifyOutOfStock": false,
+    "notifyNotHandled": false,
+    "notifyLottery": true,
+    "notifyChain": "",
+    "maxReportAgeHours": 24,
+    "onlyOnsiteGps": false
+  },
+  "sidebarTab": "feed",
+  "statusFilter": {
+    "i": true,
+    "o": true,
+    "n": true,
+    "u": true
+  },
+  "maxReportAgeHours": 24,
+  "includeCold": true,
+  "currentChain": "",
+  "sortMode": "newest",
+  "showExpired": false
+}

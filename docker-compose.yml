@@ -1,0 +1,19 @@
+services:
+  pokemap:
+    build: .
+    container_name: pokemap
+    image: pokemap:latest
+    restart: always
+    ports:
+      - "127.0.0.1:8880:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PORT=8000
+    volumes:
+      - ./app/data:/app/app/data
+    networks:
+      - bawui-net
+
+networks:
+  bawui-net:
+    external: true
