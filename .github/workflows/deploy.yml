@@ -61,5 +61,5 @@ jobs:
               echo "🧹 Cleaning up old unused Docker images..."
               docker image prune -f
 
-              echo "✅ [CI/CD] Auto Deploy hoàn tất thành công! https://pokem.bawui.com is live!"
+              echo "✅ [CI/CD] Auto Deploy hoàn tất thành công! https://pokemap.bawui.com is live!"
           ENDSSH
