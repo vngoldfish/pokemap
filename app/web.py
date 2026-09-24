@@ -5061,13 +5061,20 @@ def main():
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
     
-    import socket
-    port = 8080
-    for test_port in [8080, 8081, 8082, 8888, 5000]:
-      with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        if s.connect_ex(('127.0.0.1', test_port)) != 0:
-          port = test_port
-          break
+    port_env = os.getenv("PORT")
+    if port_env:
+        try:
+            port = int(port_env)
+        except ValueError:
+            port = 8000
+    else:
+        import socket
+        port = 8000
+        for test_port in [8000, 8080, 8081, 8082, 8888, 5000]:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                if s.connect_ex(('127.0.0.1', test_port)) != 0:
+                    port = test_port
+                    break
 
     print("=================================================================")
     print("🚀 BAWUI POKE APP - Instant Real-Time Push Dashboard")
