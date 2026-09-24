@@ -18,7 +18,7 @@
     "discordEnabled": false,
     "telegramBotToken": "8888535478:AAFtlcFhwjhlAvLZ4lPf7tGQtnZ8XIoKvSE",
     "telegramChatId": "5572197416",
-    "telegramEnabled": false
+    "telegramEnabled": true
   },
   "sidebarTab": "feed",
   "statusFilter": {

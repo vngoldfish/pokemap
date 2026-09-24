@@ -145,33 +145,100 @@ async def send_webhook_notification(request: Request):
         cfg = load_user_settings().get("notifications", {})
         results = {}
 
+        # Fetch store report history if store_id available
+        store_id = store.get("id") or ""
+        history_list = []
+        if store_id and store_id != "test_store_webhook":
+            try:
+                history_list = fetch_store_history(store_id) or []
+            except Exception as he:
+                print("Could not fetch history for webhook:", he)
+        elif is_test:
+            # Demo history entries for test notification
+            history_list = [
+                {
+                    "status_code": "o",
+                    "status_label": "🔴 Hết hàng",
+                    "note": "Hết đợt Terastal Festival",
+                    "formatted_time": "14:20 24/09",
+                    "timestamp": 1727155200,
+                    "user": "Trainer_A"
+                },
+                {
+                    "status_code": "i",
+                    "status_label": "🟢 Có hàng",
+                    "note": "Về 2 box Terastal",
+                    "formatted_time": "09:15 24/09",
+                    "timestamp": 1727136900,
+                    "user": "Trainer_B"
+                }
+            ]
+
+        # Filter out current report if duplicated in history
+        filtered_hist = []
+        cur_ts = info.get("timestamp") or 0
+        for h in history_list:
+            h_ts = h.get("timestamp") or 0
+            if cur_ts > 0 and abs(h_ts - cur_ts) < 180:
+                continue
+            filtered_hist.append(h)
+            if len(filtered_hist) >= 3:
+                break
+
+        # Build concise history text for Telegram and Discord
+        hist_text_tg_lines = []
+        hist_fields_discord = []
+        if filtered_hist:
+            for item in filtered_hist:
+                s_icon = "🟢" if item.get("status_code") == "i" else ("🔴" if item.get("status_code") == "o" else "⚪")
+                t_str = item.get("formatted_time") or "Trước đó"
+                note_str = f" ({item.get('note')})" if item.get("note") else ""
+                hist_text_tg_lines.append(f"  • {s_icon} {t_str}: {item.get('status_label', '')}{note_str}")
+                hist_fields_discord.append(f"{s_icon} `{t_str}`: {item.get('status_label', '')}{note_str}")
+
+        packs_text = ", ".join(info.get("packs", [])) if info.get("packs") else "Gói thẻ Pokémon (Xem tại quán)"
+        store_name = store.get('name', 'Cửa hàng')
+        store_chain = store.get('chain_label') or store.get('chain') or 'Tiện lợi'
+        store_addr = store.get('address') or 'Khu vực Osaka'
+        maps_query = urllib.parse.quote_plus(f"{store_name} {store_addr}".strip())
+        maps_url = f"https://www.google.com/maps/search/?api=1&query={maps_query}" if maps_query else ""
+        time_display = info.get('reported_at', 'Vừa xong')
+        if info.get('timeAgo'):
+            time_display += f" ({info.get('timeAgo')})"
+
         # 1. DISCORD WEBHOOK
         discord_url = (cfg.get("discordWebhookUrl") or "").strip()
         discord_enabled = cfg.get("discordEnabled", False) or is_test
         
         if discord_url and discord_enabled:
             try:
-                packs_text = ", ".join(info.get("packs", [])) if info.get("packs") else "Gói thẻ Pokémon (Xem tại quán)"
-                store_name = store.get('name', '')
-                store_addr = store.get('address', '')
-                maps_query = urllib.parse.quote_plus(f"{store_name} {store_addr}".strip())
-                maps_url = f"https://www.google.com/maps/search/?api=1&query={maps_query}" if maps_query else ""
-                
+                embed_fields = [
+                    {"name": "📦 Sản phẩm", "value": packs_text, "inline": False},
+                    {"name": "⏱ Báo lúc", "value": time_display, "inline": True},
+                    {"name": "📍 Địa chỉ", "value": store_addr, "inline": False}
+                ]
+                if hist_fields_discord:
+                    embed_fields.append({
+                        "name": "📜 Lịch sử các lần báo gần nhất",
+                        "value": "\n".join(hist_fields_discord),
+                        "inline": False
+                    })
+                if maps_url:
+                    embed_fields.append({
+                        "name": "🗺️ Chỉ đường",
+                        "value": f"[Mở Google Maps dẫn đường chính xác]({maps_url})",
+                        "inline": False
+                    })
+
                 embed = {
-                    "title": f"{'🧪 [TEST] ' if is_test else '🔥 '}{store.get('name', 'Cửa hàng')}",
-                    "description": f"**Trạng thái:** 🟢 Có hàng (In Stock)\n**Chuỗi:** {store.get('chain_label', 'Tiện lợi')}",
+                    "title": f"{'🧪 [TEST] ' if is_test else '🔥 '}{store_name} ({store_chain})",
+                    "description": "🟢 **TRẠNG THÁI: CÓ HÀNG (IN STOCK)**",
                     "color": 0x16a34a,
-                    "fields": [
-                        {"name": "📦 Sản phẩm", "value": packs_text, "inline": False},
-                        {"name": "⏱ Thời gian báo", "value": f"{info.get('reported_at', 'Vừa xong')} ({info.get('timeAgo', '')})", "inline": True},
-                        {"name": "📍 Địa chỉ", "value": store.get('address') or "Khu vực Osaka", "inline": False}
-                    ],
+                    "fields": embed_fields,
                     "footer": {
                         "text": "BAWUI POKE APP • Osaka Stock Radar"
                     }
                 }
-                if maps_url:
-                    embed["fields"].append({"name": "🗺️ Google Maps", "value": f"[Mở bản đồ dẫn đường chính xác]({maps_url})", "inline": True})
 
                 payload = {
                     "username": "BAWUI Poke Radar",
@@ -197,23 +264,26 @@ async def send_webhook_notification(request: Request):
         
         if tg_token and tg_chat_id and tg_enabled:
             try:
-                packs_text = ", ".join(info.get("packs", [])) if info.get("packs") else "Gói thẻ Pokémon (Xem tại quán)"
-                store_name = store.get('name', '')
-                store_addr = store.get('address', '')
-                maps_query = urllib.parse.quote_plus(f"{store_name} {store_addr}".strip())
-                maps_url = f"https://www.google.com/maps/search/?api=1&query={maps_query}" if maps_query else ""
-                
                 header_prefix = "🧪 <b>[THÔNG BÁO THỬ NGHIỆM]</b>\n" if is_test else "🔥 <b>CÓ HÀNG MỚI TẠI OSAKA!</b>\n"
+                
+                # Format gọn gàng, rõ ràng, chi tiết
                 msg_lines = [
                     f"{header_prefix}",
-                    f"🏪 <b>{store.get('name', 'Cửa hàng')}</b> ({store.get('chain_label', 'Tiện lợi')})",
-                    f"🟢 <b>Trạng thái:</b> Có hàng (In Stock)",
+                    f"🏪 <b>{store_name}</b> ({store_chain})",
+                    f"🟢 <b>Trạng thái:</b> Đang có hàng (In Stock)",
                     f"📦 <b>Sản phẩm:</b> {packs_text}",
-                    f"⏱ <b>Thời gian:</b> {info.get('reported_at', 'Vừa xong')} ({info.get('timeAgo', '')})",
-                    f"📍 <b>Địa chỉ:</b> {store.get('address') or 'Khu vực Osaka'}"
+                    f"⏱ <b>Báo lúc:</b> {time_display}",
+                    f"📍 <b>Địa chỉ:</b> {store_addr}"
                 ]
+
+                # Bổ sung lịch sử báo cáo các lần trước
+                if hist_text_tg_lines:
+                    msg_lines.append("\n📜 <b>Lịch sử các lần báo trước:</b>")
+                    msg_lines.extend(hist_text_tg_lines)
+
+                # Link chỉ đường Google Maps chính xác
                 if maps_url:
-                    msg_lines.append(f"\n🗺️ <a href=\"{maps_url}\">Mở Google Maps chỉ đường chính xác</a>")
+                    msg_lines.append(f"\n🗺️ <a href=\"{maps_url}\">Mở Google Maps chỉ đường chuẩn xác ↗</a>")
                 
                 tg_payload = {
                     "chat_id": tg_chat_id,
