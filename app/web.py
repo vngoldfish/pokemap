@@ -445,6 +445,53 @@ def index():
     }
     .loc-btn:hover { background: #1d4ed8; }
     
+    /* SIDEBAR TAB SWITCHER (TÁCH BIỆT BÁO CÓ HÀNG & TRA CỨU TOÀN BỘ) */
+    .sidebar-tab-switcher {
+      display: flex;
+      background: #f1f5f9;
+      padding: 6px 12px;
+      gap: 6px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .sidebar-tab-btn {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 8px 10px;
+      border: 1.5px solid transparent;
+      border-radius: 8px;
+      background: transparent;
+      color: #64748b;
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+    .sidebar-tab-btn:hover {
+      color: #0f172a;
+      background: rgba(255, 255, 255, 0.7);
+    }
+    .sidebar-tab-btn.active {
+      background: white;
+      color: #0f172a;
+      border-color: #cbd5e1;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+    }
+    .tab-pill-badge {
+      font-size: 0.68rem;
+      padding: 1px 7px;
+      border-radius: 12px;
+      background: #16a34a;
+      color: white;
+      font-weight: 800;
+    }
+    .tab-pill-badge.muted {
+      background: #94a3b8;
+    }
+
     .stats-bar {
       display: flex;
       padding: 10px 16px;
@@ -2208,16 +2255,28 @@ def index():
           <button class="loc-btn" onclick="requestUserLocation(true)">Cập nhật GPS</button>
         </div>
         
+        <!-- 2. SIDEBAR TAB SWITCHER: SEPARATE IN-STOCK FEED & ALL STORES -->
+        <div class="sidebar-tab-switcher">
+          <button class="sidebar-tab-btn active" id="tab-btn-feed" onclick="setSidebarTab('feed')">
+            <span>⚡ Báo Có Hàng</span>
+            <span class="tab-pill-badge" id="feed-tab-count">0</span>
+          </button>
+          <button class="sidebar-tab-btn" id="tab-btn-all" onclick="setSidebarTab('all')">
+            <span>🏢 Tra Cứu Toàn Bộ</span>
+            <span class="tab-pill-badge muted" id="all-tab-count">4,050</span>
+          </button>
+        </div>
+
         <div class="stats-bar">
-          <div class="stat-badge" onclick="setMapMode('only_in')" title="Bấm để lọc chỉ cửa hàng có hàng">
+          <div class="stat-badge" onclick="setSidebarTab('feed')" title="Xem danh sách các cửa hàng đang có hàng">
             <div class="num stat-in" id="stat-in">-</div>
             <div class="label">🟢 Có hàng</div>
           </div>
-          <div class="stat-badge" onclick="setMapMode('with_out')" title="Bấm để xem các cửa hàng biến động kho">
+          <div class="stat-badge" onclick="setSidebarTab('all', 'o')" title="Xem các cửa hàng vừa báo hết hàng">
             <div class="num stat-out" id="stat-out">-</div>
             <div class="label">🔴 Hết hàng</div>
           </div>
-          <div class="stat-badge" onclick="setMapMode('all')" title="Bấm để xem toàn bộ 4,050 cửa hàng trên bản đồ">
+          <div class="stat-badge" onclick="setSidebarTab('all', 'all')" title="Tra cứu trong toàn bộ 4,050 cửa hàng Osaka">
             <div class="num" id="stat-total" style="color:#0284c7;">4,050</div>
             <div class="label">🏢 Toàn bộ Osaka</div>
           </div>
@@ -2225,53 +2284,96 @@ def index():
         
         <div class="controls">
           <div class="search-row">
-            <input type="text" id="search-input" class="search-box" placeholder="🔍 Tìm theo tên hoặc khu vực (VD: 梅田, 難波)..." />
-            <button class="settings-icon-btn" id="btn-sidebar-settings" onclick="toggleMapSettingsModal()" title="⚙️ Cài đặt cửa hàng bản đồ (Hiện tất cả 4,050 điểm / có hàng / chuỗi)">
-              ⚙️
+            <input type="text" id="search-input" class="search-box" placeholder="🔍 Tìm trong các điểm có hàng (tên quán, ga, khu vực)..." oninput="handleSearchInput(this.value)" />
+            <button class="settings-icon-btn" id="btn-sidebar-settings" onclick="toggleMapSettingsModal()" title="🗺️ Cài đặt ghim hiển thị trên bản đồ">
+              🗺️
             </button>
             <button class="settings-icon-btn" id="btn-sidebar-notif" onclick="toggleNotifSettingsModal()" title="🔔 Cài đặt thông báo có hàng & cảnh báo" style="color:#2563eb;">
               🔔
             </button>
           </div>
 
-          <!-- COMPACT SELECT BOXES (NO OVERFLOW HORIZONTAL SCROLLBARS) -->
-          <div class="controls-grid" style="margin-top: 6px;">
-            <div class="control-box">
-              <span class="control-box-label">🔍 Tình trạng kho:</span>
-              <select id="status-quick-select" class="control-dropdown" onchange="setMapMode(this.value)" title="Chọn tình trạng kho cần hiển thị">
-                <option value="all">🏢 Hiện tất cả (4,050 điểm)</option>
-                <option value="only_in">🟢 Chỉ xem Có hàng</option>
-                <option value="with_out">🟢🔴 Có hàng & Hết hàng</option>
-              </select>
+          <!-- CONTROLS CHO TAB 1: BÁO CÓ HÀNG (FEED) -->
+          <div id="controls-feed-group">
+            <div class="controls-grid" style="margin-top: 6px;">
+              <div class="control-box">
+                <span class="control-box-label">⏱ Độ mới tin báo:</span>
+                <select id="feed-freshness-select" class="control-dropdown" onchange="setFeedFreshness(this.value)" title="Lọc tin báo có hàng theo thời gian">
+                  <option value="24" selected>📅 24 giờ qua (Mặc định)</option>
+                  <option value="1">⚡ Siêu mới: Trong 1 giờ (<1h) 🔥</option>
+                  <option value="3">⏱ Trong 3 giờ (Săn thẻ)</option>
+                  <option value="6">⏱ Trong 6 giờ</option>
+                  <option value="12">📅 Trong 12 giờ</option>
+                  <option value="9999">⏳ Tất cả thời gian</option>
+                </select>
+              </div>
+
+              <div class="control-box">
+                <span class="control-box-label">🏪 Chuỗi cửa hàng:</span>
+                <select id="feed-chain-select" class="control-dropdown" onchange="setFeedChain(this.value)" title="Lọc theo chuỗi cửa hàng">
+                  <option value="" selected>🏢 Tất cả chuỗi</option>
+                  <option value="seven">🏪 7-Eleven</option>
+                  <option value="lawson">🏪 Lawson</option>
+                  <option value="familymart">🏪 FamilyMart</option>
+                  <option value="ministop">🏪 Ministop</option>
+                  <option value="specialty">🃏 Shop thẻ Pokémon</option>
+                </select>
+              </div>
             </div>
 
-            <div class="control-box">
-              <span class="control-box-label">🏪 Chuỗi cửa hàng:</span>
-              <select id="chain-select" class="control-dropdown" onchange="setMapChain(this.value)" title="Lọc theo chuỗi cửa hàng">
-                <option value="" selected>🏢 Tất cả chuỗi cửa hàng</option>
-                <option value="seven">🏪 7-Eleven</option>
-                <option value="lawson">🏪 Lawson</option>
-                <option value="familymart">🏪 FamilyMart</option>
-                <option value="ministop">🏪 Ministop</option>
-                <option value="specialty">🃏 Cửa hàng thẻ Pokémon</option>
-              </select>
+            <div class="controls-grid" style="margin-top: 6px; grid-template-columns: 1fr;">
+              <div class="control-box">
+                <span class="control-box-label">↕️ Sắp xếp danh sách có hàng:</span>
+                <select id="feed-sort-select" class="control-dropdown" onchange="setFeedSort(this.value)" title="Cách sắp xếp danh sách có hàng">
+                  <option value="newest" selected>⏱ Mới báo nhất trước</option>
+                  <option value="nearest">📍 Gần tôi nhất (GPS)</option>
+                </select>
+              </div>
             </div>
           </div>
 
-          <div class="controls-grid" style="margin-top: 6px; grid-template-columns: 1fr;">
-            <div class="control-box">
-              <span class="control-box-label">↕️ Sắp xếp danh sách:</span>
-              <select id="sort-select" class="control-dropdown" onchange="setSortMode(this.value)" title="Chọn cách sắp xếp">
-                <option value="newest" selected>⏱ Mới báo nhất trước</option>
-                <option value="nearest">📍 Gần tôi nhất (GPS)</option>
-              </select>
+          <!-- CONTROLS CHO TAB 2: TRA CỨU TOÀN BỘ (ALL) -->
+          <div id="controls-all-group" style="display: none;">
+            <div class="controls-grid" style="margin-top: 6px;">
+              <div class="control-box">
+                <span class="control-box-label">🎯 Lọc tình trạng:</span>
+                <select id="all-status-select" class="control-dropdown" onchange="setAllStatusFilter(this.value)" title="Lọc theo tình trạng">
+                  <option value="all" selected>🏢 Tất cả (4,050 điểm)</option>
+                  <option value="i">🟢 Đang có hàng</option>
+                  <option value="o">🔴 Hết hàng</option>
+                  <option value="n">⚪ Không bán thẻ</option>
+                  <option value="u">🔘 Chưa có báo cáo</option>
+                </select>
+              </div>
+
+              <div class="control-box">
+                <span class="control-box-label">🏪 Chuỗi cửa hàng:</span>
+                <select id="all-chain-select" class="control-dropdown" onchange="setAllChain(this.value)" title="Lọc theo chuỗi cửa hàng">
+                  <option value="" selected>🏢 Tất cả chuỗi</option>
+                  <option value="seven">🏪 7-Eleven</option>
+                  <option value="lawson">🏪 Lawson</option>
+                  <option value="familymart">🏪 FamilyMart</option>
+                  <option value="ministop">🏪 Ministop</option>
+                  <option value="specialty">🃏 Shop thẻ Pokémon</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="controls-grid" style="margin-top: 6px; grid-template-columns: 1fr;">
+              <div class="control-box">
+                <span class="control-box-label">↕️ Sắp xếp tra cứu:</span>
+                <select id="all-sort-select" class="control-dropdown" onchange="setAllSort(this.value)" title="Cách sắp xếp">
+                  <option value="newest" selected>⏱ Cập nhật mới nhất</option>
+                  <option value="nearest">📍 Gần tôi nhất (GPS)</option>
+                </select>
+              </div>
             </div>
           </div>
         </div>
 
         <div class="filter-status-banner" id="filter-status-banner">
-          <span id="banner-filter-text">🗺️ Đang hiển thị: Tất cả 4,050 cửa hàng Osaka</span>
-          <a href="javascript:void(0)" id="banner-filter-link" onclick="toggleMapSettingsModal()" style="color:#2563eb;font-weight:700;text-decoration:none;">Đổi ⚙️</a>
+          <span id="banner-filter-text">🟢 Đang hiển thị danh sách các điểm có hàng tại Osaka</span>
+          <span style="font-size:0.72rem;color:#0284c7;font-weight:700;" id="banner-map-status">🗺️ Bản đồ: Toàn cảnh 4,050 điểm</span>
         </div>
         
         <div id="store-list">
@@ -2281,8 +2383,11 @@ def index():
 
       <div id="map">
         <div class="map-controls-box">
+          <button class="floating-btn" id="btn-quick-map-mode" onclick="toggleQuickMapMode()" title="Chuyển nhanh chế độ ghim trên bản đồ">
+            <span id="quick-map-mode-text">🗺️ Bản đồ: Tất cả 4,050 điểm</span>
+          </button>
           <button class="floating-btn" onclick="toggleMapSettingsModal()" title="Cài đặt những cửa hàng muốn nhìn thấy trên bản đồ">
-            <span>⚙️ Cài đặt cửa hàng bản đồ</span>
+            <span>⚙️ Cài đặt bản đồ</span>
           </button>
           <button class="floating-btn" onclick="toggleNotifSettingsModal()" title="Cài đặt những thông báo bạn muốn nhận">
             <span>🔔 Cài đặt thông báo</span>
@@ -2965,20 +3070,30 @@ def index():
     const storeHistoryCache = {};
     const openAccordionStoreIds = new Set();
     
-    // 1.1 MAP DISPLAY STATE (TÁCH BIỆT HOÀN TOÀN KHỎI THÔNG BÁO)
+    // 1.1 CẤU HÌNH BẢN ĐỒ (CHỈ ĐIỀU KHIỂN GHIM TRÊN BẢN ĐỒ)
     let mapDisplay = {
       mode: 'all',          // 'all' = 4,050 cửa hàng, 'only_in' = chỉ ghim có hàng, 'with_out' = ghim có hàng + hết hàng
       chain: '',            // Lọc chuỗi trên bản đồ: '' = tất cả
       includeCold: true     // Nạp dữ liệu lịch sử (>24h)
     };
 
-    // 1.2 ACTIVE SIDEBAR TAB: 'feed' (⚡ Báo Có Hàng) hoặc 'map' (🏢 Cửa Hàng Bản Đồ)
-    let sidebarTab = 'feed';
+    // 1.2 CẤU HÌNH DANH SÁCH SIDEBAR (TÁCH BIỆT HOÀN TOÀN KHỎI BẢN ĐỒ)
+    let sidebarTab = 'feed'; // 'feed' (Báo Có Hàng) | 'all' (Tra Cứu Toàn Bộ)
 
-    let currentQuery = '';
-    let sortMode = 'newest';
+    // Bộ lọc riêng cho Tab 1: Báo Có Hàng (Feed)
+    let feedFreshnessHours = 24.0;
+    let feedChain = '';
+    let feedSortMode = 'newest'; // 'newest' | 'nearest'
+    let feedQuery = '';
+
+    // Bộ lọc riêng cho Tab 2: Tra Cứu Toàn Bộ 4,050 Điểm (All)
+    let allStatusFilter = 'all'; // 'all' | 'i' | 'o' | 'n' | 'u'
+    let allChain = '';
+    let allSortMode = 'newest';
+    let allQuery = '';
+
+    let visibleLimit = 150;
     let calendarEvents = [];
-
     let userLat = null;
     let userLng = null;
     let userAccuracy = null;
@@ -2989,68 +3104,105 @@ def index():
     let maxReportAgeHours = 24.0;
     let currentChain = '';
 
-    // 2. TABS & CONTROLS DECOUPLING LOGIC
-    function switchSidebarTab(tab) {
-      if (tab === 'feed') {
-        setMapMode('only_in');
-      } else if (tab === 'map') {
-        setMapMode('all');
+    // 2. CHUYỂN ĐỔI TAB SIDEBAR: BÁO CÓ HÀNG vs TRA CỨU TOÀN BỘ
+    function setSidebarTab(tab, subFilter = null) {
+      sidebarTab = tab;
+      const btnFeed = document.getElementById('tab-btn-feed');
+      const btnAll = document.getElementById('tab-btn-all');
+      const controlsFeed = document.getElementById('controls-feed-group');
+      const controlsAll = document.getElementById('controls-all-group');
+
+      if (btnFeed) btnFeed.classList.toggle('active', tab === 'feed');
+      if (btnAll) btnAll.classList.toggle('active', tab === 'all');
+      if (controlsFeed) controlsFeed.style.display = (tab === 'feed') ? 'block' : 'none';
+      if (controlsAll) controlsAll.style.display = (tab === 'all') ? 'block' : 'none';
+
+      // Cập nhật ô input search
+      const searchInput = document.getElementById('search-input');
+      if (searchInput) {
+        searchInput.value = (tab === 'feed') ? feedQuery : allQuery;
+        searchInput.placeholder = (tab === 'feed') 
+          ? "🔍 Tìm trong các điểm có hàng (tên quán, ga, khu vực)..." 
+          : "🔍 Tìm trong toàn bộ 4,050 cửa hàng Osaka...";
+      }
+
+      if (subFilter && tab === 'all') {
+        allStatusFilter = subFilter;
+        const allStatusSel = document.getElementById('all-status-select');
+        if (allStatusSel) allStatusSel.value = subFilter;
+      }
+
+      updateFilterBanner();
+      renderSidebarListOnly();
+      saveSettings();
+    }
+    window.setSidebarTab = setSidebarTab;
+    window.switchSidebarTab = setSidebarTab; // backward-compat
+
+    // BỘ LỌC CHO TAB BÁO CÓ HÀNG (FEED)
+    function setFeedFreshness(val) {
+      feedFreshnessHours = parseFloat(val);
+      updateFilterBanner();
+      renderSidebarListOnly();
+      saveSettings();
+    }
+    window.setFeedFreshness = setFeedFreshness;
+
+    function setFeedChain(val) {
+      feedChain = val;
+      updateFilterBanner();
+      renderSidebarListOnly();
+      saveSettings();
+    }
+    window.setFeedChain = setFeedChain;
+
+    function setFeedSort(val) {
+      feedSortMode = val;
+      renderSidebarListOnly();
+      saveSettings();
+    }
+    window.setFeedSort = setFeedSort;
+
+    // BỘ LỌC CHO TAB TRA CỨU TOÀN BỘ (ALL)
+    function setAllStatusFilter(val) {
+      allStatusFilter = val;
+      updateFilterBanner();
+      renderSidebarListOnly();
+      saveSettings();
+    }
+    window.setAllStatusFilter = setAllStatusFilter;
+
+    function setAllChain(val) {
+      allChain = val;
+      updateFilterBanner();
+      renderSidebarListOnly();
+      saveSettings();
+    }
+    window.setAllChain = setAllChain;
+
+    function setAllSort(val) {
+      allSortMode = val;
+      renderSidebarListOnly();
+      saveSettings();
+    }
+    window.setAllSort = setAllSort;
+
+    function handleSearchInput(val) {
+      if (sidebarTab === 'feed') {
+        feedQuery = val;
       } else {
-        renderUI();
+        allQuery = val;
       }
+      renderSidebarListOnly();
     }
-    window.switchSidebarTab = switchSidebarTab;
+    window.handleSearchInput = handleSearchInput;
 
-    function openCurrentTabSettings() {
-      toggleMapSettingsModal();
-    }
-    window.openCurrentTabSettings = openCurrentTabSettings;
-
-    function updateFilterBanner() {
-      const banner = document.getElementById('banner-filter-text');
-      const bannerLink = document.getElementById('banner-filter-link');
-      if (!banner) return;
-
-      let modeDesc = 'Tất cả 4,050 cửa hàng Osaka';
-      if (mapDisplay.mode === 'only_in') modeDesc = 'Chỉ cửa hàng đang có hàng 🟢';
-      else if (mapDisplay.mode === 'with_out') modeDesc = 'Cửa hàng Có hàng & Hết hàng 🟢🔴';
-
-      let chainDesc = '';
-      if (mapDisplay.chain) {
-        const chainMap = {
-          'seven': '7-Eleven',
-          'lawson': 'Lawson',
-          'familymart': 'FamilyMart',
-          'ministop': 'Ministop',
-          'specialty': 'Shop thẻ Pokémon'
-        };
-        chainDesc = ` • Chuỗi ${chainMap[mapDisplay.chain] || mapDisplay.chain}`;
-      }
-
-      banner.innerHTML = `🗺️ Đang hiển thị: <b>${modeDesc}${chainDesc}</b>`;
-      if (bannerLink) {
-        bannerLink.innerHTML = 'Đổi ⚙️';
-        bannerLink.onclick = () => toggleMapSettingsModal();
-      }
-    }
-    window.updateFilterBanner = updateFilterBanner;
-    window.updateControlsForTab = updateFilterBanner; // backward-compat
-
-    function handleDynamicControlChange(val) {
-      setMapMode(val);
-    }
-    window.handleDynamicControlChange = handleDynamicControlChange;
-
-    function handleChainChange(chain) {
-      setMapChain(chain);
-    }
-    window.handleChainChange = handleChainChange;
-
-    // MAP DISPLAY ACTIONS
+    // 3. ĐIỀU KHIỂN GHIM TRÊN BẢN ĐỒ (CHỈ TÁC ĐỘNG BẢN ĐỒ LEAFLET, KHÔNG ĐỤNG SIDEBAR)
     function setMapMode(mode) {
       mapDisplay.mode = mode;
       syncMapSettingsUI();
-      renderUI();
+      updateQuickMapModeBtn();
+      renderMapMarkersOnly(); // Chỉ vẽ lại ghim bản đồ!
       saveSettings();
     }
     window.setMapMode = setMapMode;
@@ -3059,17 +3211,42 @@ def index():
       mapDisplay.chain = chain;
       currentChain = chain;
       syncMapSettingsUI();
-      renderUI();
+      renderMapMarkersOnly(); // Chỉ vẽ lại ghim bản đồ!
       saveSettings();
     }
     window.setMapChain = setMapChain;
-    window.setChain = setMapChain; // backward-compat
+
+    function toggleQuickMapMode() {
+      if (mapDisplay.mode === 'all') {
+        setMapMode('only_in');
+      } else {
+        setMapMode('all');
+      }
+    }
+    window.toggleQuickMapMode = toggleQuickMapMode;
+
+    function updateQuickMapModeBtn() {
+      const btnText = document.getElementById('quick-map-mode-text');
+      const bannerMap = document.getElementById('banner-map-status');
+      let label = '🏢 Bản đồ: Tất cả 4,050 điểm';
+      let bannerText = '🗺️ Bản đồ: Toàn cảnh 4,050 điểm';
+      if (mapDisplay.mode === 'only_in') {
+        label = '🟢 Bản đồ: Chỉ điểm có hàng';
+        bannerText = '🗺️ Bản đồ: Chỉ điểm có hàng 🟢';
+      } else if (mapDisplay.mode === 'with_out') {
+        label = '🟢🔴 Bản đồ: Có & Hết hàng';
+        bannerText = '🗺️ Bản đồ: Có hàng & Hết hàng 🟢🔴';
+      }
+      if (btnText) btnText.innerHTML = label;
+      if (bannerMap) bannerMap.innerHTML = bannerText;
+    }
 
     function toggleMapCold(checked) {
       mapDisplay.includeCold = checked;
       includeCold = checked;
       syncMapSettingsUI();
-      renderUI();
+      renderMapMarkersOnly();
+      renderSidebarListOnly();
       saveSettings();
     }
     window.toggleMapCold = toggleMapCold;
@@ -3080,11 +3257,37 @@ def index():
       mapDisplay = { mode: 'all', chain: '', includeCold: true };
       currentChain = '';
       syncMapSettingsUI();
-      renderUI();
+      updateQuickMapModeBtn();
+      renderMapMarkersOnly();
       saveSettings();
     }
     window.resetMapSettings = resetMapSettings;
     window.resetToFactorySettings = resetMapSettings; // backward-compat
+
+    function updateFilterBanner() {
+      const banner = document.getElementById('banner-filter-text');
+      if (!banner) return;
+      if (sidebarTab === 'feed') {
+        let fText = '24 giờ qua';
+        if (feedFreshnessHours === 1) fText = '1 giờ qua 🔥';
+        else if (feedFreshnessHours === 3) fText = '3 giờ qua';
+        else if (feedFreshnessHours === 6) fText = '6 giờ qua';
+        else if (feedFreshnessHours > 9000) fText = 'Tất cả thời gian';
+
+        let cText = feedChain ? ` • Chuỗi ${feedChain}` : '';
+        banner.innerHTML = `🟢 Báo Có Hàng (${fText}${cText})`;
+      } else {
+        let sText = 'Tất cả trạng thái';
+        if (allStatusFilter === 'i') sText = 'Chỉ có hàng 🟢';
+        else if (allStatusFilter === 'o') sText = 'Chỉ hết hàng 🔴';
+        else if (allStatusFilter === 'n') sText = 'Không bán thẻ ⚪';
+
+        let cText = allChain ? ` • Chuỗi ${allChain}` : '';
+        banner.innerHTML = `🏢 Tra cứu toàn bộ 4,050 điểm (${sText}${cText})`;
+      }
+      updateQuickMapModeBtn();
+    }
+    window.updateFilterBanner = updateFilterBanner;
 
     function syncMapSettingsUI() {
       const rAll = document.getElementById('map-mode-all');
@@ -3104,15 +3307,10 @@ def index():
       const modalChain = document.getElementById('map-modal-chain-select');
       if (modalChain) modalChain.value = mapDisplay.chain || '';
 
-      const sideStatus = document.getElementById('status-quick-select');
-      if (sideStatus) sideStatus.value = mapDisplay.mode;
-
-      const sideChain = document.getElementById('chain-select');
-      if (sideChain) sideChain.value = mapDisplay.chain || '';
-
       const checkCold = document.getElementById('check-include-cold');
       if (checkCold) checkCold.checked = mapDisplay.includeCold;
 
+      updateQuickMapModeBtn();
       updateFilterBanner();
     }
     window.syncMapSettingsUI = syncMapSettingsUI;
@@ -3216,6 +3414,12 @@ def index():
         mapDisplay,
         notifications: notifSettings,
         sidebarTab,
+        feedFreshnessHours,
+        feedChain,
+        feedSortMode,
+        allStatusFilter,
+        allChain,
+        allSortMode,
         statusFilter: {
           'i': true,
           'o': mapDisplay.mode !== 'only_in',
@@ -3276,6 +3480,38 @@ def index():
       if (typeof settings.sidebarTab === 'string') {
         sidebarTab = settings.sidebarTab;
       }
+      if (typeof settings.feedFreshnessHours === 'number') {
+        feedFreshnessHours = settings.feedFreshnessHours;
+      }
+      if (typeof settings.feedChain === 'string') {
+        feedChain = settings.feedChain;
+      }
+      if (typeof settings.feedSortMode === 'string') {
+        feedSortMode = settings.feedSortMode;
+      }
+      if (typeof settings.allStatusFilter === 'string') {
+        allStatusFilter = settings.allStatusFilter;
+      }
+      if (typeof settings.allChain === 'string') {
+        allChain = settings.allChain;
+      }
+      if (typeof settings.allSortMode === 'string') {
+        allSortMode = settings.allSortMode;
+      }
+
+      const fFreshSel = document.getElementById('feed-freshness-select');
+      if (fFreshSel) fFreshSel.value = String(feedFreshnessHours);
+      const fChainSel = document.getElementById('feed-chain-select');
+      if (fChainSel) fChainSel.value = feedChain;
+      const fSortSel = document.getElementById('feed-sort-select');
+      if (fSortSel) fSortSel.value = feedSortMode;
+      const aStatSel = document.getElementById('all-status-select');
+      if (aStatSel) aStatSel.value = allStatusFilter;
+      const aChainSel = document.getElementById('all-chain-select');
+      if (aChainSel) aChainSel.value = allChain;
+      const aSortSel = document.getElementById('all-sort-select');
+      if (aSortSel) aSortSel.value = allSortMode;
+
       if (typeof settings.sortMode === 'string') {
         sortMode = settings.sortMode;
       }
@@ -3283,6 +3519,7 @@ def index():
         showExpired = settings.showExpired;
       }
 
+      setSidebarTab(sidebarTab || 'feed');
       syncMapSettingsUI();
       syncNotifUI();
       renderUI();
@@ -3719,39 +3956,13 @@ def index():
     }
 
     // 9. RENDER ALL STORES WITH COMPLETELY DECOUPLED MAP & NOTIFICATION FEED
-    function renderUI() {
+    function renderMapMarkersOnly() {
       markersLayer.clearLayers();
       markerMap = {};
 
-      const now = Math.floor(Date.now() / 1000);
       const allStores = Object.values(storesDict);
       const effectiveStatus = mapDisplay.includeCold ? latestMergedStatus : hotStatus;
 
-      // 1. OVERALL STATS
-      let countI = 0;
-      let countO = 0;
-      let countN = 0;
-      let countU = 0;
-
-      for (const store of allStores) {
-        const raw = effectiveStatus[store.id];
-        const code = (raw && typeof raw === 'string') ? raw[0].toLowerCase() : 'u';
-        if (code === 'i') countI++;
-        else if (code === 'o') countO++;
-        else if (code === 'n') countN++;
-        else countU++;
-      }
-
-      const statInEl = document.getElementById('stat-in');
-      if (statInEl) statInEl.innerText = countI;
-      const statOutEl = document.getElementById('stat-out');
-      if (statOutEl) statOutEl.innerText = countO;
-      const statTotEl = document.getElementById('stat-total');
-      if (statTotEl) statTotEl.innerText = allStores.length ? allStores.length.toLocaleString() : '4,050';
-      const menuStockEl = document.getElementById('menu-stock-count');
-      if (menuStockEl) menuStockEl.innerText = `${countI} Có hàng`;
-
-      // 2. RENDER MAP MARKERS (DỰA RIÊNG THEO CÀI ĐẶT BẢN ĐỒ mapDisplay)
       for (const store of allStores) {
         if (!store.lat || !store.lng) continue;
 
@@ -3762,7 +3973,7 @@ def index():
         const rawVal = effectiveStatus[sid];
         const info = decodeStatus(rawVal, effectiveStatus[sid + '_c']);
 
-        // Check mapDisplay mode filter
+        // Check mapDisplay mode filter (CHỈ LỌC CHO BẢN ĐỒ)
         if (mapDisplay.mode === 'only_in' && info.code !== 'i') continue;
         if (mapDisplay.mode === 'with_out' && info.code !== 'i' && info.code !== 'o') continue;
 
@@ -3862,163 +4073,216 @@ def index():
         markerMap[sid] = marker;
       }
 
-      // 3. COMPILE STORE LIST FOR SIDEBAR (ĐỒNG BỘ HOÀN TOÀN THEO TÙY CHỌN BẢN ĐỒ mapDisplay)
-      const filteredStoresList = [];
-
-      for (const store of allStores) {
-        const sid = store.id;
-        const rawVal = effectiveStatus[sid];
-        const info = decodeStatus(rawVal, effectiveStatus[sid + '_c']);
-
-        // Check mapDisplay chain filter
-        if (mapDisplay.chain && store.chain !== mapDisplay.chain) continue;
-
-        // Check mapDisplay mode filter
-        if (mapDisplay.mode === 'only_in' && info.code !== 'i') continue;
-        if (mapDisplay.mode === 'with_out' && info.code !== 'i' && info.code !== 'o') continue;
-
-        let distanceKm = null;
-        if (userLat !== null && userLng !== null && store.lat && store.lng) {
-          distanceKm = calcDistanceKm(userLat, userLng, store.lat, store.lng);
-        }
-
-        let matchesQuery = true;
-        if (currentQuery) {
-          const q = currentQuery.toLowerCase();
-          const matchName = (store.name || '').toLowerCase().includes(q);
-          const matchAddr = (store.address || '').toLowerCase().includes(q);
-          matchesQuery = matchName || matchAddr;
-        }
-
-        if (matchesQuery) {
-          filteredStoresList.push({ store, info, distanceKm });
-        }
-      }
-
-      // Sort List
-      const sortFn = (a, b) => {
-        if (sortMode === 'nearest') {
-          if (a.distanceKm === null) return 1;
-          if (b.distanceKm === null) return -1;
-          return a.distanceKm - b.distanceKm;
-        } else {
-          if (a.info.code === 'i' && b.info.code !== 'i') return -1;
-          if (a.info.code !== 'i' && b.info.code === 'i') return 1;
-          return b.info.timestamp - a.info.timestamp;
-        }
-      };
-      filteredStoresList.sort(sortFn);
-
-      renderSidebarList(filteredStoresList);
+      updateQuickMapModeBtn();
     }
+    window.renderMapMarkersOnly = renderMapMarkersOnly;
 
-    function renderSidebarList(listToRender) {
+    // RENDER SIDEBAR LIST (TÁCH BIỆT HOÀN TOÀN: BÁO CÓ HÀNG vs TRA CỨU TOÀN BỘ)
+    function renderSidebarListOnly() {
       const storeList = document.getElementById('store-list');
       if (!storeList) return;
 
-      if (listToRender.length === 0) {
-        storeList.innerHTML = `
-          <div style="text-align:center;color:#64748b;padding:36px 16px;">
-            <div style="font-size:2.2rem;margin-bottom:8px;">🔍</div>
-            <b style="font-size:0.95rem;color:#0f172a;">Không có cửa hàng nào phù hợp bộ lọc tìm kiếm.</b>
-            <div style="font-size:0.8rem;margin-top:6px;">Hãy kiểm tra từ khóa hoặc chọn lại chuỗi cửa hàng.</div>
-            <button class="status-quick-btn" style="margin-top:14px;" onclick="setMapMode('all'); setMapChain(''); document.getElementById('search-input').value=''; currentQuery=''; renderUI();">Xem lại toàn bộ 4,050 cửa hàng</button>
-          </div>
-        `;
-        return;
+      const now = Math.floor(Date.now() / 1000);
+      const allStores = Object.values(storesDict);
+      const effectiveStatus = mapDisplay.includeCold ? latestMergedStatus : hotStatus;
+
+      // 1. TÍNH TOÁN CÁC CON SỐ THỐNG KÊ TOÀN CỤC
+      let countI = 0;
+      let countO = 0;
+      let countN = 0;
+      let countU = 0;
+
+      for (const store of allStores) {
+        const raw = effectiveStatus[store.id];
+        const code = (raw && typeof raw === 'string') ? raw[0].toLowerCase() : 'u';
+        if (code === 'i') countI++;
+        else if (code === 'o') countO++;
+        else if (code === 'n') countN++;
+        else countU++;
       }
 
-      const renderSlice = listToRender.slice(0, visibleLimit);
-      let html = '';
+      const statInEl = document.getElementById('stat-in');
+      if (statInEl) statInEl.innerText = countI;
+      const statOutEl = document.getElementById('stat-out');
+      if (statOutEl) statOutEl.innerText = countO;
+      const statTotEl = document.getElementById('stat-total');
+      if (statTotEl) statTotEl.innerText = allStores.length ? allStores.length.toLocaleString() : '4,050';
+      const menuStockEl = document.getElementById('menu-stock-count');
+      if (menuStockEl) menuStockEl.innerText = `${countI} Có hàng`;
 
-      if (mapDisplay.mode === 'only_in') {
-        html += `<div style="font-size:0.75rem;color:#16a34a;background:#dcfce7;padding:6px 12px;border-radius:6px;border:1px solid #86efac;text-align:center;margin-bottom:8px;font-weight:700;">🟢 Danh sách ${listToRender.length} điểm có hàng (Mới nhất trước)</div>`;
-      } else if (mapDisplay.mode === 'with_out') {
-        html += `<div style="font-size:0.75rem;color:#b91c1c;background:#fee2e2;padding:6px 12px;border-radius:6px;border:1px solid #fca5a5;text-align:center;margin-bottom:8px;font-weight:700;">🟢🔴 Đang hiển thị ${renderSlice.length} / ${listToRender.length.toLocaleString()} điểm Có hàng & Hết hàng</div>`;
-      } else {
-        html += `<div style="font-size:0.75rem;color:#0369a1;background:#e0f2fe;padding:6px 12px;border-radius:6px;border:1px solid #bae6fd;text-align:center;margin-bottom:8px;font-weight:700;">🏢 Đang hiển thị ${renderSlice.length} / ${listToRender.length.toLocaleString()} cửa hàng trên bản đồ</div>`;
-      }
+      const feedBadge = document.getElementById('feed-tab-count');
+      if (feedBadge) feedBadge.innerText = countI;
+      const allBadge = document.getElementById('all-tab-count');
+      if (allBadge) allBadge.innerText = allStores.length ? allStores.length.toLocaleString() : '4,050';
+      const mobStockBadge = document.getElementById('mob-badge-stock');
+      if (mobStockBadge) mobStockBadge.innerText = countI;
 
-      for (const item of renderSlice) {
-        const { store, info, distanceKm } = item;
-        const packsHtml = info.packs.map(p => `<span class="pack-tag">📦 ${p}</span>`).join('');
-        const distBadge = distanceKm !== null 
-          ? `<span style="color:#2563eb;font-weight:700;background:#dbeafe;padding:2px 6px;border-radius:4px;font-size:0.72rem;">📍 ${formatDistance(distanceKm)}</span>` 
-          : '';
+      let listToRender = [];
 
-        let cardClass = 'in-stock';
-        let statusBadge = '<span class="status-tag tag-in">🟢 Có hàng</span>';
-        if (info.code === 'o') {
-          cardClass = 'out-of-stock';
-          statusBadge = '<span class="status-tag tag-out">🔴 Hết hàng</span>';
-        } else if (info.code === 'n') {
-          cardClass = 'not-handled';
-          statusBadge = '<span class="status-tag tag-none">⚪ Không bán</span>';
-        } else if (info.code === 'u') {
-          cardClass = 'unknown';
-          statusBadge = '<span class="status-tag tag-u">🔘 Chưa rõ</span>';
+      if (sidebarTab === 'feed') {
+        // ============================================
+        // TAB 1: DANH SÁCH BÁO CÓ HÀNG (IN-STOCK FEED)
+        // ============================================
+        for (const store of allStores) {
+          const sid = store.id;
+          const rawVal = effectiveStatus[sid];
+          const info = decodeStatus(rawVal, effectiveStatus[sid + '_c']);
+
+          // CHỈ LẤY CỬA HÀNG ĐANG CÓ HÀNG (🟢 Có hàng)
+          if (info.code !== 'i') continue;
+
+          // Lọc theo độ mới tin báo (feedFreshnessHours)
+          if (feedFreshnessHours < 9000 && info.timestamp > 0) {
+            const ageHours = (now - info.timestamp) / 3600;
+            if (ageHours > feedFreshnessHours) continue;
+          }
+
+          // Lọc theo chuỗi
+          if (feedChain && store.chain !== feedChain) continue;
+
+          // Tính khoảng cách GPS
+          let distanceKm = null;
+          if (userLat !== null && userLng !== null && store.lat && store.lng) {
+            distanceKm = calcDistanceKm(userLat, userLng, store.lat, store.lng);
+          }
+
+          // Lọc theo từ khóa tìm kiếm
+          if (feedQuery) {
+            const q = feedQuery.toLowerCase();
+            const matchName = (store.name || '').toLowerCase().includes(q);
+            const matchAddr = (store.address || '').toLowerCase().includes(q);
+            if (!matchName && !matchAddr) continue;
+          }
+
+          listToRender.push({ store, info, distanceKm });
         }
 
-        const freshnessBadgeHtml = info.freshness 
-          ? `<div class="freshness-badge ${info.freshness.badgeClass}">${info.freshness.tagText}</div>`
-          : '';
+        // Sắp xếp danh sách có hàng
+        if (feedSortMode === 'nearest') {
+          listToRender.sort((a, b) => {
+            if (a.distanceKm === null) return 1;
+            if (b.distanceKm === null) return -1;
+            return a.distanceKm - b.distanceKm;
+          });
+        } else {
+          // Mới nhất trước
+          listToRender.sort((a, b) => b.info.timestamp - a.info.timestamp);
+        }
 
-        const reportMeta = (info.reported_at && info.reported_at !== '-' && info.reported_at !== 'Chưa rõ')
-          ? `<span>⏱ <b>${info.timeAgo}</b> (${info.reported_at})</span><span>👥 ${info.confirms} xác nhận</span>`
-          : `<span style="color:#94a3b8;">Chưa có cập nhật gần đây</span>`;
-
-        const isAccordionOpen = openAccordionStoreIds.has(store.id);
-        const arrowChar = isAccordionOpen ? '▼' : '▶';
-        const toggleBtnLabel = isAccordionOpen ? 'Thu gọn' : 'Lịch sử';
-        const toggleBtnClass = isAccordionOpen ? 'store-accordion-toggle expanded' : 'store-accordion-toggle';
-        const accordionStyle = isAccordionOpen ? 'display:block;' : 'display:none;';
-
-        html += `
-          <div class="store-card ${cardClass}" id="card-${store.id}" onclick="focusStoreOnMap('${store.id}')" title="Bấm để định vị cửa hàng trên bản đồ">
-            <div class="store-header">
-              <span class="store-name">${store.name}</span>
-              ${statusBadge}
-            </div>
-            <div style="display:flex;justify-content:space-between;align-items:center;">
-              <span style="font-size:0.75rem;color:#0284c7;font-weight:600;">${store.chain_label || store.chain}</span>
-              ${distBadge}
-            </div>
-            ${freshnessBadgeHtml}
-            ${packsHtml ? `<div class="pack-tags">${packsHtml}</div>` : ''}
-            <div class="store-meta">
-              ${reportMeta}
-            </div>
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;padding-top:6px;border-top:1px dashed #e2e8f0;gap:8px;cursor:pointer;" onclick="event.stopPropagation(); toggleStoreHistoryAccordion('${store.id}')" title="Bấm để xem / thu gọn lịch sử báo cáo">
-              <div class="store-addr" style="margin-top:0;flex:1;min-width:0;">📍 ${store.address || ''}</div>
-              <button type="button" class="${toggleBtnClass}" id="toggle-btn-${store.id}" onclick="event.stopPropagation(); toggleStoreHistoryAccordion('${store.id}')" title="Bấm để xem / thu gọn lịch sử báo cáo">
-                <span class="accordion-arrow" id="arrow-${store.id}">${arrowChar}</span>
-                <span class="accordion-label" id="toggle-label-${store.id}">${toggleBtnLabel}</span>
+        if (listToRender.length === 0) {
+          storeList.innerHTML = `
+            <div style="text-align:center;color:#64748b;padding:36px 16px;">
+              <div style="font-size:2.2rem;margin-bottom:8px;">🟢</div>
+              <b style="font-size:0.95rem;color:#0f172a;">Không có điểm có hàng nào thỏa mãn bộ lọc.</b>
+              <div style="font-size:0.8rem;margin-top:6px;color:#64748b;">Hãy thử chọn mốc thời gian dài hơn (ví dụ: 24 giờ qua) hoặc chọn Tất cả chuỗi.</div>
+              <button class="status-quick-btn" style="margin-top:14px;" onclick="setFeedFreshness(24); setFeedChain(''); document.getElementById('feed-freshness-select').value='24'; document.getElementById('feed-chain-select').value='';">
+                🔄 Xem tất cả ${countI} điểm có hàng trong 24h
               </button>
             </div>
-            <div class="store-accordion-body" id="accordion-${store.id}" onclick="event.stopPropagation();" style="${accordionStyle}">
-              <!-- Accordion content dynamically rendered -->
+          `;
+          return;
+        }
+
+        let html = `
+          <div style="font-size:0.75rem;color:#16a34a;background:#dcfce7;padding:8px 12px;border-radius:8px;border:1px solid #86efac;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <b>🟢 Danh sách ${listToRender.length} điểm ĐANG CÓ HÀNG</b>
+            <span style="font-size:0.7rem;color:#15803d;font-weight:600;">(Bản đồ giữ nguyên)</span>
+          </div>
+        `;
+
+        for (const item of listToRender) {
+          html += renderSingleStoreCard(item);
+        }
+        storeList.innerHTML = html;
+
+      } else {
+        // ============================================
+        // TAB 2: TRA CỨU TOÀN BỘ 4,050 CỬA HÀNG (ALL STORES)
+        // ============================================
+        for (const store of allStores) {
+          const sid = store.id;
+          const rawVal = effectiveStatus[sid];
+          const info = decodeStatus(rawVal, effectiveStatus[sid + '_c']);
+
+          // Lọc theo tình trạng
+          if (allStatusFilter !== 'all' && info.code !== allStatusFilter) continue;
+
+          // Lọc theo chuỗi
+          if (allChain && store.chain !== allChain) continue;
+
+          // Tính khoảng cách GPS
+          let distanceKm = null;
+          if (userLat !== null && userLng !== null && store.lat && store.lng) {
+            distanceKm = calcDistanceKm(userLat, userLng, store.lat, store.lng);
+          }
+
+          // Lọc theo từ khóa tìm kiếm
+          if (allQuery) {
+            const q = allQuery.toLowerCase();
+            const matchName = (store.name || '').toLowerCase().includes(q);
+            const matchAddr = (store.address || '').toLowerCase().includes(q);
+            if (!matchName && !matchAddr) continue;
+          }
+
+          listToRender.push({ store, info, distanceKm });
+        }
+
+        // Sắp xếp
+        if (allSortMode === 'nearest') {
+          listToRender.sort((a, b) => {
+            if (a.distanceKm === null) return 1;
+            if (b.distanceKm === null) return -1;
+            return a.distanceKm - b.distanceKm;
+          });
+        } else {
+          listToRender.sort((a, b) => {
+            if (a.info.code === 'i' && b.info.code !== 'i') return -1;
+            if (a.info.code !== 'i' && b.info.code === 'i') return 1;
+            return b.info.timestamp - a.info.timestamp;
+          });
+        }
+
+        if (listToRender.length === 0) {
+          storeList.innerHTML = `
+            <div style="text-align:center;color:#64748b;padding:36px 16px;">
+              <div style="font-size:2.2rem;margin-bottom:8px;">🔍</div>
+              <b style="font-size:0.95rem;color:#0f172a;">Không tìm thấy cửa hàng nào phù hợp.</b>
+              <div style="font-size:0.8rem;margin-top:6px;">Hãy kiểm tra lại từ khóa tìm kiếm hoặc chọn lại chuỗi.</div>
             </div>
+          `;
+          return;
+        }
+
+        const renderSlice = listToRender.slice(0, visibleLimit);
+        let html = `
+          <div style="font-size:0.75rem;color:#0369a1;background:#e0f2fe;padding:8px 12px;border-radius:8px;border:1px solid #bae6fd;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <b>🏢 Tra cứu: Hiển thị ${renderSlice.length} / ${listToRender.length.toLocaleString()} điểm</b>
           </div>
         `;
-      }
 
-      if (listToRender.length > renderSlice.length) {
-        html += `
-          <div style="text-align:center;padding:12px 0;">
-            <button type="button" onclick="loadMoreStores()" style="width:100%;padding:10px;font-size:0.82rem;font-weight:700;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:6px;cursor:pointer;">
-              ⬇️ Tải thêm 150 cửa hàng tiếp theo (Đang xem ${renderSlice.length} / ${listToRender.length.toLocaleString()})
-            </button>
-            <button type="button" onclick="loadAllStores()" style="margin-top:6px;background:none;border:none;color:#64748b;font-size:0.75rem;text-decoration:underline;cursor:pointer;">
-              Xem toàn bộ ${listToRender.length.toLocaleString()} cửa hàng trong danh sách
-            </button>
-          </div>
-        `;
-      }
+        for (const item of renderSlice) {
+          html += renderSingleStoreCard(item);
+        }
 
-      storeList.innerHTML = html;
+        if (listToRender.length > renderSlice.length) {
+          html += `
+            <div style="text-align:center;padding:12px 0;">
+              <button type="button" onclick="loadMoreStores()" style="width:100%;padding:10px;font-size:0.82rem;font-weight:700;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:6px;cursor:pointer;">
+                ⬇️ Tải thêm 150 cửa hàng tiếp theo (Đang xem ${renderSlice.length} / ${listToRender.length.toLocaleString()})
+              </button>
+              <button type="button" onclick="loadAllStores()" style="margin-top:6px;background:none;border:none;color:#64748b;font-size:0.75rem;text-decoration:underline;cursor:pointer;">
+                Xem toàn bộ ${listToRender.length.toLocaleString()} cửa hàng trong danh sách
+              </button>
+            </div>
+          `;
+        }
+
+        storeList.innerHTML = html;
+      }
 
       // Populate open accordions if any
-      for (const item of renderSlice) {
+      const renderedCards = (sidebarTab === 'feed') ? listToRender : listToRender.slice(0, visibleLimit);
+      for (const item of renderedCards) {
         if (openAccordionStoreIds.has(item.store.id)) {
           const bodyEl = document.getElementById(`accordion-${item.store.id}`);
           if (bodyEl) {
@@ -4031,17 +4295,86 @@ def index():
         }
       }
     }
+    window.renderSidebarListOnly = renderSidebarListOnly;
 
-    let visibleLimit = 150;
+    function renderSingleStoreCard(item) {
+      const { store, info, distanceKm } = item;
+      const packsHtml = info.packs.map(p => `<span class="pack-tag">📦 ${p}</span>`).join('');
+      const distBadge = distanceKm !== null 
+        ? `<span style="color:#2563eb;font-weight:700;background:#dbeafe;padding:2px 6px;border-radius:4px;font-size:0.72rem;">📍 ${formatDistance(distanceKm)}</span>` 
+        : '';
+
+      let cardClass = 'in-stock';
+      let statusBadge = '<span class="status-tag tag-in">🟢 Có hàng</span>';
+      if (info.code === 'o') {
+        cardClass = 'out-of-stock';
+        statusBadge = '<span class="status-tag tag-out">🔴 Hết hàng</span>';
+      } else if (info.code === 'n') {
+        cardClass = 'not-handled';
+        statusBadge = '<span class="status-tag tag-none">⚪ Không bán</span>';
+      } else if (info.code === 'u') {
+        cardClass = 'unknown';
+        statusBadge = '<span class="status-tag tag-u">🔘 Chưa rõ</span>';
+      }
+
+      const freshnessBadgeHtml = info.freshness 
+        ? `<div class="freshness-badge ${info.freshness.badgeClass}">${info.freshness.tagText}</div>`
+        : '';
+
+      const reportMeta = (info.reported_at && info.reported_at !== '-' && info.reported_at !== 'Chưa rõ')
+        ? `<span>⏱ <b>${info.timeAgo}</b> (${info.reported_at})</span><span>👥 ${info.confirms} xác nhận</span>`
+        : `<span style="color:#94a3b8;">Chưa có cập nhật gần đây</span>`;
+
+      const isAccordionOpen = openAccordionStoreIds.has(store.id);
+      const arrowChar = isAccordionOpen ? '▼' : '▶';
+      const toggleBtnLabel = isAccordionOpen ? 'Thu gọn' : 'Lịch sử';
+      const toggleBtnClass = isAccordionOpen ? 'store-accordion-toggle expanded' : 'store-accordion-toggle';
+      const accordionStyle = isAccordionOpen ? 'display:block;' : 'display:none;';
+
+      return `
+        <div class="store-card ${cardClass}" id="card-${store.id}" onclick="focusStore('${store.id}')" title="Bấm để xem vị trí cửa hàng trên bản đồ">
+          <div class="store-header">
+            <span class="store-name">${store.name}</span>
+            ${statusBadge}
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:0.75rem;color:#0284c7;font-weight:600;">${store.chain_label || store.chain}</span>
+            ${distBadge}
+          </div>
+          ${freshnessBadgeHtml}
+          ${packsHtml ? `<div class="pack-tags">${packsHtml}</div>` : ''}
+          <div class="store-meta">
+            ${reportMeta}
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;padding-top:6px;border-top:1px dashed #e2e8f0;gap:8px;cursor:pointer;" onclick="event.stopPropagation(); toggleStoreHistoryAccordion('${store.id}')" title="Bấm để xem / thu gọn lịch sử báo cáo">
+            <div class="store-addr" style="margin-top:0;flex:1;min-width:0;">📍 ${store.address || ''}</div>
+            <button type="button" class="${toggleBtnClass}" id="toggle-btn-${store.id}" onclick="event.stopPropagation(); toggleStoreHistoryAccordion('${store.id}')" title="Bấm để xem / thu gọn lịch sử báo cáo">
+              <span class="accordion-arrow" id="arrow-${store.id}">${arrowChar}</span>
+              <span class="accordion-label" id="toggle-label-${store.id}">${toggleBtnLabel}</span>
+            </button>
+          </div>
+          <div class="store-accordion-body" id="accordion-${store.id}" onclick="event.stopPropagation();" style="${accordionStyle}">
+            <!-- Accordion content dynamically rendered -->
+          </div>
+        </div>
+      `;
+    }
+
+    function renderUI() {
+      renderMapMarkersOnly();
+      renderSidebarListOnly();
+    }
+    window.renderUI = renderUI;
+
     function loadMoreStores() {
       visibleLimit += 150;
-      renderUI();
+      renderSidebarListOnly();
     }
     window.loadMoreStores = loadMoreStores;
 
     function loadAllStores() {
       visibleLimit = 5000;
-      renderUI();
+      renderSidebarListOnly();
     }
     window.loadAllStores = loadAllStores;
 
