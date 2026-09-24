@@ -615,6 +615,7 @@ def index():
       display: flex;
       overflow: hidden;
       position: relative;
+      padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
     }
     .app-view {
       width: 100%;
@@ -631,43 +632,24 @@ def index():
       position: relative;
     }
     #sidebar {
-      width: 540px;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
       height: 100%;
-      display: flex;
+      display: none;
       flex-direction: column;
       background: white;
-      border-right: 1px solid #e2e8f0;
-      box-shadow: 2px 0 12px rgba(0,0,0,0.05);
-      z-index: 1000;
-      flex-shrink: 0;
-      transition: margin-left 0.28s cubic-bezier(0.4, 0, 0.2, 1);
-      position: relative;
+      z-index: 1500;
+      transition: none;
     }
-    #sidebar.desktop-collapsed {
-      margin-left: -540px;
+    #sidebar.view-active {
+      display: flex;
     }
 
-    /* Floating toggle button for sidebar */
+    /* Floating toggle button for sidebar - HIDDEN in new layout */
     .sidebar-collapse-trigger {
-      position: absolute;
-      top: 14px;
-      left: 540px;
-      z-index: 1200;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 32px;
-      height: 38px;
-      background: #ffffff;
-      border: 1px solid #cbd5e1;
-      border-left: none;
-      border-radius: 0 8px 8px 0;
-      box-shadow: 3px 2px 8px rgba(0,0,0,0.12);
-      cursor: pointer;
-      font-size: 0.85rem;
-      color: #334155;
-      font-weight: bold;
-      transition: left 0.28s cubic-bezier(0.4, 0, 0.2, 1), background 0.15s, color 0.15s;
+      display: none !important;
     }
     .sidebar-collapse-trigger:hover {
       background: #f1f5f9;
@@ -1316,9 +1298,11 @@ def index():
     }
 
     #map {
-      flex: 1;
+      width: 100%;
       height: 100%;
-      position: relative;
+      position: absolute;
+      top: 0;
+      left: 0;
     }
     .map-controls-box {
       position: absolute;
@@ -2067,7 +2051,148 @@ def index():
        MOBILE BOTTOM NAVIGATION BAR (Hidden on desktop)
        ============================================ */
     #mobile-bottom-nav {
-      display: none;
+      display: flex;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 60px;
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+      background: #0f172a;
+      border-top: 1px solid #1e293b;
+      z-index: 3000;
+      align-items: stretch;
+      box-shadow: 0 -4px 20px rgba(0,0,0,0.25);
+    }
+    .mobile-nav-btn {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      background: none;
+      border: none;
+      color: #64748b;
+      font-size: 0.65rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: color 0.15s, background 0.15s;
+      position: relative;
+      padding: 6px 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .mobile-nav-btn .nav-btn-icon {
+      font-size: 1.3rem;
+      line-height: 1;
+    }
+    .mobile-nav-btn .nav-btn-label {
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    .mobile-nav-btn.active {
+      color: #60a5fa;
+    }
+    .mobile-nav-btn.active::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 25%;
+      right: 25%;
+      height: 3px;
+      background: #3b82f6;
+      border-radius: 0 0 3px 3px;
+    }
+    .mobile-nav-btn .nav-btn-badge {
+      position: absolute;
+      top: 4px;
+      right: 50%;
+      transform: translateX(calc(50% + 12px));
+      background: #16a34a;
+      color: white;
+      font-size: 0.58rem;
+      font-weight: 800;
+      padding: 1px 5px;
+      border-radius: 8px;
+      min-width: 16px;
+      text-align: center;
+      line-height: 1.3;
+    }
+    .mobile-nav-btn .nav-btn-badge.cal-badge-color {
+      background: #f59e0b;
+    }
+    .mobile-nav-btn.gacha-center-btn .nav-btn-icon {
+      font-size: 1.5rem;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 0 6px rgba(139, 92, 246, 0.4));
+    }
+    .mobile-nav-btn.gacha-center-btn.active {
+      color: #a78bfa;
+    }
+
+    /* MAP TOAST OVERLAY for new stock alerts */
+    #map-toast-overlay {
+      position: fixed;
+      top: 68px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 4000;
+      width: 90%;
+      max-width: 420px;
+      pointer-events: none;
+    }
+    .map-toast {
+      pointer-events: auto;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      color: white;
+      border-radius: 14px;
+      padding: 14px 18px;
+      margin-bottom: 8px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.35);
+      border: 1px solid rgba(96, 165, 250, 0.3);
+      cursor: pointer;
+      animation: toastSlideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .map-toast:hover {
+      border-color: rgba(96, 165, 250, 0.6);
+    }
+    .map-toast-icon {
+      font-size: 1.6rem;
+      flex-shrink: 0;
+    }
+    .map-toast-content {
+      flex: 1;
+      min-width: 0;
+    }
+    .map-toast-title {
+      font-weight: 800;
+      font-size: 0.85rem;
+      color: #4ade80;
+    }
+    .map-toast-sub {
+      font-size: 0.73rem;
+      color: #94a3b8;
+      margin-top: 2px;
+    }
+    .map-toast-arrow {
+      color: #60a5fa;
+      font-weight: 800;
+      font-size: 0.9rem;
+      flex-shrink: 0;
+    }
+    @keyframes toastSlideDown {
+      from { transform: translateY(-30px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    @keyframes toastFadeOut {
+      from { opacity: 1; transform: translateY(0); }
+      to { opacity: 0; transform: translateY(-20px); }
     }
 
     /* ============================================
@@ -2151,24 +2276,7 @@ def index():
         position: relative;
       }
 
-      /* Sidebar: full screen overlay, hidden by default on mobile */
-      #sidebar {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100% !important;
-        height: 100% !important;
-        z-index: 1500;
-        transform: translateX(-100%);
-        transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-        border-right: none;
-        box-shadow: none;
-        will-change: transform;
-      }
-      #sidebar.mobile-visible {
-        transform: translateX(0);
-        box-shadow: 4px 0 24px rgba(0,0,0,0.15);
-      }
+      /* Sidebar already styled globally as full-screen overlay */
 
       /* Map: always full area */
       #map {
@@ -2477,84 +2585,7 @@ def index():
         font-size: 0.85rem;
       }
 
-      /* --- MOBILE BOTTOM NAV BAR --- */
-      #mobile-bottom-nav {
-        display: flex;
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        height: 60px;
-        padding-bottom: env(safe-area-inset-bottom, 0px);
-        background: #0f172a;
-        border-top: 1px solid #1e293b;
-        z-index: 3000;
-        align-items: stretch;
-        box-shadow: 0 -4px 20px rgba(0,0,0,0.25);
-      }
-      .mobile-nav-btn {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 3px;
-        background: none;
-        border: none;
-        color: #64748b;
-        font-size: 0.65rem;
-        font-weight: 700;
-        cursor: pointer;
-        transition: color 0.15s, background 0.15s;
-        position: relative;
-        padding: 6px 0;
-        -webkit-tap-highlight-color: transparent;
-      }
-      .mobile-nav-btn .nav-btn-icon {
-        font-size: 1.3rem;
-        line-height: 1;
-      }
-      .mobile-nav-btn .nav-btn-label {
-        font-size: 0.62rem;
-        font-weight: 700;
-        letter-spacing: 0.02em;
-      }
-      .mobile-nav-btn.active {
-        color: #60a5fa;
-      }
-      .mobile-nav-btn.active::after {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 25%;
-        right: 25%;
-        height: 3px;
-        background: #3b82f6;
-        border-radius: 0 0 3px 3px;
-      }
-      .mobile-nav-btn .nav-btn-badge {
-        position: absolute;
-        top: 4px;
-        right: 50%;
-        transform: translateX(calc(50% + 12px));
-        background: #16a34a;
-        color: white;
-        font-size: 0.58rem;
-        font-weight: 800;
-        padding: 1px 5px;
-        border-radius: 8px;
-        min-width: 16px;
-        text-align: center;
-        line-height: 1.3;
-      }
-      .mobile-nav-btn .nav-btn-badge.cal-badge-color {
-        background: #f59e0b;
-      }
-
-      /* Space for bottom nav in all views */
-      #app-container {
-        padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
-      }
+      /* Mobile bottom nav already styled globally, only adjust sizes */
 
       /* Sidebar mobile swipe hint */
       .mobile-swipe-hint {
@@ -3172,24 +3203,31 @@ def index():
   </div>
 
   <!-- MOBILE BOTTOM NAVIGATION BAR -->
+  <!-- MAP TOAST OVERLAY -->
+  <div id="map-toast-overlay"></div>
+
   <nav id="mobile-bottom-nav">
     <button class="mobile-nav-btn active" id="mob-nav-map" onclick="mobileNavTo('map')">
       <span class="nav-btn-icon">🗺️</span>
-      <span class="nav-btn-label">Bản đồ</span>
+      <span class="nav-btn-label">地図</span>
     </button>
     <button class="mobile-nav-btn" id="mob-nav-list" onclick="mobileNavTo('list')">
       <span class="nav-btn-icon">📋</span>
-      <span class="nav-btn-label">Danh sách</span>
+      <span class="nav-btn-label">一覧</span>
       <span class="nav-btn-badge" id="mob-badge-stock">0</span>
+    </button>
+    <button class="mobile-nav-btn gacha-center-btn" id="mob-nav-gacha" onclick="mobileNavTo('gacha')">
+      <span class="nav-btn-icon">⚡</span>
+      <span class="nav-btn-label">ガチ巡り</span>
     </button>
     <button class="mobile-nav-btn" id="mob-nav-cal" onclick="mobileNavTo('calendar')">
       <span class="nav-btn-icon">📅</span>
-      <span class="nav-btn-label">Lịch</span>
+      <span class="nav-btn-label">さがす</span>
       <span class="nav-btn-badge cal-badge-color" id="mob-badge-cal">0</span>
     </button>
     <button class="mobile-nav-btn" id="mob-nav-settings" onclick="mobileNavTo('settings')">
-      <span class="nav-btn-icon">⚙️</span>
-      <span class="nav-btn-label">Cài đặt</span>
+      <span class="nav-btn-icon">🔔</span>
+      <span class="nav-btn-label">掲示板</span>
     </button>
   </nav>
 
@@ -4187,6 +4225,9 @@ def index():
 
       playChime(force);
 
+      // Show quick toast on map view
+      showMapToast(store, info);
+
       if ((force || notifSettings.pushEnabled) && "Notification" in window && Notification.permission === "granted") {
         try {
           const packsDesc = info.packs.length ? info.packs.join(', ') : 'Thẻ Pokémon';
@@ -4222,6 +4263,42 @@ def index():
       }, 10000);
     }
     window.showToast = showToast;
+
+    // MAP TOAST: Shows a quick toast on the map view when there's new stock
+    function showMapToast(store, info) {
+      // Only show when user is on map tab
+      if (currentMobileTab !== 'map') return;
+      const overlay = document.getElementById('map-toast-overlay');
+      if (!overlay) return;
+
+      const packsText = info.packs && info.packs.length ? info.packs.join(', ') : 'Thẻ Pokémon';
+      const toast = document.createElement('div');
+      toast.className = 'map-toast';
+      toast.innerHTML = `
+        <div class="map-toast-icon">🔥</div>
+        <div class="map-toast-content">
+          <div class="map-toast-title">${store.name} - CÓ HÀNG!</div>
+          <div class="map-toast-sub">📦 ${packsText} • ${info.timeAgo || 'Vừa xong'}</div>
+        </div>
+        <div class="map-toast-arrow">→</div>
+      `;
+      toast.onclick = () => {
+        toast.remove();
+        mobileNavTo('list');
+        setTimeout(() => {
+          const card = document.getElementById('card-' + store.id);
+          if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 300);
+      };
+      overlay.appendChild(toast);
+
+      // Auto-dismiss after 5 seconds
+      setTimeout(() => {
+        toast.style.animation = 'toastFadeOut 0.3s ease forwards';
+        setTimeout(() => toast.remove(), 350);
+      }, 5000);
+    }
+    window.showMapToast = showMapToast;
 
     function showOutOfStockToast(store, info) {
       if (!notifSettings.notifyOutOfStock) return;
@@ -5707,17 +5784,9 @@ def index():
     // MOBILE UI: Bottom Nav, Swipe, Sidebar Toggle
     // ======================================
     const isMobileViewport = () => window.innerWidth <= 768;
-    let currentMobileTab = 'map'; // 'map' | 'list' | 'calendar'
+    let currentMobileTab = 'map'; // 'map' | 'list' | 'calendar' | 'gacha' | 'settings'
 
     function mobileNavTo(tab) {
-      if (!isMobileViewport()) {
-        // On desktop, just use existing navigation
-        if (tab === 'calendar') navigateMenu('calendar');
-        else if (tab === 'settings') toggleNotifSettingsModal();
-        else navigateMenu('map');
-        return;
-      }
-
       const sidebar = document.getElementById('sidebar');
       const btns = document.querySelectorAll('.mobile-nav-btn');
       btns.forEach(b => b.classList.remove('active'));
@@ -5725,23 +5794,35 @@ def index():
       if (tab === 'map') {
         currentMobileTab = 'map';
         navigateMenu('map');
-        sidebar.classList.remove('mobile-visible');
+        sidebar.classList.remove('view-active');
         document.getElementById('mob-nav-map').classList.add('active');
         setTimeout(() => map.invalidateSize(), 150);
       } else if (tab === 'list') {
         currentMobileTab = 'list';
-        navigateMenu('map'); // ensure we're on map view (which contains sidebar)
-        sidebar.classList.add('mobile-visible');
+        navigateMenu('map');
+        sidebar.classList.add('view-active');
         document.getElementById('mob-nav-list').classList.add('active');
+      } else if (tab === 'gacha') {
+        currentMobileTab = 'gacha';
+        navigateMenu('map');
+        sidebar.classList.remove('view-active');
+        document.getElementById('mob-nav-gacha').classList.add('active');
+        toggleNotifSettingsModal();
+        setTimeout(() => {
+          document.getElementById('mob-nav-gacha').classList.remove('active');
+          const prevBtn = document.getElementById('mob-nav-' + (currentMobileTab === 'list' ? 'list' : currentMobileTab === 'calendar' ? 'cal' : 'map'));
+          if (prevBtn) prevBtn.classList.add('active');
+          currentMobileTab = 'map';
+        }, 300);
+        return;
       } else if (tab === 'calendar') {
         currentMobileTab = 'calendar';
-        sidebar.classList.remove('mobile-visible');
+        sidebar.classList.remove('view-active');
         navigateMenu('calendar');
         document.getElementById('mob-nav-cal').classList.add('active');
       } else if (tab === 'settings') {
         document.getElementById('mob-nav-settings').classList.add('active');
         toggleNotifSettingsModal();
-        // Restore previous active tab after short delay
         setTimeout(() => {
           document.getElementById('mob-nav-settings').classList.remove('active');
           const prevBtn = document.getElementById('mob-nav-' + (currentMobileTab === 'list' ? 'list' : currentMobileTab === 'calendar' ? 'cal' : 'map'));
@@ -5915,8 +5996,8 @@ def index():
       }
     });
 
-    // On initial load: set mobile state if needed
-    if (isMobileViewport()) {
+    // On initial load: set state
+    {
       const sidebar = document.getElementById('sidebar');
       sidebar.classList.remove('mobile-visible');
       currentMobileTab = 'map';
