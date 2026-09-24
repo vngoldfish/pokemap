@@ -631,6 +631,38 @@ def index():
       width: 28px;
       text-align: center;
     }
+    /* NOTIFICATION SETTINGS FULL-SCREEN VIEW */
+    #view-notif-mode {
+      flex-direction: column;
+      background: #f8fafc;
+    }
+    #view-notif-mode .notif-view-header {
+      padding: 16px 20px;
+      background: #0f172a;
+      color: white;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    #view-notif-mode .notif-view-header h3 {
+      font-size: 1.05rem;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    #view-notif-mode .notif-view-header .nv-subtitle {
+      font-size: 0.72rem;
+      color: #94a3b8;
+      margin-top: 2px;
+    }
+    #view-notif-mode .notif-view-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      -webkit-overflow-scrolling: touch;
+    }
 
     /* 2. APP CONTAINER & VIEW SWITCHER */
     #app-container {
@@ -2824,7 +2856,19 @@ def index():
           <div id="calendar-expired-grid"></div>
         </div>
       </div>
+    </div>
 
+    <!-- VIEW 3: NOTIFICATION SETTINGS (FULL SCREEN) -->
+    <div id="view-notif-mode" class="app-view">
+      <div class="notif-view-header">
+        <div>
+          <h3>🔔 Cài Đặt Thông Báo & Cảnh Báo</h3>
+          <div class="nv-subtitle">Tùy chọn chuông, thông báo nổi, Discord & Telegram</div>
+        </div>
+      </div>
+      <div class="notif-view-body" id="notif-view-body-container">
+        <!-- Content will be populated from existing modal body -->
+      </div>
     </div>
 
   </div>
@@ -4078,6 +4122,7 @@ def index():
       const calLink = document.getElementById('menu-cal-link');
       const viewMap = document.getElementById('view-stores-mode');
       const viewCal = document.getElementById('view-calendar-mode');
+      const viewNotif = document.getElementById('view-notif-mode');
 
       const targetPath = route === 'calendar' ? '/calendar' : '/map';
 
@@ -4090,6 +4135,7 @@ def index():
         mapLink.classList.remove('active');
         viewMap.classList.remove('active');
         viewCal.classList.add('active');
+        if (viewNotif) viewNotif.classList.remove('active');
         document.title = "Lịch Bốc Thăm & Đặt Trước | BAWUI POKE APP";
         loadCalendar();
       } else {
@@ -4097,6 +4143,7 @@ def index():
         calLink.classList.remove('active');
         viewMap.classList.add('active');
         viewCal.classList.remove('active');
+        if (viewNotif) viewNotif.classList.remove('active');
         document.title = "Bản Đồ & Kho Thẻ Osaka | BAWUI POKE APP";
         setTimeout(() => {
           map.invalidateSize();
@@ -5791,49 +5838,68 @@ def index():
     const isMobileViewport = () => window.innerWidth <= 768;
     let currentMobileTab = 'map'; // 'map' | 'list' | 'calendar' | 'gacha' | 'settings'
 
-    function mobileNavTo(tab) {
+    function showAppView(viewName) {
       const sidebar = document.getElementById('sidebar');
+      const viewMap = document.getElementById('view-stores-mode');
+      const viewCal = document.getElementById('view-calendar-mode');
+      const viewNotif = document.getElementById('view-notif-mode');
+
+      // Hide all views
+      viewMap.classList.remove('active');
+      viewCal.classList.remove('active');
+      viewNotif.classList.remove('active');
+      sidebar.classList.remove('view-active');
+
+      if (viewName === 'map') {
+        viewMap.classList.add('active');
+        setTimeout(() => map.invalidateSize(), 150);
+      } else if (viewName === 'list') {
+        viewMap.classList.add('active');
+        sidebar.classList.add('view-active');
+      } else if (viewName === 'calendar') {
+        viewCal.classList.add('active');
+        loadCalendar();
+      } else if (viewName === 'notif') {
+        viewNotif.classList.add('active');
+        // Move modal body content into full-screen view on first open
+        ensureNotifViewPopulated();
+        syncNotifUI();
+      }
+    }
+
+    function ensureNotifViewPopulated() {
+      const container = document.getElementById('notif-view-body-container');
+      if (container && container.children.length === 0) {
+        const modalBody = document.querySelector('#notif-settings-modal .modal-body');
+        if (modalBody) {
+          // Move all children from modal body into the full-screen view
+          while (modalBody.firstChild) {
+            container.appendChild(modalBody.firstChild);
+          }
+        }
+      }
+    }
+
+    function mobileNavTo(tab) {
       const btns = document.querySelectorAll('.mobile-nav-btn');
       btns.forEach(b => b.classList.remove('active'));
 
       if (tab === 'map') {
         currentMobileTab = 'map';
-        navigateMenu('map');
-        sidebar.classList.remove('view-active');
+        showAppView('map');
         document.getElementById('mob-nav-map').classList.add('active');
-        setTimeout(() => map.invalidateSize(), 150);
       } else if (tab === 'list') {
         currentMobileTab = 'list';
-        navigateMenu('map');
-        sidebar.classList.add('view-active');
+        showAppView('list');
         document.getElementById('mob-nav-list').classList.add('active');
-      } else if (tab === 'gacha') {
-        currentMobileTab = 'gacha';
-        navigateMenu('map');
-        sidebar.classList.remove('view-active');
-        document.getElementById('mob-nav-gacha').classList.add('active');
-        toggleNotifSettingsModal();
-        setTimeout(() => {
-          document.getElementById('mob-nav-gacha').classList.remove('active');
-          const prevBtn = document.getElementById('mob-nav-' + (currentMobileTab === 'list' ? 'list' : currentMobileTab === 'calendar' ? 'cal' : 'map'));
-          if (prevBtn) prevBtn.classList.add('active');
-          currentMobileTab = 'map';
-        }, 300);
-        return;
+      } else if (tab === 'gacha' || tab === 'settings') {
+        currentMobileTab = tab;
+        showAppView('notif');
+        document.getElementById(tab === 'gacha' ? 'mob-nav-gacha' : 'mob-nav-settings').classList.add('active');
       } else if (tab === 'calendar') {
         currentMobileTab = 'calendar';
-        sidebar.classList.remove('view-active');
-        navigateMenu('calendar');
+        showAppView('calendar');
         document.getElementById('mob-nav-cal').classList.add('active');
-      } else if (tab === 'settings') {
-        document.getElementById('mob-nav-settings').classList.add('active');
-        toggleNotifSettingsModal();
-        setTimeout(() => {
-          document.getElementById('mob-nav-settings').classList.remove('active');
-          const prevBtn = document.getElementById('mob-nav-' + (currentMobileTab === 'list' ? 'list' : currentMobileTab === 'calendar' ? 'cal' : 'map'));
-          if (prevBtn) prevBtn.classList.add('active');
-        }, 300);
-        return;
       }
     }
     window.mobileNavTo = mobileNavTo;
