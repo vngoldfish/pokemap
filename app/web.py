@@ -436,16 +436,16 @@ def index():
       color: #1e293b;
     }
     
-    /* 1. TOP GLOBAL APPLICATION NAVBAR */
+    /* 1. COMPACT TOP NAVBAR (PoKeTan Style) */
     #top-navbar {
-      height: 60px;
-      background: #0f172a;
+      height: 48px;
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
       color: white;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 20px;
-      border-bottom: 1px solid #1e293b;
+      padding: 0 14px;
+      border-bottom: 1px solid #334155;
       z-index: 2000;
       box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
       flex-shrink: 0;
@@ -454,159 +454,182 @@ def index():
     .navbar-left {
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: 10px;
     }
     .brand-logo {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
       text-decoration: none;
       cursor: pointer;
     }
     .brand-icon {
-      font-size: 1.5rem;
-      filter: drop-shadow(0 0 8px rgba(250, 204, 21, 0.7));
+      width: 28px;
+      height: 28px;
+      background: #6366f1;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.9rem;
+      box-shadow: 0 0 12px rgba(99, 102, 241, 0.5);
     }
     .brand-text {
       display: flex;
       flex-direction: column;
     }
     .brand-title {
-      font-size: 1.15rem;
+      font-size: 1rem;
       font-weight: 900;
-      letter-spacing: -0.01em;
+      letter-spacing: 0.02em;
       color: #ffffff;
     }
     .brand-sub {
-      font-size: 0.65rem;
-      color: #38bdf8;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
+      display: none;
     }
     
-    .live-pill {
+    .header-location-pill {
       display: flex;
       align-items: center;
       gap: 6px;
-      font-size: 0.7rem;
-      background: rgba(34, 197, 94, 0.15);
-      color: #4ade80;
-      padding: 4px 10px;
+      padding: 4px 12px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
       border-radius: 20px;
-      border: 1px solid rgba(74, 222, 128, 0.35);
-      font-weight: 700;
-    }
-    .live-dot {
-      width: 7px;
-      height: 7px;
-      background: #22c55e;
-      border-radius: 50%;
-      animation: pulse 1.5s infinite;
-    }
-    @keyframes pulse {
-      0% { transform: scale(0.9); opacity: 1; box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
-      70% { transform: scale(1.1); opacity: 0.8; box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
-      100% { transform: scale(0.9); opacity: 1; }
-    }
-
-    /* CENTER MENU ITEMS ON HEADER (REAL NAVIGATION LINKS) */
-    .navbar-menu {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: rgba(30, 41, 59, 0.75);
-      padding: 4px;
-      border-radius: 10px;
-      border: 1px solid #334155;
-    }
-    .nav-menu-link {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 7px 18px;
-      border-radius: 7px;
-      color: #94a3b8;
-      font-size: 0.84rem;
-      font-weight: 700;
-      text-decoration: none;
       cursor: pointer;
-      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-      user-select: none;
+      transition: background 0.2s;
     }
-    .nav-menu-link:hover {
-      color: #f8fafc;
-      background: rgba(255, 255, 255, 0.08);
+    .header-location-pill:hover {
+      background: rgba(255,255,255,0.15);
     }
-    .nav-menu-link.active {
-      color: #ffffff;
-      background: #2563eb;
-      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4);
+    .header-location-pill .loc-main {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #e2e8f0;
     }
-    .nav-icon {
-      font-size: 0.95rem;
+    .header-location-pill .loc-sub {
+      font-size: 0.6rem;
+      color: #64748b;
     }
-    .nav-text {
-      white-space: nowrap;
+    
+    .live-pill { display: none; }
+    .live-dot { display: none; }
+
+    /* CENTER MENU - HIDDEN (replaced by bottom nav) */
+    .navbar-menu { display: none !important; }
+    .nav-menu-link, .nav-icon, .nav-text, .nav-badge, .stock-badge, .cal-badge { }
+
+    /* RIGHT: Hamburger menu button only */
+    .navbar-right { display: none; }
+    .header-gps-btn { display: none; }
+    .header-action-btn { display: none; }
+    
+    #hamburger-btn {
+      background: none;
+      border: none;
+      color: #e2e8f0;
+      font-size: 1.4rem;
+      cursor: pointer;
+      padding: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      transition: background 0.2s;
+      -webkit-tap-highlight-color: transparent;
     }
-    .nav-badge {
-      font-size: 0.7rem;
-      padding: 2px 8px;
-      border-radius: 10px;
-      font-weight: 800;
-    }
-    .stock-badge {
-      background: #16a34a;
-      color: white;
-    }
-    .cal-badge {
-      background: #f59e0b;
-      color: white;
+    #hamburger-btn:hover {
+      background: rgba(255,255,255,0.1);
     }
 
-    /* RIGHT CONTROLS ON HEADER */
-    .navbar-right {
+    /* SIDE DRAWER MENU (slides from left) */
+    #side-drawer-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 5000;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s, visibility 0.3s;
+    }
+    #side-drawer-overlay.open {
+      opacity: 1;
+      visibility: visible;
+    }
+    #side-drawer {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 320px;
+      max-width: 85vw;
+      height: 100%;
+      background: #ffffff;
+      z-index: 5001;
+      transform: translateX(-100%);
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      flex-direction: column;
+      box-shadow: 4px 0 24px rgba(0,0,0,0.2);
+    }
+    #side-drawer-overlay.open #side-drawer {
+      transform: translateX(0);
+    }
+    .drawer-header {
+      padding: 18px 20px;
+      background: #0f172a;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .drawer-header-title {
+      font-weight: 900;
+      font-size: 1rem;
+    }
+    .drawer-close-btn {
+      background: none;
+      border: none;
+      color: #94a3b8;
+      font-size: 1.3rem;
+      cursor: pointer;
+      padding: 4px;
+    }
+    .drawer-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0;
+    }
+    .drawer-section {
+      padding: 14px 20px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .drawer-section-title {
+      font-size: 0.72rem;
+      font-weight: 800;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 10px;
+    }
+    .drawer-menu-item {
       display: flex;
       align-items: center;
       gap: 10px;
-    }
-    .header-gps-btn {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      background: rgba(30, 41, 59, 0.8);
-      border: 1px solid #334155;
-      padding: 6px 12px;
-      border-radius: 8px;
-      color: #93c5fd;
-      font-size: 0.75rem;
+      padding: 10px 4px;
+      font-size: 0.85rem;
       font-weight: 600;
+      color: #1e293b;
       cursor: pointer;
-      transition: all 0.2s;
-    }
-    .header-gps-btn:hover {
-      background: #1e293b;
-      border-color: #60a5fa;
-      color: white;
-    }
-    .header-action-btn {
-      background: rgba(30, 41, 59, 0.8);
-      border: 1px solid #334155;
-      padding: 6px 10px;
       border-radius: 8px;
-      color: #cbd5e1;
-      font-size: 0.78rem;
-      font-weight: 600;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      transition: all 0.2s;
+      transition: background 0.15s;
     }
-    .header-action-btn:hover {
-      background: #1e293b;
-      color: white;
-      border-color: #64748b;
+    .drawer-menu-item:hover {
+      background: #f1f5f9;
+    }
+    .drawer-menu-item .dm-icon {
+      font-size: 1.1rem;
+      width: 28px;
+      text-align: center;
     }
 
     /* 2. APP CONTAINER & VIEW SWITCHER */
@@ -2214,54 +2237,12 @@ def index():
         overscroll-behavior: contain;
       }
 
-      /* --- TOP NAVBAR: Compact --- */
+      /* --- TOP NAVBAR: Already compact in new design --- */
       #top-navbar {
-        height: 48px;
-        padding: 0 12px;
+        padding: 0 10px;
       }
-      .navbar-left {
-        gap: 8px;
-      }
-      .brand-icon {
-        font-size: 1.25rem;
-      }
-      .brand-title {
-        font-size: 0.95rem;
-      }
-      .brand-sub,
-      .live-pill {
-        display: none !important;
-      }
-      /* Hide desktop center menu on mobile - replaced by bottom nav */
-      .navbar-menu {
-        display: none !important;
-      }
-      /* Compact right action buttons: icon only */
-      .navbar-right {
-        gap: 6px;
-      }
-      .navbar-right .header-action-btn span,
-      .navbar-right .header-gps-btn span#header-loc-summary,
-      .navbar-right .header-gps-btn span#sound-text {
+      .header-location-pill .loc-sub {
         display: none;
-      }
-      .navbar-right .header-action-btn,
-      .navbar-right .header-gps-btn {
-        padding: 8px;
-        min-width: 40px;
-        min-height: 40px;
-        justify-content: center;
-        font-size: 1.05rem;
-      }
-      /* Only show emoji/icon, hide text in header buttons */
-      .header-action-btn span:first-child,
-      .header-gps-btn span:first-child {
-        display: inline !important;
-        font-size: 1.1rem;
-      }
-      #btn-header-map,
-      #btn-header-notif {
-        display: none !important;
       }
 
       /* --- APP CONTAINER: Stack vertically --- */
@@ -2635,53 +2616,77 @@ def index():
 <body>
   <div id="toast-container"></div>
 
-  <!-- 1. TOP GLOBAL APPLICATION NAVBAR -->
+  <!-- SIDE DRAWER OVERLAY -->
+  <div id="side-drawer-overlay" onclick="closeSideDrawer()">
+    <div id="side-drawer" onclick="event.stopPropagation()">
+      <div class="drawer-header">
+        <span class="drawer-header-title">⚡ ポケ探 メニュー</span>
+        <button class="drawer-close-btn" onclick="closeSideDrawer()">✕</button>
+      </div>
+      <div class="drawer-body">
+        <div class="drawer-section">
+          <div class="drawer-section-title">📍 Vị trí GPS</div>
+          <div class="drawer-menu-item" onclick="requestUserLocation(true); closeSideDrawer();">
+            <span class="dm-icon">📍</span>
+            <span id="drawer-loc-summary">Nhấn để định vị GPS</span>
+          </div>
+        </div>
+        <div class="drawer-section">
+          <div class="drawer-section-title">🗺️ Cài đặt bản đồ</div>
+          <div class="drawer-menu-item" onclick="toggleMapSettingsModal(); closeSideDrawer();">
+            <span class="dm-icon">⚙️</span>
+            <span>Cài đặt cửa hàng hiển thị trên bản đồ</span>
+          </div>
+        </div>
+        <div class="drawer-section">
+          <div class="drawer-section-title">🔔 Thông báo</div>
+          <div class="drawer-menu-item" onclick="toggleNotifSettingsModal(); closeSideDrawer();">
+            <span class="dm-icon">🔔</span>
+            <span>Cài đặt thông báo (Telegram / Discord)</span>
+          </div>
+          <div class="drawer-menu-item" onclick="requestPushPermission(); closeSideDrawer();">
+            <span class="dm-icon">📲</span>
+            <span>Bật thông báo trình duyệt (Push)</span>
+          </div>
+        </div>
+        <div class="drawer-section">
+          <div class="drawer-section-title">⚡ Hành động</div>
+          <div class="drawer-menu-item" onclick="refreshAll(); closeSideDrawer();">
+            <span class="dm-icon">🔄</span>
+            <span>Làm mới dữ liệu</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 1. COMPACT TOP NAVBAR -->
   <header id="top-navbar">
     <div class="navbar-left">
       <a href="/map" class="brand-logo" onclick="event.preventDefault(); navigateMenu('map');">
         <span class="brand-icon">⚡</span>
-        <div class="brand-text">
-          <span class="brand-title">BAWUI POKE APP</span>
-          <span class="brand-sub">Real-Time Stock & Lottery Tracker</span>
-        </div>
+        <span class="brand-title">ポケ探</span>
       </a>
-      <div class="live-pill">
-        <div class="live-dot"></div>
-        <span>FIRESTORE PUSH</span>
+      <div class="header-location-pill" id="header-loc-pill" onclick="requestUserLocation(true)" title="Nhấn để định vị GPS">
+        <span class="loc-main" id="header-loc-main">◎ 大阪エリア</span>
+        <span class="loc-sub">表示中・エリアを変える</span>
       </div>
     </div>
-
-    <!-- MAIN APPLICATION MENU (REAL LINKS SYNCED WITH URL) -->
-    <nav class="navbar-menu" id="main-navbar-menu">
-      <a href="/map" class="nav-menu-link active" id="menu-map-link" onclick="event.preventDefault(); navigateMenu('map');">
-        <span class="nav-icon">🗺️</span>
-        <span class="nav-text">Bản Đồ & Kho Thẻ</span>
-        <span class="nav-badge stock-badge" id="menu-stock-count">0 Có hàng</span>
-      </a>
-      <a href="/calendar" class="nav-menu-link" id="menu-cal-link" onclick="event.preventDefault(); navigateMenu('calendar');">
-        <span class="nav-icon">📅</span>
-        <span class="nav-text">Lịch Bốc Thăm & Sự Kiện</span>
-        <span class="nav-badge cal-badge" id="menu-cal-count">11 Đang mở</span>
-      </a>
+    <!-- Hidden elements for backward compatibility -->
+    <nav class="navbar-menu" id="main-navbar-menu" style="display:none">
+      <a href="/map" class="nav-menu-link active" id="menu-map-link"></a>
+      <a href="/calendar" class="nav-menu-link" id="menu-cal-link"></a>
     </nav>
-
-    <!-- RIGHT ACTION CONTROLS -->
-    <div class="navbar-right">
-      <button class="header-action-btn" id="btn-header-map" onclick="toggleMapSettingsModal()" title="Cài đặt những cửa hàng muốn nhìn thấy trên bản đồ">
-        <span>⚙️ Cài đặt cửa hàng bản đồ</span>
-      </button>
-      <button class="header-action-btn" id="btn-header-notif" onclick="toggleNotifSettingsModal()" title="Cài đặt những thông báo bạn muốn nhận">
-        <span id="sound-icon">🔔</span>
-        <span id="sound-text">Cài đặt thông báo</span>
-      </button>
-      <button class="header-gps-btn" id="header-loc-btn" onclick="requestUserLocation(true)" title="Nhấn để định vị GPS">
-        <span>📍</span>
-        <span id="header-loc-summary">Đang định vị...</span>
-      </button>
-      <button class="header-action-btn" onclick="refreshAll()" title="Nạp lại dữ liệu">
-        <span>🔄 Làm mới</span>
-      </button>
+    <span class="nav-badge stock-badge" id="menu-stock-count" style="display:none">0</span>
+    <span class="nav-badge cal-badge" id="menu-cal-count" style="display:none">0</span>
+    <div class="navbar-right" style="display:none">
+      <span id="sound-icon"></span>
+      <span id="sound-text"></span>
+      <span id="header-loc-summary"></span>
     </div>
+    <button id="hamburger-btn" onclick="openSideDrawer()" title="メニュー">
+      ☰
+    </button>
   </header>
 
   <!-- 2. MAIN APP CONTAINER -->
@@ -5832,6 +5837,28 @@ def index():
       }
     }
     window.mobileNavTo = mobileNavTo;
+
+    // SIDE DRAWER
+    function openSideDrawer() {
+      const overlay = document.getElementById('side-drawer-overlay');
+      if (overlay) overlay.classList.add('open');
+    }
+    window.openSideDrawer = openSideDrawer;
+
+    function closeSideDrawer() {
+      const overlay = document.getElementById('side-drawer-overlay');
+      if (overlay) overlay.classList.remove('open');
+    }
+    window.closeSideDrawer = closeSideDrawer;
+
+    // Sync drawer location text with header
+    function syncDrawerLocation() {
+      const headerLoc = document.getElementById('header-loc-main');
+      const drawerLoc = document.getElementById('drawer-loc-summary');
+      if (headerLoc && drawerLoc) {
+        drawerLoc.textContent = headerLoc.textContent || '◎ 大阪エリア';
+      }
+    }
 
     // Sync mobile bottom nav badges with stock counts
     function syncMobileBadges() {
