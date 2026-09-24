@@ -4317,6 +4317,14 @@ def index():
       return `${days} ngày trước`;
     }
 
+    function formatExactTime(timestamp) {
+      if (!timestamp || timestamp <= 0) return '';
+      const d = new Date(timestamp * 1000);
+      const timePart = d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+      const datePart = d.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' });
+      return `${timePart} (${datePart})`;
+    }
+
     function updateAllRelativeTimes() {
       const now = Math.floor(Date.now() / 1000);
       const elements = document.querySelectorAll('.live-rel-time');
@@ -4735,8 +4743,10 @@ def index():
       // Format distance
       const distStr = distanceKm !== null ? `📍 ${formatDistance(distanceKm)}` : '';
       
-      // Format time
+      // Format time: exact report time + relative time
+      const exactTimeStr = info.timestamp ? formatExactTime(info.timestamp) : (info.reported_at !== '-' ? info.reported_at : '');
       const timeStr = info.timeAgo || 'Vừa xong';
+      const fullTimeDisplay = exactTimeStr ? `${exactTimeStr} • <span class="live-rel-time" data-live-timestamp="${info.timestamp || 0}" data-live-prefix="⏱ ">⏱ ${timeStr}</span>` : `<span class="live-rel-time" data-live-timestamp="${info.timestamp || 0}" data-live-prefix="⏱ ">⏱ ${timeStr}</span>`;
 
       // Packs or note
       const packStr = info.packs.length ? `<span class="poketan-meta-pack">📦 ${info.packs.join(', ')}</span>` : '';
@@ -4759,7 +4769,10 @@ def index():
                   ${newBadge}
                 </div>
                 <div class="poketan-row-subline">
-                  <span class="live-rel-time" data-live-timestamp="${info.timestamp || 0}" data-live-prefix="⏱ ">⏱ ${timeStr}</span>
+                  <span class="poketan-time-block" style="display:inline-flex;align-items:center;gap:4px;color:#1e293b;font-weight:600;">
+                    ${exactTimeStr ? `<span style="color:#0f172a;font-weight:700;">🕒 ${exactTimeStr}</span> • ` : ''}
+                    <span class="live-rel-time" data-live-timestamp="${info.timestamp || 0}" data-live-prefix="⏱ " style="color:#2563eb;font-weight:700;">⏱ ${timeStr}</span>
+                  </span>
                   ${distStr ? `<span>• ${distStr}</span>` : ''}
                   <span>• ${confirmStr}</span>
                   ${packStr ? `<span>• ${packStr}</span>` : ''}
@@ -4891,14 +4904,17 @@ def index():
 
         entriesHtml += `
           <div class="accordion-hist-entry ${entryClass}">
-            <div style="display:flex;justify-content:space-between;align-items:center;gap:4px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:4px;flex-wrap:wrap;">
               <span class="hist-mini-badge ${badgeClass}">${item.status_label}</span>
-              <span class="live-rel-time" data-live-timestamp="${item.timestamp || 0}" data-live-prefix="⏱ " style="font-size:0.72rem;font-weight:700;color:#2563eb;">⏱ ${itemTimeAgo}</span>
+              <div style="font-size:0.72rem;display:inline-flex;align-items:center;gap:5px;">
+                ${dateStr ? `<span style="font-weight:700;color:#0f172a;">🕒 ${dateStr}</span>` : ''}
+                <span class="live-rel-time" data-live-timestamp="${item.timestamp || 0}" data-live-prefix="⏱ " style="font-weight:700;color:#2563eb;">⏱ ${itemTimeAgo}</span>
+              </div>
             </div>
             ${item.note ? `<div style="font-size:0.73rem;color:#1e293b;margin-top:2px;">📝 <b>Sản phẩm:</b> ${item.note}</div>` : ''}
             <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.68rem;color:#64748b;margin-top:2px;">
               <span>👤 ${userStr} ${whoStr} ${onsiteBadge}</span>
-              <span>${dateStr}</span>
+              <span style="color:#94a3b8;">${dateStr}</span>
             </div>
           </div>
         `;
