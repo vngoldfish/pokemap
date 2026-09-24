@@ -660,7 +660,10 @@ def index():
     #view-notif-mode .notif-view-body {
       flex: 1;
       overflow-y: auto;
-      padding: 16px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
       -webkit-overflow-scrolling: touch;
     }
 
