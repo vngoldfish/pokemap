@@ -192,7 +192,7 @@ def index():
 <head>
   <meta charset="UTF-8">
   <title>BAWUI POKE APP - Định Vị, Tồn Kho & Lịch Bốc Thăm Thẻ Pokémon</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -1619,6 +1619,521 @@ def index():
       color: #854d0e;
       border: 1px solid #fde047;
     }
+    /* ============================================
+       MOBILE BOTTOM NAVIGATION BAR (Hidden on desktop)
+       ============================================ */
+    #mobile-bottom-nav {
+      display: none;
+    }
+
+    /* ============================================
+       MOBILE RESPONSIVE STYLES (≤ 768px)
+       ============================================ */
+    @media (max-width: 768px) {
+
+      /* --- GLOBAL MOBILE TOUCH IMPROVEMENTS --- */
+      html, body {
+        -webkit-text-size-adjust: 100%;
+        -webkit-tap-highlight-color: transparent;
+      }
+      #store-list,
+      .modal-body,
+      #view-calendar-mode,
+      .store-accordion-body,
+      .popup-accordion-body {
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+      }
+
+      /* --- TOP NAVBAR: Compact --- */
+      #top-navbar {
+        height: 48px;
+        padding: 0 12px;
+      }
+      .navbar-left {
+        gap: 8px;
+      }
+      .brand-icon {
+        font-size: 1.25rem;
+      }
+      .brand-title {
+        font-size: 0.95rem;
+      }
+      .brand-sub,
+      .live-pill {
+        display: none !important;
+      }
+      /* Hide desktop center menu on mobile - replaced by bottom nav */
+      .navbar-menu {
+        display: none !important;
+      }
+      /* Compact right action buttons: icon only */
+      .navbar-right {
+        gap: 6px;
+      }
+      .navbar-right .header-action-btn span,
+      .navbar-right .header-gps-btn span#header-loc-summary,
+      .navbar-right .header-gps-btn span#sound-text {
+        display: none;
+      }
+      .navbar-right .header-action-btn,
+      .navbar-right .header-gps-btn {
+        padding: 8px;
+        min-width: 40px;
+        min-height: 40px;
+        justify-content: center;
+        font-size: 1.05rem;
+      }
+      /* Only show emoji/icon, hide text in header buttons */
+      .header-action-btn span:first-child,
+      .header-gps-btn span:first-child {
+        display: inline !important;
+        font-size: 1.1rem;
+      }
+      #btn-header-map,
+      #btn-header-notif {
+        display: none !important;
+      }
+
+      /* --- APP CONTAINER: Stack vertically --- */
+      #app-container {
+        position: relative;
+        overflow: hidden;
+      }
+
+      /* --- MAP VIEW: Full screen with sidebar overlay --- */
+      #view-stores-mode {
+        flex-direction: column;
+        position: relative;
+      }
+
+      /* Sidebar: full screen overlay, hidden by default on mobile */
+      #sidebar {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100% !important;
+        height: 100% !important;
+        z-index: 1500;
+        transform: translateX(-100%);
+        transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        border-right: none;
+        box-shadow: none;
+        will-change: transform;
+      }
+      #sidebar.mobile-visible {
+        transform: translateX(0);
+        box-shadow: 4px 0 24px rgba(0,0,0,0.15);
+      }
+
+      /* Map: always full area */
+      #map {
+        width: 100% !important;
+        height: 100% !important;
+        position: absolute;
+        top: 0;
+        left: 0;
+      }
+
+      /* Map floating controls: compact for mobile */
+      .map-controls-box {
+        top: 8px;
+        right: 8px;
+        gap: 6px;
+      }
+      .floating-btn {
+        padding: 8px 10px;
+        font-size: 0.75rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      }
+      .floating-btn span {
+        font-size: 0.75rem;
+      }
+
+      /* --- SIDEBAR INTERNALS: Mobile optimized --- */
+      .location-bar {
+        padding: 8px 12px;
+      }
+      .stats-bar {
+        padding: 8px 12px;
+        gap: 6px;
+      }
+      .stat-badge {
+        padding: 8px 4px;
+        min-height: 54px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+      .stat-badge .num {
+        font-size: 1.1rem;
+      }
+      .stat-badge .label {
+        font-size: 0.64rem;
+      }
+
+      .controls {
+        padding: 10px 12px;
+        gap: 8px;
+      }
+      .search-row {
+        gap: 6px;
+      }
+      .search-box {
+        padding: 10px 12px;
+        font-size: 16px; /* prevents iOS zoom on focus */
+        border-radius: 10px;
+      }
+      .settings-icon-btn {
+        width: 44px;
+        height: 44px;
+        font-size: 1.2rem;
+      }
+
+      .controls-grid {
+        gap: 6px;
+      }
+      .control-dropdown {
+        height: 44px;
+        font-size: 16px; /* prevents iOS zoom */
+        padding: 0 8px;
+        border-radius: 10px;
+      }
+
+      .filter-status-banner {
+        padding: 6px 12px;
+        font-size: 0.72rem;
+      }
+
+      #store-list {
+        padding: 8px 10px;
+        gap: 8px;
+        padding-bottom: 80px; /* space for bottom nav */
+      }
+
+      /* --- STORE CARDS: Tap-friendly --- */
+      .store-card {
+        padding: 12px;
+        border-radius: 12px;
+        gap: 5px;
+      }
+      .store-name {
+        font-size: 0.88rem;
+      }
+      .store-meta {
+        font-size: 0.72rem;
+        flex-direction: column;
+        gap: 3px;
+      }
+      .store-addr {
+        font-size: 0.72rem;
+      }
+
+      /* Accordion body inside cards */
+      .store-accordion-body {
+        max-height: 260px;
+        padding: 8px 10px;
+      }
+      .store-accordion-toggle,
+      .store-hist-btn {
+        padding: 6px 12px;
+        min-height: 36px;
+        font-size: 0.72rem;
+      }
+
+      /* --- CALENDAR VIEW: Mobile friendly --- */
+      #view-calendar-mode {
+        padding-bottom: 72px; /* space for bottom nav */
+      }
+      #calendar-dedicated-header {
+        padding: 14px 14px 12px 14px;
+        position: sticky;
+        top: 0;
+      }
+      .cal-header-row-1 {
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+      .cal-header-title-group h2 {
+        font-size: 1.05rem;
+        gap: 6px;
+      }
+      .cal-header-title-group p {
+        font-size: 0.75rem;
+        display: none;
+      }
+      .cal-header-actions-group {
+        gap: 6px;
+      }
+      .cal-stat-pill {
+        font-size: 0.7rem;
+        padding: 4px 10px;
+      }
+      .cal-btn-toggle-expired {
+        font-size: 0.72rem;
+        padding: 6px 12px;
+      }
+      .cal-filter-toolbar {
+        gap: 8px;
+        padding-top: 10px;
+      }
+      .cal-search-box-wrap {
+        min-width: unset;
+        max-width: unset;
+        width: 100%;
+      }
+      .cal-search-box-wrap input {
+        font-size: 16px; /* prevents iOS zoom */
+      }
+      .cal-chip-group {
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 4px;
+      }
+      .cal-chip {
+        flex-shrink: 0;
+      }
+      #calendar-grid-container {
+        padding: 14px 12px 80px 12px;
+      }
+      #calendar-cards-grid,
+      #calendar-expired-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+      .cal-card {
+        padding: 14px;
+      }
+
+      /* --- MODALS: Full-width mobile --- */
+      .modal-overlay {
+        align-items: flex-end;
+        padding: 0;
+      }
+      .modal-content {
+        width: 100% !important;
+        max-width: 100% !important;
+        max-height: 92vh;
+        border-radius: 18px 18px 0 0;
+        animation: modalSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      @keyframes modalSlideUp {
+        from { transform: translateY(100%); opacity: 0.5; }
+        to { transform: translateY(0); opacity: 1; }
+      }
+      .modal-header {
+        padding: 14px 16px;
+        border-radius: 18px 18px 0 0;
+        position: relative;
+      }
+      /* Drag handle indicator on modals */
+      .modal-header::before {
+        content: '';
+        position: absolute;
+        top: 6px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 40px;
+        height: 4px;
+        background: rgba(255,255,255,0.3);
+        border-radius: 2px;
+      }
+      .modal-header h3 {
+        font-size: 0.95rem;
+      }
+      .modal-close-btn {
+        width: 36px;
+        height: 36px;
+        font-size: 1.1rem;
+      }
+      .modal-body {
+        padding: 16px;
+        max-height: 75vh;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+        padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+      }
+
+      /* Settings tabs */
+      .settings-tab-bar {
+        padding: 4px 12px 0 12px;
+      }
+      .settings-tab-btn {
+        padding: 10px 8px;
+        font-size: 0.78rem;
+      }
+      .setting-checkbox-row {
+        padding: 12px;
+        min-height: 48px;
+      }
+      .time-radio-row {
+        padding: 10px;
+        min-height: 44px;
+      }
+      .modal-quick-actions {
+        gap: 6px;
+      }
+      .btn-preset {
+        min-width: 100px;
+        padding: 10px 8px;
+        font-size: 0.76rem;
+      }
+
+      /* History modal */
+      .hist-timeline {
+        padding-left: 14px;
+      }
+      .hist-item {
+        padding: 10px 12px;
+      }
+
+      /* --- TOAST NOTIFICATIONS: Mobile width --- */
+      #toast-container {
+        top: 56px;
+        right: 8px;
+        left: 8px;
+      }
+      .toast {
+        width: 100%;
+        max-width: 100%;
+        padding: 12px;
+        border-radius: 10px;
+      }
+      .toast-header {
+        font-size: 0.88rem;
+      }
+      .toast-body {
+        font-size: 0.82rem;
+      }
+
+      /* --- MAP POPUPS: Wider on mobile --- */
+      .leaflet-popup-content-wrapper {
+        max-width: 300px !important;
+        border-radius: 12px !important;
+      }
+      .leaflet-popup-content {
+        margin: 12px !important;
+        font-size: 0.85rem;
+      }
+
+      /* --- MOBILE BOTTOM NAV BAR --- */
+      #mobile-bottom-nav {
+        display: flex;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 60px;
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+        background: #0f172a;
+        border-top: 1px solid #1e293b;
+        z-index: 3000;
+        align-items: stretch;
+        box-shadow: 0 -4px 20px rgba(0,0,0,0.25);
+      }
+      .mobile-nav-btn {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 3px;
+        background: none;
+        border: none;
+        color: #64748b;
+        font-size: 0.65rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: color 0.15s, background 0.15s;
+        position: relative;
+        padding: 6px 0;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .mobile-nav-btn .nav-btn-icon {
+        font-size: 1.3rem;
+        line-height: 1;
+      }
+      .mobile-nav-btn .nav-btn-label {
+        font-size: 0.62rem;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+      }
+      .mobile-nav-btn.active {
+        color: #60a5fa;
+      }
+      .mobile-nav-btn.active::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 25%;
+        right: 25%;
+        height: 3px;
+        background: #3b82f6;
+        border-radius: 0 0 3px 3px;
+      }
+      .mobile-nav-btn .nav-btn-badge {
+        position: absolute;
+        top: 4px;
+        right: 50%;
+        transform: translateX(calc(50% + 12px));
+        background: #16a34a;
+        color: white;
+        font-size: 0.58rem;
+        font-weight: 800;
+        padding: 1px 5px;
+        border-radius: 8px;
+        min-width: 16px;
+        text-align: center;
+        line-height: 1.3;
+      }
+      .mobile-nav-btn .nav-btn-badge.cal-badge-color {
+        background: #f59e0b;
+      }
+
+      /* Space for bottom nav in all views */
+      #app-container {
+        padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+      }
+
+      /* Sidebar mobile swipe hint */
+      .mobile-swipe-hint {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 6px;
+        background: linear-gradient(135deg, #eff6ff, #dbeafe);
+        font-size: 0.7rem;
+        color: #3b82f6;
+        font-weight: 600;
+        gap: 6px;
+        border-bottom: 1px solid #bfdbfe;
+      }
+    }
+
+    /* Extra small devices (≤ 380px) */
+    @media (max-width: 380px) {
+      #top-navbar {
+        padding: 0 8px;
+      }
+      .brand-title {
+        font-size: 0.85rem;
+      }
+      .stat-badge .num {
+        font-size: 0.95rem;
+      }
+      .stat-badge .label {
+        font-size: 0.58rem;
+      }
+      .store-name {
+        font-size: 0.82rem;
+      }
+      .controls-grid {
+        grid-template-columns: 1fr;
+      }
+    }
   </style>
 
   <script type="module">
@@ -2175,6 +2690,28 @@ def index():
       </div>
     </div>
   </div>
+
+  <!-- MOBILE BOTTOM NAVIGATION BAR -->
+  <nav id="mobile-bottom-nav">
+    <button class="mobile-nav-btn active" id="mob-nav-map" onclick="mobileNavTo('map')">
+      <span class="nav-btn-icon">🗺️</span>
+      <span class="nav-btn-label">Bản đồ</span>
+    </button>
+    <button class="mobile-nav-btn" id="mob-nav-list" onclick="mobileNavTo('list')">
+      <span class="nav-btn-icon">📋</span>
+      <span class="nav-btn-label">Danh sách</span>
+      <span class="nav-btn-badge" id="mob-badge-stock">0</span>
+    </button>
+    <button class="mobile-nav-btn" id="mob-nav-cal" onclick="mobileNavTo('calendar')">
+      <span class="nav-btn-icon">📅</span>
+      <span class="nav-btn-label">Lịch</span>
+      <span class="nav-btn-badge cal-badge-color" id="mob-badge-cal">0</span>
+    </button>
+    <button class="mobile-nav-btn" id="mob-nav-settings" onclick="mobileNavTo('settings')">
+      <span class="nav-btn-icon">⚙️</span>
+      <span class="nav-btn-label">Cài đặt</span>
+    </button>
+  </nav>
 
   <script>
     // 0. NOTIFICATION SETTINGS STATE (TÁCH BIỆT HOÀN TOÀN KHỎI BẢN ĐỒ)
@@ -3256,8 +3793,12 @@ def index():
             ${reportTimeHtml}
             ${packsHtml}
             <div style="margin-top:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-              <a href="${dirUrl}" target="_blank" style="display:inline-block;padding:5px 11px;background:#2563eb;color:white;text-decoration:none;border-radius:5px;font-size:0.75rem;font-weight:700;">Chỉ đường Google Maps ↗</a>
-              <button type="button" onclick="openStoreHistoryModal('${store.id}')" style="display:inline-flex;align-items:center;gap:4px;padding:5px 11px;background:#0f172a;color:white;border:none;border-radius:5px;font-size:0.75rem;font-weight:700;cursor:pointer;">📜 Lịch sử báo cáo ↗</button>
+              <a href="${dirUrl}" target="_blank" style="display:inline-block;padding:5px 11px;background:#2563eb;color:white;text-decoration:none;border-radius:5px;font-size:0.75rem;font-weight:700;">Chỉ đường Maps ↗</a>
+              <button type="button" id="popup-btn-${store.id}" onclick="event.stopPropagation(); togglePopupHistoryAccordion('${store.id}', event)" style="display:inline-flex;align-items:center;gap:5px;padding:6px 12px;background:#0f172a;color:white;border:none;border-radius:6px;font-size:0.75rem;font-weight:700;cursor:pointer;">
+                <span id="popup-arrow-${store.id}" style="font-weight:900;">▶</span> Lịch sử báo cáo
+              </button>
+            </div>
+            <div id="popup-accordion-${store.id}" class="popup-accordion-body" style="display:none;margin-top:8px;padding-top:8px;border-top:1px dashed #cbd5e1;max-height:250px;overflow-y:auto;">
             </div>
           </div>
         `;
@@ -3418,6 +3959,12 @@ def index():
           ? `<span>⏱ <b>${info.timeAgo}</b> (${info.reported_at})</span><span>👥 ${info.confirms} xác nhận</span>`
           : `<span style="color:#94a3b8;">Chưa có cập nhật gần đây</span>`;
 
+        const isAccordionOpen = openAccordionStoreIds.has(store.id);
+        const arrowChar = isAccordionOpen ? '▼' : '▶';
+        const toggleBtnLabel = isAccordionOpen ? 'Thu gọn' : 'Lịch sử';
+        const toggleBtnClass = isAccordionOpen ? 'store-accordion-toggle expanded' : 'store-accordion-toggle';
+        const accordionStyle = isAccordionOpen ? 'display:block;' : 'display:none;';
+
         html += `
           <div class="store-card ${cardClass}" id="card-${store.id}" onclick="focusStoreOnMap('${store.id}')" title="Bấm để định vị cửa hàng trên bản đồ">
             <div class="store-header">
@@ -3433,11 +3980,15 @@ def index():
             <div class="store-meta">
               ${reportMeta}
             </div>
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;padding-top:6px;border-top:1px dashed #e2e8f0;gap:8px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;padding-top:6px;border-top:1px dashed #e2e8f0;gap:8px;cursor:pointer;" onclick="event.stopPropagation(); toggleStoreHistoryAccordion('${store.id}')" title="Bấm để xem / thu gọn lịch sử báo cáo">
               <div class="store-addr" style="margin-top:0;flex:1;min-width:0;">📍 ${store.address || ''}</div>
-              <button type="button" class="store-hist-btn" onclick="event.stopPropagation(); openStoreHistoryModal('${store.id}')" title="Xem bảng lịch sử báo cáo của cửa hàng này">
-                📜 Xem lịch sử
+              <button type="button" class="${toggleBtnClass}" id="toggle-btn-${store.id}" onclick="event.stopPropagation(); toggleStoreHistoryAccordion('${store.id}')" title="Bấm để xem / thu gọn lịch sử báo cáo">
+                <span class="accordion-arrow" id="arrow-${store.id}">${arrowChar}</span>
+                <span class="accordion-label" id="toggle-label-${store.id}">${toggleBtnLabel}</span>
               </button>
+            </div>
+            <div class="store-accordion-body" id="accordion-${store.id}" onclick="event.stopPropagation();" style="${accordionStyle}">
+              <!-- Accordion content dynamically rendered -->
             </div>
           </div>
         `;
@@ -3457,6 +4008,20 @@ def index():
       }
 
       storeList.innerHTML = html;
+
+      // Populate open accordions if any
+      for (const item of renderSlice) {
+        if (openAccordionStoreIds.has(item.store.id)) {
+          const bodyEl = document.getElementById(`accordion-${item.store.id}`);
+          if (bodyEl) {
+            if (storeHistoryCache[item.store.id]) {
+              renderAccordionContent(item.store.id, bodyEl, storeHistoryCache[item.store.id]);
+            } else {
+              loadAndRenderAccordion(item.store.id, bodyEl);
+            }
+          }
+        }
+      }
     }
 
     let visibleLimit = 150;
@@ -3494,6 +4059,242 @@ def index():
       focusStore(sid, true);
     }
     window.focusStoreOnMap = focusStoreOnMap;
+    // ----------------------------------------------------
+    // STORE REPORT HISTORY ACCORDION & TIMELINE LOGIC
+    // ----------------------------------------------------
+    function buildStoreTimelineHtml(storeId, rawHistory, currentInfo, isPopup = false) {
+      let timelineList = Array.isArray(rawHistory) ? [...rawHistory] : [];
+
+      // Merge current realtime info if not present
+      if (currentInfo && (currentInfo.code === 'i' || currentInfo.code === 'o' || currentInfo.timestamp > 0)) {
+        const exists = timelineList.some(item => (currentInfo.timestamp > 0 && Math.abs((item.timestamp || 0) - currentInfo.timestamp) < 300));
+        if (!exists) {
+          timelineList.unshift({
+            id: 'current_realtime',
+            status: currentInfo.code === 'i' ? 'in-stock' : (currentInfo.code === 'o' ? 'out-of-stock' : 'not-handled'),
+            status_code: currentInfo.code,
+            status_label: currentInfo.code === 'i' ? '🟢 Có hàng (Trạng thái hiện tại)' : (currentInfo.code === 'o' ? '🔴 Hết hàng' : '⚪ Không bán'),
+            note: currentInfo.packs.length ? currentInfo.packs.join(', ') : 'Ghi nhận trực tiếp realtime',
+            user: 'Cộng đồng Poketan Osaka',
+            who: currentInfo.confirms ? `${currentInfo.confirms} xác nhận` : '',
+            onsite: currentInfo.onsite,
+            timestamp: currentInfo.timestamp,
+            formatted_time: (currentInfo.reported_at && currentInfo.reported_at !== '-') ? currentInfo.reported_at : ''
+          });
+        }
+      }
+
+      if (timelineList.length === 0) {
+        return `
+          <div style="background:white;border:1px dashed #cbd5e1;border-radius:6px;padding:12px;text-align:center;color:#64748b;font-size:0.75rem;">
+            <div style="font-weight:700;color:#0f172a;margin-bottom:2px;">📋 Chưa có thêm báo cáo cũ</div>
+            <div>Trạng thái hiện tại ghi nhận từ hệ thống Poketan.</div>
+          </div>
+        `;
+      }
+
+      let entriesHtml = '';
+      for (const item of timelineList) {
+        const itemTimeAgo = item.timestamp ? formatTimeAgo(item.timestamp) : 'Chưa rõ';
+        let entryClass = 'entry-none';
+        let badgeClass = 'mini-none';
+        if (item.status_code === 'i') {
+          entryClass = 'entry-in';
+          badgeClass = 'mini-in';
+        } else if (item.status_code === 'o') {
+          entryClass = 'entry-out';
+          badgeClass = 'mini-out';
+        }
+
+        let dateStr = item.formatted_time || '';
+        if (item.timestamp && !dateStr) {
+          const d = new Date(item.timestamp * 1000);
+          dateStr = d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) + ' ' +
+                    d.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' });
+        }
+
+        const onsiteBadge = item.onsite ? `<span style="background:#e0f2fe;color:#0284c7;padding:1px 5px;border-radius:4px;font-size:0.68rem;font-weight:700;">📍 Tại quán</span>` : '';
+        const userStr = item.user || 'Người dùng ẩn danh';
+        const whoStr = item.who ? `(${item.who})` : '';
+
+        entriesHtml += `
+          <div class="accordion-hist-entry ${entryClass}">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:4px;">
+              <span class="hist-mini-badge ${badgeClass}">${item.status_label}</span>
+              <span style="font-size:0.72rem;font-weight:700;color:#2563eb;">⏱ ${itemTimeAgo}</span>
+            </div>
+            ${item.note ? `<div style="font-size:0.73rem;color:#1e293b;margin-top:2px;">📝 <b>Sản phẩm:</b> ${item.note}</div>` : ''}
+            <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.68rem;color:#64748b;margin-top:2px;">
+              <span>👤 ${userStr} ${whoStr} ${onsiteBadge}</span>
+              <span>${dateStr}</span>
+            </div>
+          </div>
+        `;
+      }
+
+      const store = storesDict[storeId];
+      const dirUrl = (store && store.lat && store.lng) 
+        ? ((userLat && userLng) 
+            ? `https://www.google.com/maps/dir/?api=1&origin=${userLat},${userLng}&destination=${store.lat},${store.lng}&travelmode=walking`
+            : `https://www.google.com/maps/search/?api=1&query=${store.lat},${store.lng}`)
+        : '';
+
+      const actionsBar = isPopup ? '' : `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:6px;border-top:1px solid #e2e8f0;flex-wrap:wrap;gap:6px;">
+          ${dirUrl ? `<a href="${dirUrl}" target="_blank" style="font-size:0.72rem;color:#2563eb;font-weight:700;text-decoration:none;">🗺️ Chỉ đường Google Maps ↗</a>` : ''}
+          <button type="button" onclick="openStoreHistoryModal('${storeId}')" style="background:none;border:none;color:#64748b;font-size:0.72rem;cursor:pointer;text-decoration:underline;">
+            🔍 Phóng to toàn màn hình ↗
+          </button>
+        </div>
+      `;
+
+      return `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid #e2e8f0;">
+          <span style="font-size:0.74rem;font-weight:800;color:#0f172a;">📜 LỊCH SỬ BÁO CÁO</span>
+          <span style="font-size:0.7rem;color:#2563eb;font-weight:700;">${timelineList.length} lượt</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;">
+          ${entriesHtml}
+        </div>
+        ${actionsBar}
+      `;
+    }
+
+    function renderAccordionContent(storeId, containerEl, historyData, isPopup = false) {
+      const effectiveStatus = (mapDisplay && mapDisplay.includeCold) ? latestMergedStatus : hotStatus;
+      const currentRaw = effectiveStatus[storeId];
+      const currentInfo = decodeStatus(currentRaw, effectiveStatus[storeId + '_c']);
+
+      const html = buildStoreTimelineHtml(storeId, historyData, currentInfo, isPopup);
+      containerEl.innerHTML = html;
+    }
+
+    async function loadAndRenderAccordion(storeId, bodyEl) {
+      if (!bodyEl) return;
+      bodyEl.innerHTML = `
+        <div style="text-align:center;padding:14px 8px;color:#64748b;font-size:0.75rem;">
+          <span style="font-size:1.1rem;display:inline-block;animation:pulse 1s infinite;">⏳</span>
+          <div style="margin-top:4px;font-weight:600;">Đang tải lịch sử báo cáo...</div>
+        </div>
+      `;
+
+      try {
+        const res = await fetch(`/api/store_history/${storeId}`);
+        const data = await res.json();
+        storeHistoryCache[storeId] = data;
+        renderAccordionContent(storeId, bodyEl, data);
+      } catch (err) {
+        bodyEl.innerHTML = `
+          <div style="color:#ef4444;font-size:0.75rem;padding:8px;text-align:center;">
+            ⚠️ Không thể tải lịch sử: ${err.message}
+          </div>
+        `;
+      }
+    }
+
+    async function toggleStoreHistoryAccordion(storeId) {
+      const bodyEl = document.getElementById(`accordion-${storeId}`);
+      const arrowEl = document.getElementById(`arrow-${storeId}`);
+      const labelEl = document.getElementById(`toggle-label-${storeId}`);
+      const btnEl = document.getElementById(`toggle-btn-${storeId}`);
+
+      if (!bodyEl) return;
+
+      const isOpen = bodyEl.style.display !== 'none';
+      if (isOpen) {
+        // Thu gọn: đổi mũi tên sang ngang ▶, card trở về kích thước ban đầu
+        bodyEl.style.display = 'none';
+        openAccordionStoreIds.delete(storeId);
+        if (arrowEl) arrowEl.innerText = '▶';
+        if (labelEl) labelEl.innerText = 'Lịch sử';
+        if (btnEl) {
+          btnEl.classList.remove('expanded');
+          btnEl.title = 'Bấm để mở lịch sử báo cáo';
+        }
+        return;
+      }
+
+      // Mở rộng: đổi mũi tên hướng xuống ▼, card cao hơn để hiển thị lịch sử
+      bodyEl.style.display = 'block';
+      openAccordionStoreIds.add(storeId);
+      if (arrowEl) arrowEl.innerText = '▼';
+      if (labelEl) labelEl.innerText = 'Thu gọn';
+      if (btnEl) {
+        btnEl.classList.add('expanded');
+        btnEl.title = 'Bấm để thu gọn lịch sử báo cáo';
+      }
+
+      if (storeHistoryCache[storeId]) {
+        renderAccordionContent(storeId, bodyEl, storeHistoryCache[storeId]);
+      } else {
+        await loadAndRenderAccordion(storeId, bodyEl);
+      }
+    }
+    window.toggleStoreHistoryAccordion = toggleStoreHistoryAccordion;
+
+    function adjustLeafletPopup(storeId) {
+      const marker = markerMap[storeId];
+      if (marker && marker.getPopup()) {
+        const pop = marker.getPopup();
+        if (pop._updateLayout) pop._updateLayout();
+        if (pop._updatePosition) pop._updatePosition();
+        if (pop._adjustPan) pop._adjustPan();
+      }
+    }
+    window.adjustLeafletPopup = adjustLeafletPopup;
+
+    async function togglePopupHistoryAccordion(storeId, ev) {
+      if (ev) {
+        try {
+          ev.stopPropagation();
+          ev.preventDefault();
+        } catch(e) {}
+      }
+      const bodyEl = document.getElementById(`popup-accordion-${storeId}`);
+      const btnEl = document.getElementById(`popup-btn-${storeId}`);
+
+      if (!bodyEl) return;
+
+      const isOpen = bodyEl.style.display !== 'none';
+      if (isOpen) {
+        bodyEl.style.display = 'none';
+        if (btnEl) btnEl.innerHTML = `<span id="popup-arrow-${storeId}" style="font-weight:900;">▶</span> Lịch sử báo cáo`;
+        adjustLeafletPopup(storeId);
+        return;
+      }
+
+      bodyEl.style.display = 'block';
+      if (btnEl) btnEl.innerHTML = `<span id="popup-arrow-${storeId}" style="font-weight:900;">▼</span> Thu gọn lịch sử`;
+      adjustLeafletPopup(storeId);
+
+      if (storeHistoryCache[storeId]) {
+        renderAccordionContent(storeId, bodyEl, storeHistoryCache[storeId], true);
+        adjustLeafletPopup(storeId);
+      } else {
+        bodyEl.innerHTML = `
+          <div style="text-align:center;padding:12px;color:#64748b;font-size:0.75rem;">
+            ⏳ Đang tải lịch sử báo cáo...
+          </div>
+        `;
+        adjustLeafletPopup(storeId);
+
+        try {
+          const res = await fetch(`/api/store_history/${storeId}`);
+          const data = await res.json();
+          storeHistoryCache[storeId] = data;
+          renderAccordionContent(storeId, bodyEl, data, true);
+          adjustLeafletPopup(storeId);
+        } catch (err) {
+          bodyEl.innerHTML = `
+            <div style="color:#ef4444;font-size:0.75rem;padding:8px;text-align:center;">
+              ⚠️ Không thể tải lịch sử: ${err.message}
+            </div>
+          `;
+          adjustLeafletPopup(storeId);
+        }
+      }
+    }
+    window.togglePopupHistoryAccordion = togglePopupHistoryAccordion;
 
     // STORE REPORT HISTORY MODAL LOGIC
     async function openStoreHistoryModal(storeId) {
@@ -3545,7 +4346,7 @@ def index():
 
       // Open modal immediately to provide instant feedback
       modal.style.display = 'flex';
-      if (bodyEl) {
+      if (!storeHistoryCache[storeId] && bodyEl) {
         bodyEl.innerHTML = `
           <div style="text-align:center;padding:36px;color:#64748b;">
             <div style="font-size:1.8rem;animation:pulse 1s infinite;">⏳</div>
@@ -3555,8 +4356,12 @@ def index():
       }
 
       try {
-        const res = await fetch(`/api/store_history/${storeId}`);
-        const history = await res.json();
+        let history = storeHistoryCache[storeId];
+        if (!history) {
+          const res = await fetch(`/api/store_history/${storeId}`);
+          history = await res.json();
+          storeHistoryCache[storeId] = history;
+        }
 
         // Get latest decoded status from cache for reference
         const effectiveStatus = (mapDisplay && mapDisplay.includeCold) ? latestMergedStatus : hotStatus;
@@ -4075,6 +4880,176 @@ def index():
       });
     }
 
+    // ======================================
+    // MOBILE UI: Bottom Nav, Swipe, Sidebar Toggle
+    // ======================================
+    const isMobileViewport = () => window.innerWidth <= 768;
+    let currentMobileTab = 'map'; // 'map' | 'list' | 'calendar'
+
+    function mobileNavTo(tab) {
+      if (!isMobileViewport()) {
+        // On desktop, just use existing navigation
+        if (tab === 'calendar') navigateMenu('calendar');
+        else if (tab === 'settings') toggleNotifSettingsModal();
+        else navigateMenu('map');
+        return;
+      }
+
+      const sidebar = document.getElementById('sidebar');
+      const btns = document.querySelectorAll('.mobile-nav-btn');
+      btns.forEach(b => b.classList.remove('active'));
+
+      if (tab === 'map') {
+        currentMobileTab = 'map';
+        navigateMenu('map');
+        sidebar.classList.remove('mobile-visible');
+        document.getElementById('mob-nav-map').classList.add('active');
+        setTimeout(() => map.invalidateSize(), 150);
+      } else if (tab === 'list') {
+        currentMobileTab = 'list';
+        navigateMenu('map'); // ensure we're on map view (which contains sidebar)
+        sidebar.classList.add('mobile-visible');
+        document.getElementById('mob-nav-list').classList.add('active');
+      } else if (tab === 'calendar') {
+        currentMobileTab = 'calendar';
+        sidebar.classList.remove('mobile-visible');
+        navigateMenu('calendar');
+        document.getElementById('mob-nav-cal').classList.add('active');
+      } else if (tab === 'settings') {
+        document.getElementById('mob-nav-settings').classList.add('active');
+        toggleNotifSettingsModal();
+        // Restore previous active tab after short delay
+        setTimeout(() => {
+          document.getElementById('mob-nav-settings').classList.remove('active');
+          const prevBtn = document.getElementById('mob-nav-' + (currentMobileTab === 'list' ? 'list' : currentMobileTab === 'calendar' ? 'cal' : 'map'));
+          if (prevBtn) prevBtn.classList.add('active');
+        }, 300);
+        return;
+      }
+    }
+    window.mobileNavTo = mobileNavTo;
+
+    // Sync mobile bottom nav badges with stock counts
+    function syncMobileBadges() {
+      const mobStock = document.getElementById('mob-badge-stock');
+      const mobCal = document.getElementById('mob-badge-cal');
+      const desktopStock = document.getElementById('menu-stock-count');
+      const desktopCal = document.getElementById('menu-cal-count');
+      if (mobStock && desktopStock) {
+        const match = desktopStock.textContent.match(/(\d+)/);
+        if (match) mobStock.textContent = match[1];
+      }
+      if (mobCal && desktopCal) {
+        const match = desktopCal.textContent.match(/(\d+)/);
+        if (match) mobCal.textContent = match[1];
+      }
+    }
+
+    // Patch existing syncMenuAndRoute to also sync mobile nav state
+    const _origSyncMenuAndRoute = syncMenuAndRoute;
+    // Override will be applied after syncMenuAndRoute is available (it's already defined above)
+
+    // Observe DOM changes on desktop badge to sync mobile badges
+    const stockBadgeEl = document.getElementById('menu-stock-count');
+    if (stockBadgeEl) {
+      const observer = new MutationObserver(syncMobileBadges);
+      observer.observe(stockBadgeEl, { childList: true, characterData: true, subtree: true });
+    }
+    const calBadgeEl = document.getElementById('menu-cal-count');
+    if (calBadgeEl) {
+      const observer = new MutationObserver(syncMobileBadges);
+      observer.observe(calBadgeEl, { childList: true, characterData: true, subtree: true });
+    }
+    // Initial sync
+    syncMobileBadges();
+
+    // ======================================
+    // TOUCH SWIPE GESTURES
+    // ======================================
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchStartTime = 0;
+    const SWIPE_THRESHOLD = 60;
+    const SWIPE_MAX_TIME = 400;
+    const SWIPE_MAX_VERTICAL = 80;
+
+    // Sidebar swipe: swipe left on sidebar to close, swipe right on map edge to open
+    document.addEventListener('touchstart', (e) => {
+      if (!isMobileViewport()) return;
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+      touchStartTime = Date.now();
+    }, { passive: true });
+
+    document.addEventListener('touchend', (e) => {
+      if (!isMobileViewport()) return;
+      const touchEndX = e.changedTouches[0].clientX;
+      const touchEndY = e.changedTouches[0].clientY;
+      const deltaX = touchEndX - touchStartX;
+      const deltaY = touchEndY - touchStartY;
+      const elapsed = Date.now() - touchStartTime;
+
+      // Only process horizontal swipes
+      if (elapsed > SWIPE_MAX_TIME) return;
+      if (Math.abs(deltaY) > SWIPE_MAX_VERTICAL) return;
+      if (Math.abs(deltaX) < SWIPE_THRESHOLD) return;
+
+      const sidebar = document.getElementById('sidebar');
+      // Check if we're in map/list view (not calendar)
+      const viewStores = document.getElementById('view-stores-mode');
+      if (!viewStores || !viewStores.classList.contains('active')) return;
+
+      if (deltaX < -SWIPE_THRESHOLD && sidebar.classList.contains('mobile-visible')) {
+        // Swipe left → hide sidebar (show map)
+        mobileNavTo('map');
+      } else if (deltaX > SWIPE_THRESHOLD && !sidebar.classList.contains('mobile-visible')) {
+        // Swipe right from left edge → show sidebar (store list)
+        if (touchStartX < 40) {
+          mobileNavTo('list');
+        }
+      }
+    }, { passive: true });
+
+    // Modal swipe-down to close
+    document.addEventListener('touchstart', function(e) {
+      if (!isMobileViewport()) return;
+      const modal = e.target.closest('.modal-overlay');
+      if (!modal) return;
+      modal._swipeStartY = e.touches[0].clientY;
+    }, { passive: true });
+
+    document.addEventListener('touchend', function(e) {
+      if (!isMobileViewport()) return;
+      const modal = e.target.closest('.modal-overlay');
+      if (!modal || !modal._swipeStartY) return;
+      const deltaY = e.changedTouches[0].clientY - modal._swipeStartY;
+      if (deltaY > 100) {
+        // Swipe down → close modal
+        modal.style.display = 'none';
+      }
+      modal._swipeStartY = null;
+    }, { passive: true });
+
+    // On resize: clean up mobile state if switching to desktop
+    window.addEventListener('resize', () => {
+      const sidebar = document.getElementById('sidebar');
+      if (!isMobileViewport()) {
+        sidebar.classList.remove('mobile-visible');
+      } else {
+        // Ensure map is properly sized
+        setTimeout(() => map.invalidateSize(), 200);
+      }
+    });
+
+    // On initial load: set mobile state if needed
+    if (isMobileViewport()) {
+      const sidebar = document.getElementById('sidebar');
+      sidebar.classList.remove('mobile-visible');
+      // Default to map view on mobile
+      currentMobileTab = 'map';
+      setTimeout(() => map.invalidateSize(), 300);
+    }
+
     startRealtimeEngine();
   </script>
 </body>
@@ -4086,17 +5061,13 @@ def main():
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
     
-    port_env = os.environ.get("PORT")
-    if port_env:
-        port = int(port_env)
-    else:
-        import socket
-        port = 8080
-        for test_port in [8080, 8081, 8082, 8888, 5000]:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                if s.connect_ex(('127.0.0.1', test_port)) != 0:
-                    port = test_port
-                    break
+    import socket
+    port = 8080
+    for test_port in [8080, 8081, 8082, 8888, 5000]:
+      with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        if s.connect_ex(('127.0.0.1', test_port)) != 0:
+          port = test_port
+          break
 
     print("=================================================================")
     print("🚀 BAWUI POKE APP - Instant Real-Time Push Dashboard")
