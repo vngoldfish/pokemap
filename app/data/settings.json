@@ -12,7 +12,7 @@
     "notifyNotHandled": false,
     "notifyLottery": true,
     "notifyChain": "",
-    "maxReportAgeHours": 24,
+    "maxReportAgeHours": 1,
     "onlyOnsiteGps": false
   },
   "sidebarTab": "feed",
@@ -22,9 +22,15 @@
     "n": true,
     "u": true
   },
-  "maxReportAgeHours": 24,
+  "maxReportAgeHours": 1,
   "includeCold": true,
   "currentChain": "",
   "sortMode": "newest",
-  "showExpired": false
+  "showExpired": false,
+  "feedFreshnessHours": 24,
+  "feedChain": "",
+  "feedSortMode": "newest",
+  "allStatusFilter": "all",
+  "allChain": "",
+  "allSortMode": "newest"
 }

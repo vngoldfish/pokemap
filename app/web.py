@@ -400,9 +400,10 @@ def index():
     /* VIEW 1: STORE STOCK & MAP */
     #view-stores-mode {
       flex-direction: row;
+      position: relative;
     }
     #sidebar {
-      width: 480px;
+      width: 540px;
       height: 100%;
       display: flex;
       flex-direction: column;
@@ -411,6 +412,48 @@ def index():
       box-shadow: 2px 0 12px rgba(0,0,0,0.05);
       z-index: 1000;
       flex-shrink: 0;
+      transition: margin-left 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+    }
+    #sidebar.desktop-collapsed {
+      margin-left: -540px;
+    }
+
+    /* Floating toggle button for sidebar */
+    .sidebar-collapse-trigger {
+      position: absolute;
+      top: 14px;
+      left: 540px;
+      z-index: 1200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 38px;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-left: none;
+      border-radius: 0 8px 8px 0;
+      box-shadow: 3px 2px 8px rgba(0,0,0,0.12);
+      cursor: pointer;
+      font-size: 0.85rem;
+      color: #334155;
+      font-weight: bold;
+      transition: left 0.28s cubic-bezier(0.4, 0, 0.2, 1), background 0.15s, color 0.15s;
+    }
+    .sidebar-collapse-trigger:hover {
+      background: #f1f5f9;
+      color: #2563eb;
+    }
+    #view-stores-mode.sidebar-hidden .sidebar-collapse-trigger {
+      left: 0;
+      border-left: 1px solid #cbd5e1;
+    }
+
+    @media (max-width: 768px) {
+      .sidebar-collapse-trigger {
+        display: none !important;
+      }
     }
     
     .location-bar {
@@ -674,137 +717,203 @@ def index():
       box-shadow: 0 4px 12px rgba(37, 99, 235, 0.1);
       transform: translateY(-1px);
     }
-    .store-card.active-store-card {
-      border-color: #2563eb !important;
-      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.4), 0 4px 14px rgba(37, 99, 235, 0.15) !important;
-    }
-    .store-card.in-stock {
-      border-left: 5px solid #16a34a;
-      background: #f0fdf4;
-    }
-    .store-card.out-of-stock {
-      border-left: 5px solid #dc2626;
-      background: #fef2f2;
-    }
-    .store-card.not-handled {
-      border-left: 5px solid #94a3b8;
-      background: #f8fafc;
-    }
-    .store-card.unknown {
-      border-left: 5px solid #cbd5e1;
-      background: white;
-    }
-    
-    .store-card.just-updated {
-      animation: highlightFlash 2s ease-out;
-    }
-    @keyframes highlightFlash {
-      0% { background: #bbf7d0; }
-      100% { background: #f0fdf4; }
-    }
-    
-    .store-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 8px;
-    }
-    .store-name {
-      font-weight: 700;
-      font-size: 0.92rem;
-      color: #0f172a;
-    }
-    .status-tag {
-      font-size: 0.72rem;
-      font-weight: 700;
-      padding: 3px 8px;
-      border-radius: 12px;
-      white-space: nowrap;
-    }
-    .tag-in { background: #dcfce7; color: #15803d; }
-    .tag-out { background: #fee2e2; color: #b91c1c; }
-    .tag-none { background: #f1f5f9; color: #64748b; }
-    .tag-u { background: #f1f5f9; color: #94a3b8; }
-    
-    /* REPORT FRESHNESS BADGES */
-    .freshness-badge {
-      font-size: 0.72rem;
-      font-weight: 700;
-      padding: 4px 8px;
-      border-radius: 6px;
+    /* ========================================================
+       POKETAN STYLE LIST & PILL FILTERS
+       ======================================================== */
+    .poketan-chips-bar {
       display: flex;
       align-items: center;
-      gap: 4px;
-      margin-top: 2px;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      margin-bottom: 10px;
     }
-    .freshness-fresh {
-      background: #dcfce7;
-      color: #15803d;
-      border: 1px solid #86efac;
+    .poketan-chip {
+      padding: 6px 14px;
+      border-radius: 9999px;
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #475569;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s ease;
     }
-    .freshness-moderate {
-      background: #fef9c3;
-      color: #854d0e;
-      border: 1px solid #fde047;
+    .poketan-chip:hover {
+      background: #e2e8f0;
+      color: #0f172a;
     }
-    .freshness-aging {
-      background: #ffedd5;
-      color: #9a3412;
-      border: 1px solid #fdba74;
+    .poketan-chip.active {
+      background: #0f172a;
+      color: #ffffff;
+      border-color: #0f172a;
     }
-    .freshness-stale {
-      background: #fee2e2;
-      color: #991b1b;
-      border: 1px solid #fca5a5;
+    .poketan-chip.active-in {
+      background: #15803d;
+      color: #ffffff;
+      border-color: #15803d;
+    }
+    .poketan-chip.active-out {
+      background: #dc2626;
+      color: #ffffff;
+      border-color: #dc2626;
     }
 
-    .pack-tags {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 4px;
-      margin-top: 2px;
-    }
-    .pack-tag {
-      background: #fef3c7;
-      color: #92400e;
-      font-size: 0.7rem;
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-weight: 600;
-      border: 1px solid #fde68a;
-    }
-    .store-meta {
-      font-size: 0.75rem;
-      color: #64748b;
-      margin-top: 6px;
+    .poketan-header-row {
       display: flex;
       justify-content: space-between;
+      align-items: center;
+      padding: 6px 4px 8px 4px;
+      border-bottom: 1px solid #f1f5f9;
+      margin-bottom: 6px;
     }
-    .store-addr {
-      font-size: 0.75rem;
-      color: #94a3b8;
-      margin-top: 4px;
+    .poketan-header-title {
+      font-size: 0.78rem;
+      font-weight: 800;
+      color: #334155;
+    }
+    .poketan-sort-btn {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #64748b;
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 3px 8px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .poketan-sort-btn:hover {
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+
+    /* POKETAN CLEAN ROW */
+    .poketan-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 10px;
+      border-bottom: 1px solid #f1f5f9;
+      cursor: pointer;
+      transition: background 0.15s ease;
+      gap: 12px;
+      background: #ffffff;
+      border-radius: 8px;
+    }
+    .poketan-row:hover {
+      background: #f8fafc;
+    }
+    .poketan-row.active-store-card {
+      background: #eff6ff !important;
+      outline: 2px solid #3b82f6;
+    }
+    .poketan-row-left {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      min-width: 0;
+      flex: 1;
+    }
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      margin-top: 5px;
+    }
+    .dot-in {
+      background: #16a34a;
+      box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.2);
+    }
+    .dot-out {
+      background: #dc2626;
+    }
+    .dot-none {
+      background: #d97706;
+    }
+    .dot-u {
+      background: #94a3b8;
+    }
+
+    .poketan-row-main {
+      min-width: 0;
+      flex: 1;
+    }
+    .poketan-store-title-line {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .poketan-store-name {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: #0f172a;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    .store-hist-btn,
-    .store-accordion-toggle {
-      display: inline-flex;
+    .poketan-new-badge {
+      background: #dc2626;
+      color: #ffffff;
+      font-size: 0.65rem;
+      font-weight: 800;
+      padding: 1px 5px;
+      border-radius: 4px;
+      letter-spacing: 0.5px;
+    }
+    .poketan-row-subline {
+      font-size: 0.74rem;
+      color: #64748b;
+      margin-top: 3px;
+      display: flex;
       align-items: center;
-      gap: 5px;
-      padding: 4px 10px;
-      background: #eff6ff;
-      color: #1d4ed8;
-      border: 1.5px solid #bfdbfe;
-      border-radius: 6px;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .poketan-meta-pack {
+      color: #15803d;
+      font-weight: 600;
+      background: #f0fdf4;
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+
+    /* POKETAN STATUS BADGES ON THE RIGHT */
+    .poketan-status-badge {
+      padding: 5px 12px;
+      border-radius: 9999px;
       font-size: 0.74rem;
       font-weight: 700;
-      cursor: pointer;
       white-space: nowrap;
-      transition: all 0.18s ease;
       flex-shrink: 0;
-      user-select: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .poketan-badge-in {
+      background: #ecfdf5;
+      color: #059669;
+      border: 1px solid #a7f3d0;
+    }
+    .poketan-badge-out {
+      background: #fef2f2;
+      color: #dc2626;
+      border: 1px solid #fecaca;
+    }
+    .poketan-badge-none {
+      background: #fefce8;
+      color: #ca8a04;
+      border: 1px solid #fef08a;
+    }
+    .poketan-badge-u {
+      background: #f1f5f9;
+      color: #64748b;
+      border: 1px solid #e2e8f0;
     }
     .store-hist-btn:hover,
     .store-accordion-toggle:hover {
@@ -1840,13 +1949,27 @@ def index():
       }
 
       .controls-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
         gap: 6px;
+        width: 100%;
+      }
+      .control-box {
+        min-width: 0;
+      }
+      .search-box {
+        height: 36px;
+        padding: 0 10px;
+        font-size: 14px;
+        border-radius: 8px;
       }
       .control-dropdown {
-        height: 44px;
-        font-size: 16px; /* prevents iOS zoom */
-        padding: 0 8px;
-        border-radius: 10px;
+        height: 36px;
+        font-size: 13px;
+        padding: 0 6px;
+        border-radius: 8px;
+        background-position: right 6px center;
+        padding-right: 20px;
       }
 
       .filter-status-banner {
@@ -2248,155 +2371,73 @@ def index():
     <!-- VIEW 1: STORES LIST & MAP -->
     <div id="view-stores-mode" class="app-view active">
       <div id="sidebar">
-        <div class="location-bar">
-          <div class="location-info" id="location-text">
-            <span>📍 Đang xác định vị trí của bạn...</span>
+        <div class="controls" style="padding: 10px 12px 6px 12px; border-bottom: 1px solid #f1f5f9;">
+          <!-- ROW 1: SEARCH INPUT & CHAIN SELECT (EQUAL 50/50 SPLIT) -->
+          <div class="controls-grid" style="margin-bottom: 6px;">
+            <div class="control-box">
+              <input type="text" id="search-input" class="search-box" placeholder="🔍 Tìm ga, tiệm..." oninput="handleSearchInput(this.value)" style="height:34px; padding: 0 10px; font-size:0.78rem;" />
+            </div>
+            <div class="control-box">
+              <select id="feed-chain-select" class="control-dropdown" onchange="setFeedChain(this.value)" title="Lọc theo chuỗi cửa hàng" style="height:34px; font-size:0.78rem;">
+                <option value="" selected>🏢 Tất cả chuỗi</option>
+                <option value="seven">🏪 7-Eleven</option>
+                <option value="lawson">🏪 Lawson</option>
+                <option value="familymart">🏪 FamilyMart</option>
+                <option value="ministop">🏪 Ministop</option>
+                <option value="specialty">🃏 Shop Pokémon</option>
+              </select>
+            </div>
           </div>
-          <button class="loc-btn" onclick="requestUserLocation(true)">Cập nhật GPS</button>
+
+          <!-- ROW 2: STATUS & FRESHNESS DROPDOWNS (EQUAL 50/50 SPLIT) -->
+          <div class="controls-grid">
+            <div class="control-box">
+              <select id="poketan-status-select" class="control-dropdown" onchange="setPoketanStatusFilter(this.value)" title="Lọc theo trạng thái báo cáo" style="height:34px; font-size:0.78rem; font-weight:700;">
+                <option value="i" selected>🟢 在庫あり (Có hàng)</option>
+                <option value="all">📋 すべて (Tất cả)</option>
+                <option value="o">🔴 在庫なし (Hết hàng)</option>
+                <option value="n">⚪ 不明・扱無 (Chưa rõ)</option>
+              </select>
+            </div>
+            <div class="control-box">
+              <select id="feed-freshness-select" class="control-dropdown" onchange="setFeedFreshness(this.value)" title="Lọc tin báo theo thời gian" style="height:34px; font-size:0.78rem;">
+                <option value="24" selected>📅 24 giờ qua</option>
+                <option value="1">⚡ Mới (&lt;1h)</option>
+                <option value="3">⏱ Trong 3 giờ</option>
+                <option value="6">⏱ Trong 6 giờ</option>
+                <option value="12">📅 Trong 12 giờ</option>
+                <option value="9999">⏳ Mọi lúc</option>
+              </select>
+            </div>
+          </div>
         </div>
-        
-        <!-- 2. SIDEBAR TAB SWITCHER: SEPARATE IN-STOCK FEED & ALL STORES -->
-        <div class="sidebar-tab-switcher">
-          <button class="sidebar-tab-btn active" id="tab-btn-feed" onclick="setSidebarTab('feed')">
-            <span>⚡ Báo Có Hàng</span>
-            <span class="tab-pill-badge" id="feed-tab-count">0</span>
+
+        <!-- POKETAN HEADER ROW: MINNA NO SAISHIN NO HOKOKU & SORT -->
+        <div class="poketan-header-row" style="padding: 8px 14px 4px 14px;">
+          <div>
+            <div class="poketan-header-title">みんなの最新の報告 (Báo cáo mới nhất)</div>
+            <div style="font-size:0.68rem; color:#94a3b8;" id="poketan-sub-info">大阪府 4,050店舗から探せます</div>
+          </div>
+          <button class="poketan-sort-btn" id="btn-poketan-sort" onclick="togglePoketanSort()" title="Đổi cách sắp xếp">
+            <span id="poketan-sort-icon">⏱</span>
+            <span id="poketan-sort-label">更新順</span>
           </button>
-          <button class="sidebar-tab-btn" id="tab-btn-all" onclick="setSidebarTab('all')">
-            <span>🏢 Tra Cứu Toàn Bộ</span>
-            <span class="tab-pill-badge muted" id="all-tab-count">4,050</span>
-          </button>
-        </div>
-
-        <div class="stats-bar">
-          <div class="stat-badge" onclick="setSidebarTab('feed')" title="Xem danh sách các cửa hàng đang có hàng">
-            <div class="num stat-in" id="stat-in">-</div>
-            <div class="label">🟢 Có hàng</div>
-          </div>
-          <div class="stat-badge" onclick="setSidebarTab('all', 'o')" title="Xem các cửa hàng vừa báo hết hàng">
-            <div class="num stat-out" id="stat-out">-</div>
-            <div class="label">🔴 Hết hàng</div>
-          </div>
-          <div class="stat-badge" onclick="setSidebarTab('all', 'all')" title="Tra cứu trong toàn bộ 4,050 cửa hàng Osaka">
-            <div class="num" id="stat-total" style="color:#0284c7;">4,050</div>
-            <div class="label">🏢 Toàn bộ Osaka</div>
-          </div>
         </div>
         
-        <div class="controls">
-          <div class="search-row">
-            <input type="text" id="search-input" class="search-box" placeholder="🔍 Tìm trong các điểm có hàng (tên quán, ga, khu vực)..." oninput="handleSearchInput(this.value)" />
-            <button class="settings-icon-btn" id="btn-sidebar-settings" onclick="toggleMapSettingsModal()" title="🗺️ Cài đặt ghim hiển thị trên bản đồ">
-              🗺️
-            </button>
-            <button class="settings-icon-btn" id="btn-sidebar-notif" onclick="toggleNotifSettingsModal()" title="🔔 Cài đặt thông báo có hàng & cảnh báo" style="color:#2563eb;">
-              🔔
-            </button>
-          </div>
-
-          <!-- CONTROLS CHO TAB 1: BÁO CÓ HÀNG (FEED) -->
-          <div id="controls-feed-group">
-            <div class="controls-grid" style="margin-top: 6px;">
-              <div class="control-box">
-                <span class="control-box-label">⏱ Độ mới tin báo:</span>
-                <select id="feed-freshness-select" class="control-dropdown" onchange="setFeedFreshness(this.value)" title="Lọc tin báo có hàng theo thời gian">
-                  <option value="24" selected>📅 24 giờ qua (Mặc định)</option>
-                  <option value="1">⚡ Siêu mới: Trong 1 giờ (<1h) 🔥</option>
-                  <option value="3">⏱ Trong 3 giờ (Săn thẻ)</option>
-                  <option value="6">⏱ Trong 6 giờ</option>
-                  <option value="12">📅 Trong 12 giờ</option>
-                  <option value="9999">⏳ Tất cả thời gian</option>
-                </select>
-              </div>
-
-              <div class="control-box">
-                <span class="control-box-label">🏪 Chuỗi cửa hàng:</span>
-                <select id="feed-chain-select" class="control-dropdown" onchange="setFeedChain(this.value)" title="Lọc theo chuỗi cửa hàng">
-                  <option value="" selected>🏢 Tất cả chuỗi</option>
-                  <option value="seven">🏪 7-Eleven</option>
-                  <option value="lawson">🏪 Lawson</option>
-                  <option value="familymart">🏪 FamilyMart</option>
-                  <option value="ministop">🏪 Ministop</option>
-                  <option value="specialty">🃏 Shop thẻ Pokémon</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="controls-grid" style="margin-top: 6px; grid-template-columns: 1fr;">
-              <div class="control-box">
-                <span class="control-box-label">↕️ Sắp xếp danh sách có hàng:</span>
-                <select id="feed-sort-select" class="control-dropdown" onchange="setFeedSort(this.value)" title="Cách sắp xếp danh sách có hàng">
-                  <option value="newest" selected>⏱ Mới báo nhất trước</option>
-                  <option value="nearest">📍 Gần tôi nhất (GPS)</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <!-- CONTROLS CHO TAB 2: TRA CỨU TOÀN BỘ (ALL) -->
-          <div id="controls-all-group" style="display: none;">
-            <div class="controls-grid" style="margin-top: 6px;">
-              <div class="control-box">
-                <span class="control-box-label">🎯 Lọc tình trạng:</span>
-                <select id="all-status-select" class="control-dropdown" onchange="setAllStatusFilter(this.value)" title="Lọc theo tình trạng">
-                  <option value="all" selected>🏢 Tất cả (4,050 điểm)</option>
-                  <option value="i">🟢 Đang có hàng</option>
-                  <option value="o">🔴 Hết hàng</option>
-                  <option value="n">⚪ Không bán thẻ</option>
-                  <option value="u">🔘 Chưa có báo cáo</option>
-                </select>
-              </div>
-
-              <div class="control-box">
-                <span class="control-box-label">🏪 Chuỗi cửa hàng:</span>
-                <select id="all-chain-select" class="control-dropdown" onchange="setAllChain(this.value)" title="Lọc theo chuỗi cửa hàng">
-                  <option value="" selected>🏢 Tất cả chuỗi</option>
-                  <option value="seven">🏪 7-Eleven</option>
-                  <option value="lawson">🏪 Lawson</option>
-                  <option value="familymart">🏪 FamilyMart</option>
-                  <option value="ministop">🏪 Ministop</option>
-                  <option value="specialty">🃏 Shop thẻ Pokémon</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="controls-grid" style="margin-top: 6px; grid-template-columns: 1fr;">
-              <div class="control-box">
-                <span class="control-box-label">↕️ Sắp xếp tra cứu:</span>
-                <select id="all-sort-select" class="control-dropdown" onchange="setAllSort(this.value)" title="Cách sắp xếp">
-                  <option value="newest" selected>⏱ Cập nhật mới nhất</option>
-                  <option value="nearest">📍 Gần tôi nhất (GPS)</option>
-                </select>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="filter-status-banner" id="filter-status-banner">
-          <span id="banner-filter-text">🟢 Đang hiển thị danh sách các điểm có hàng tại Osaka</span>
-          <span style="font-size:0.72rem;color:#0284c7;font-weight:700;" id="banner-map-status">🗺️ Bản đồ: Toàn cảnh 4,050 điểm</span>
-        </div>
-        
-        <div id="store-list">
+        <div id="store-list" style="padding: 4px 14px;">
           <div style="text-align: center; color: #94a3b8; padding: 25px;">Đang tải dữ liệu thời gian thực Firestore...</div>
         </div>
       </div>
 
+      <!-- Edge toggle tab button (always accessible) -->
+      <button class="sidebar-collapse-trigger" id="sidebar-toggle-edge" onclick="toggleDesktopSidebar()" title="Ẩn / Hiện thanh danh sách">
+        ◀
+      </button>
+
       <div id="map">
         <div class="map-controls-box">
-          <button class="floating-btn" id="btn-quick-map-mode" onclick="toggleQuickMapMode()" title="Chuyển nhanh chế độ ghim trên bản đồ">
-            <span id="quick-map-mode-text">🗺️ Bản đồ: Tất cả 4,050 điểm</span>
-          </button>
-          <button class="floating-btn" onclick="toggleMapSettingsModal()" title="Cài đặt những cửa hàng muốn nhìn thấy trên bản đồ">
-            <span>⚙️ Cài đặt bản đồ</span>
-          </button>
-          <button class="floating-btn" onclick="toggleNotifSettingsModal()" title="Cài đặt những thông báo bạn muốn nhận">
-            <span>🔔 Cài đặt thông báo</span>
-          </button>
-          <button class="floating-btn" onclick="requestUserLocation(true)">
+          <button class="floating-btn" onclick="requestUserLocation(true)" title="Định vị vị trí GPS hiện tại của tôi">
             <span>📍 Vị trí của tôi</span>
-          </button>
-          <button class="floating-btn" onclick="setMockOsakaLocation()">
-            <span>🏢 Giả lập tại Ga Umeda (Osaka)</span>
           </button>
         </div>
       </div>
@@ -3163,36 +3204,41 @@ def index():
     }
     window.setFeedSort = setFeedSort;
 
-    // BỘ LỌC CHO TAB TRA CỨU TOÀN BỘ (ALL)
-    function setAllStatusFilter(val) {
-      allStatusFilter = val;
-      updateFilterBanner();
-      renderSidebarListOnly();
-      saveSettings();
-    }
-    window.setAllStatusFilter = setAllStatusFilter;
+    // ======================================
+    // POKETAN STYLE PILLS & SORT CONTROLS
+    // ======================================
+    let poketanStatus = 'i'; // 'all' | 'i' | 'o' | 'n'
 
-    function setAllChain(val) {
-      allChain = val;
-      updateFilterBanner();
+    function setPoketanStatusFilter(status) {
+      poketanStatus = status;
+      const selectEl = document.getElementById('poketan-status-select');
+      if (selectEl && selectEl.value !== status) {
+        selectEl.value = status;
+      }
       renderSidebarListOnly();
       saveSettings();
     }
-    window.setAllChain = setAllChain;
+    window.setPoketanStatusFilter = setPoketanStatusFilter;
 
-    function setAllSort(val) {
-      allSortMode = val;
+    function togglePoketanSort() {
+      feedSortMode = (feedSortMode === 'newest') ? 'nearest' : 'newest';
+      const label = document.getElementById('poketan-sort-label');
+      const icon = document.getElementById('poketan-sort-icon');
+      if (feedSortMode === 'nearest') {
+        if (label) label.textContent = '距離順 (Gần nhất)';
+        if (icon) icon.textContent = '📍';
+      } else {
+        if (label) label.textContent = '更新順 (Mới nhất)';
+        if (icon) icon.textContent = '⏱';
+      }
       renderSidebarListOnly();
       saveSettings();
     }
-    window.setAllSort = setAllSort;
+    window.togglePoketanSort = togglePoketanSort;
 
     function handleSearchInput(val) {
-      if (sidebarTab === 'feed') {
-        feedQuery = val;
-      } else {
-        allQuery = val;
-      }
+      feedQuery = val;
+      allQuery = val;
       renderSidebarListOnly();
     }
     window.handleSearchInput = handleSearchInput;
@@ -3644,15 +3690,12 @@ def index():
     }
 
     function requestUserLocation(fly = true) {
-      const locText = document.getElementById('location-text');
       const headerLoc = document.getElementById('header-loc-summary');
       if (!navigator.geolocation) {
-        if (locText) locText.innerHTML = '<span style="color:#ef4444;">❌ Trình duyệt không hỗ trợ Geolocation</span>';
-        if (headerLoc) headerLoc.innerText = 'Chưa định vị';
+        if (headerLoc) headerLoc.innerText = 'Không hỗ trợ GPS';
         return;
       }
 
-      if (locText) locText.innerHTML = '<span>⏳ Đang định vị GPS...</span>';
       if (headerLoc) headerLoc.innerText = 'Đang định vị...';
 
       navigator.geolocation.getCurrentPosition(
@@ -3673,37 +3716,18 @@ def index():
           let note = `(Cách Osaka ~${Math.round(distToOsaka)}km)`;
           if (distToOsaka < 30) note = `(Tại Osaka)`;
 
-          if (locText) locText.innerHTML = `<span>📍 Vị trí của bạn ${note} • ±${Math.round(userAccuracy)}m</span>`;
           if (headerLoc) headerLoc.innerText = `GPS của bạn ${note}`;
           renderUserLocation(fly);
           renderUI();
         },
         (err) => {
           console.warn("GPS error:", err.message);
-          // KHÔNG tự ý gọi setMockOsakaLocation() ở đây để tránh giật nhảy bản đồ sang Ga Umeda!
-          // Chỉ hiển thị hướng dẫn khi người dùng chưa cấp quyền hoặc GPS timeout
-          if (locText) locText.innerHTML = `<span>⚠️ Chưa bật GPS. Bấm '📍 Vị trí' hoặc 'Giả lập Ga Umeda'</span>`;
           if (headerLoc) headerLoc.innerText = 'Chưa bật GPS';
         },
         { enableHighAccuracy: true, timeout: 15000, maximumAge: fly ? 0 : 30000 }
       );
     }
     window.requestUserLocation = requestUserLocation;
-
-    function setMockOsakaLocation(fly = true) {
-      isMockLocation = true;
-      userLat = 34.702485;
-      userLng = 135.495951;
-      userAccuracy = 50;
-
-      const locText = document.getElementById('location-text');
-      const headerLoc = document.getElementById('header-loc-summary');
-      if (locText) locText.innerHTML = `<span>🏢 Đang giả lập tại Ga Umeda (Osaka)</span>`;
-      if (headerLoc) headerLoc.innerText = 'Ga Umeda (Osaka)';
-      renderUserLocation(fly);
-      renderUI();
-    }
-    window.setMockOsakaLocation = setMockOsakaLocation;
 
     // 6. TOAST NOTIFICATIONS & ALERT DISPATCH
     function showToast(store, info, force = false) {
@@ -4119,242 +4143,151 @@ def index():
 
       let listToRender = [];
 
-      if (sidebarTab === 'feed') {
-        // ============================================
-        // TAB 1: DANH SÁCH BÁO CÓ HÀNG (IN-STOCK FEED)
-        // ============================================
-        for (const store of allStores) {
-          const sid = store.id;
-          const rawVal = effectiveStatus[sid];
-          const info = decodeStatus(rawVal, effectiveStatus[sid + '_c']);
+      for (const store of allStores) {
+        const sid = store.id;
+        const rawVal = effectiveStatus[sid];
+        const info = decodeStatus(rawVal, effectiveStatus[sid + '_c']);
 
-          // CHỈ LẤY CỬA HÀNG ĐANG CÓ HÀNG (🟢 Có hàng)
-          if (info.code !== 'i') continue;
-
-          // Lọc theo độ mới tin báo (feedFreshnessHours)
-          if (feedFreshnessHours < 9000 && info.timestamp > 0) {
-            const ageHours = (now - info.timestamp) / 3600;
-            if (ageHours > feedFreshnessHours) continue;
-          }
-
-          // Lọc theo chuỗi
-          if (feedChain && store.chain !== feedChain) continue;
-
-          // Tính khoảng cách GPS
-          let distanceKm = null;
-          if (userLat !== null && userLng !== null && store.lat && store.lng) {
-            distanceKm = calcDistanceKm(userLat, userLng, store.lat, store.lng);
-          }
-
-          // Lọc theo từ khóa tìm kiếm
-          if (feedQuery) {
-            const q = feedQuery.toLowerCase();
-            const matchName = (store.name || '').toLowerCase().includes(q);
-            const matchAddr = (store.address || '').toLowerCase().includes(q);
-            if (!matchName && !matchAddr) continue;
-          }
-
-          listToRender.push({ store, info, distanceKm });
+        // 1. Lọc theo trạng thái PokéTan (tất cả / có hàng / hết hàng / chưa rõ)
+        if (poketanStatus !== 'all') {
+          if (poketanStatus === 'i' && info.code !== 'i') continue;
+          if (poketanStatus === 'o' && info.code !== 'o') continue;
+          if (poketanStatus === 'n' && (info.code !== 'n' && info.code !== 'u')) continue;
         }
 
-        // Sắp xếp danh sách có hàng
-        if (feedSortMode === 'nearest') {
-          listToRender.sort((a, b) => {
-            if (a.distanceKm === null) return 1;
-            if (b.distanceKm === null) return -1;
-            return a.distanceKm - b.distanceKm;
-          });
-        } else {
-          // Mới nhất trước
-          listToRender.sort((a, b) => b.info.timestamp - a.info.timestamp);
+        // 2. Lọc theo độ mới tin báo (feedFreshnessHours)
+        if (feedFreshnessHours < 9000 && info.timestamp > 0) {
+          const ageHours = (now - info.timestamp) / 3600;
+          if (ageHours > feedFreshnessHours) continue;
         }
 
-        if (listToRender.length === 0) {
-          storeList.innerHTML = `
-            <div style="text-align:center;color:#64748b;padding:36px 16px;">
-              <div style="font-size:2.2rem;margin-bottom:8px;">🟢</div>
-              <b style="font-size:0.95rem;color:#0f172a;">Không có điểm có hàng nào thỏa mãn bộ lọc.</b>
-              <div style="font-size:0.8rem;margin-top:6px;color:#64748b;">Hãy thử chọn mốc thời gian dài hơn (ví dụ: 24 giờ qua) hoặc chọn Tất cả chuỗi.</div>
-              <button class="status-quick-btn" style="margin-top:14px;" onclick="setFeedFreshness(24); setFeedChain(''); document.getElementById('feed-freshness-select').value='24'; document.getElementById('feed-chain-select').value='';">
-                🔄 Xem tất cả ${countI} điểm có hàng trong 24h
-              </button>
-            </div>
-          `;
-          return;
+        // 3. Lọc theo chuỗi
+        if (feedChain && store.chain !== feedChain) continue;
+
+        // 4. Tính khoảng cách GPS
+        let distanceKm = null;
+        if (userLat !== null && userLng !== null && store.lat && store.lng) {
+          distanceKm = calcDistanceKm(userLat, userLng, store.lat, store.lng);
         }
 
-        let html = `
-          <div style="font-size:0.75rem;color:#16a34a;background:#dcfce7;padding:8px 12px;border-radius:8px;border:1px solid #86efac;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-            <b>🟢 Danh sách ${listToRender.length} điểm ĐANG CÓ HÀNG</b>
-            <span style="font-size:0.7rem;color:#15803d;font-weight:600;">(Bản đồ giữ nguyên)</span>
-          </div>
-        `;
-
-        for (const item of listToRender) {
-          html += renderSingleStoreCard(item);
+        // 5. Lọc theo từ khóa tìm kiếm
+        if (feedQuery) {
+          const q = feedQuery.toLowerCase();
+          const matchName = (store.name || '').toLowerCase().includes(q);
+          const matchAddr = (store.address || '').toLowerCase().includes(q);
+          if (!matchName && !matchAddr) continue;
         }
-        storeList.innerHTML = html;
 
+        listToRender.push({ store, info, distanceKm });
+      }
+
+      // Sắp xếp danh sách
+      if (feedSortMode === 'nearest') {
+        listToRender.sort((a, b) => {
+          if (a.distanceKm === null) return 1;
+          if (b.distanceKm === null) return -1;
+          return a.distanceKm - b.distanceKm;
+        });
       } else {
-        // ============================================
-        // TAB 2: TRA CỨU TOÀN BỘ 4,050 CỬA HÀNG (ALL STORES)
-        // ============================================
-        for (const store of allStores) {
-          const sid = store.id;
-          const rawVal = effectiveStatus[sid];
-          const info = decodeStatus(rawVal, effectiveStatus[sid + '_c']);
+        // Cập nhật mới nhất trước (hoặc ưu tiên có hàng)
+        listToRender.sort((a, b) => {
+          const timeA = a.info.timestamp || 0;
+          const timeB = b.info.timestamp || 0;
+          return timeB - timeA;
+        });
+      }
 
-          // Lọc theo tình trạng
-          if (allStatusFilter !== 'all' && info.code !== allStatusFilter) continue;
+      const subInfoEl = document.getElementById('poketan-sub-info');
+      if (subInfoEl) {
+        subInfoEl.textContent = `大阪府 ${listToRender.length.toLocaleString()}店舗から探せます`;
+      }
 
-          // Lọc theo chuỗi
-          if (allChain && store.chain !== allChain) continue;
-
-          // Tính khoảng cách GPS
-          let distanceKm = null;
-          if (userLat !== null && userLng !== null && store.lat && store.lng) {
-            distanceKm = calcDistanceKm(userLat, userLng, store.lat, store.lng);
-          }
-
-          // Lọc theo từ khóa tìm kiếm
-          if (allQuery) {
-            const q = allQuery.toLowerCase();
-            const matchName = (store.name || '').toLowerCase().includes(q);
-            const matchAddr = (store.address || '').toLowerCase().includes(q);
-            if (!matchName && !matchAddr) continue;
-          }
-
-          listToRender.push({ store, info, distanceKm });
-        }
-
-        // Sắp xếp
-        if (allSortMode === 'nearest') {
-          listToRender.sort((a, b) => {
-            if (a.distanceKm === null) return 1;
-            if (b.distanceKm === null) return -1;
-            return a.distanceKm - b.distanceKm;
-          });
-        } else {
-          listToRender.sort((a, b) => {
-            if (a.info.code === 'i' && b.info.code !== 'i') return -1;
-            if (a.info.code !== 'i' && b.info.code === 'i') return 1;
-            return b.info.timestamp - a.info.timestamp;
-          });
-        }
-
-        if (listToRender.length === 0) {
-          storeList.innerHTML = `
-            <div style="text-align:center;color:#64748b;padding:36px 16px;">
-              <div style="font-size:2.2rem;margin-bottom:8px;">🔍</div>
-              <b style="font-size:0.95rem;color:#0f172a;">Không tìm thấy cửa hàng nào phù hợp.</b>
-              <div style="font-size:0.8rem;margin-top:6px;">Hãy kiểm tra lại từ khóa tìm kiếm hoặc chọn lại chuỗi.</div>
-            </div>
-          `;
-          return;
-        }
-
-        const renderSlice = listToRender.slice(0, visibleLimit);
-        let html = `
-          <div style="font-size:0.75rem;color:#0369a1;background:#e0f2fe;padding:8px 12px;border-radius:8px;border:1px solid #bae6fd;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-            <b>🏢 Tra cứu: Hiển thị ${renderSlice.length} / ${listToRender.length.toLocaleString()} điểm</b>
+      if (listToRender.length === 0) {
+        storeList.innerHTML = `
+          <div style="text-align:center;color:#64748b;padding:36px 16px;">
+            <div style="font-size:2.2rem;margin-bottom:8px;">🔍</div>
+            <b style="font-size:0.95rem;color:#0f172a;">Không có báo cáo nào phù hợp.</b>
+            <div style="font-size:0.8rem;margin-top:6px;color:#64748b;">Hãy thử đổi bộ lọc trạng thái sang 'すべて' hoặc mở rộng mốc thời gian.</div>
           </div>
         `;
-
-        for (const item of renderSlice) {
-          html += renderSingleStoreCard(item);
-        }
-
-        if (listToRender.length > renderSlice.length) {
-          html += `
-            <div style="text-align:center;padding:12px 0;">
-              <button type="button" onclick="loadMoreStores()" style="width:100%;padding:10px;font-size:0.82rem;font-weight:700;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:6px;cursor:pointer;">
-                ⬇️ Tải thêm 150 cửa hàng tiếp theo (Đang xem ${renderSlice.length} / ${listToRender.length.toLocaleString()})
-              </button>
-              <button type="button" onclick="loadAllStores()" style="margin-top:6px;background:none;border:none;color:#64748b;font-size:0.75rem;text-decoration:underline;cursor:pointer;">
-                Xem toàn bộ ${listToRender.length.toLocaleString()} cửa hàng trong danh sách
-              </button>
-            </div>
-          `;
-        }
-
-        storeList.innerHTML = html;
+        return;
       }
 
-      // Populate open accordions if any
-      const renderedCards = (sidebarTab === 'feed') ? listToRender : listToRender.slice(0, visibleLimit);
-      for (const item of renderedCards) {
-        if (openAccordionStoreIds.has(item.store.id)) {
-          const bodyEl = document.getElementById(`accordion-${item.store.id}`);
-          if (bodyEl) {
-            if (storeHistoryCache[item.store.id]) {
-              renderAccordionContent(item.store.id, bodyEl, storeHistoryCache[item.store.id]);
-            } else {
-              loadAndRenderAccordion(item.store.id, bodyEl);
-            }
-          }
-        }
+      const renderSlice = listToRender.slice(0, visibleLimit);
+      let html = '';
+      for (const item of renderSlice) {
+        html += renderSingleStoreCard(item);
       }
+
+      if (listToRender.length > renderSlice.length) {
+        html += `
+          <div style="text-align:center;padding:12px 0;">
+            <button type="button" onclick="loadMoreStores()" style="width:100%;padding:10px;font-size:0.82rem;font-weight:700;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:6px;cursor:pointer;">
+              ⬇️ Tải thêm 150 báo cáo tiếp theo (Đang xem ${renderSlice.length} / ${listToRender.length.toLocaleString()})
+            </button>
+          </div>
+        `;
+      }
+
+      storeList.innerHTML = html;
     }
     window.renderSidebarListOnly = renderSidebarListOnly;
 
     function renderSingleStoreCard(item) {
       const { store, info, distanceKm } = item;
-      const packsHtml = info.packs.map(p => `<span class="pack-tag">📦 ${p}</span>`).join('');
-      const distBadge = distanceKm !== null 
-        ? `<span style="color:#2563eb;font-weight:700;background:#dbeafe;padding:2px 6px;border-radius:4px;font-size:0.72rem;">📍 ${formatDistance(distanceKm)}</span>` 
-        : '';
+      
+      // Status dot and badge mapping exactly as Poketan
+      let dotClass = 'dot-in';
+      let badgeClass = 'poketan-badge-in';
+      let badgeText = '在庫あり';
 
-      let cardClass = 'in-stock';
-      let statusBadge = '<span class="status-tag tag-in">🟢 Có hàng</span>';
       if (info.code === 'o') {
-        cardClass = 'out-of-stock';
-        statusBadge = '<span class="status-tag tag-out">🔴 Hết hàng</span>';
+        dotClass = 'dot-out';
+        badgeClass = 'poketan-badge-out';
+        badgeText = '在庫なし';
       } else if (info.code === 'n') {
-        cardClass = 'not-handled';
-        statusBadge = '<span class="status-tag tag-none">⚪ Không bán</span>';
+        dotClass = 'dot-none';
+        badgeClass = 'poketan-badge-none';
+        badgeText = '扱ってない';
       } else if (info.code === 'u') {
-        cardClass = 'unknown';
-        statusBadge = '<span class="status-tag tag-u">🔘 Chưa rõ</span>';
+        dotClass = 'dot-u';
+        badgeClass = 'poketan-badge-u';
+        badgeText = '不明';
       }
 
-      const freshnessBadgeHtml = info.freshness 
-        ? `<div class="freshness-badge ${info.freshness.badgeClass}">${info.freshness.tagText}</div>`
-        : '';
+      // Check if newly reported (< 1h)
+      const isNew = info.timestamp > 0 && ((Date.now() / 1000 - info.timestamp) < 3600);
+      const newBadge = isNew ? `<span class="poketan-new-badge">NEW</span>` : '';
 
-      const reportMeta = (info.reported_at && info.reported_at !== '-' && info.reported_at !== 'Chưa rõ')
-        ? `<span>⏱ <b>${info.timeAgo}</b> (${info.reported_at})</span><span>👥 ${info.confirms} xác nhận</span>`
-        : `<span style="color:#94a3b8;">Chưa có cập nhật gần đây</span>`;
+      // Format distance
+      const distStr = distanceKm !== null ? `📍 ${formatDistance(distanceKm)}` : '';
+      
+      // Format time
+      const timeStr = info.timeAgo || 'Vừa cập nhật';
 
-      const isAccordionOpen = openAccordionStoreIds.has(store.id);
-      const arrowChar = isAccordionOpen ? '▼' : '▶';
-      const toggleBtnLabel = isAccordionOpen ? 'Thu gọn' : 'Lịch sử';
-      const toggleBtnClass = isAccordionOpen ? 'store-accordion-toggle expanded' : 'store-accordion-toggle';
-      const accordionStyle = isAccordionOpen ? 'display:block;' : 'display:none;';
+      // Packs or note
+      const packStr = info.packs.length ? `<span class="poketan-meta-pack">📦 ${info.packs.join(', ')}</span>` : '';
+      const confirmStr = info.confirms ? `👥 ${info.confirms} người báo` : '匿名トレーナー';
 
       return `
-        <div class="store-card ${cardClass}" id="card-${store.id}" onclick="focusStore('${store.id}')" title="Bấm để xem vị trí cửa hàng trên bản đồ">
-          <div class="store-header">
-            <span class="store-name">${store.name}</span>
-            ${statusBadge}
+        <div class="poketan-row" id="card-${store.id}" onclick="focusStore('${store.id}')" title="Bấm để xem vị trí trên bản đồ">
+          <div class="poketan-row-left">
+            <div class="status-dot ${dotClass}"></div>
+            <div class="poketan-row-main">
+              <div class="poketan-store-title-line">
+                <span class="poketan-store-name">${store.name}</span>
+                ${newBadge}
+              </div>
+              <div class="poketan-row-subline">
+                <span>⏱ ${timeStr}</span>
+                ${distStr ? `<span>• ${distStr}</span>` : ''}
+                ${packStr ? `<span>• ${packStr}</span>` : ''}
+                <span>• ${confirmStr}</span>
+              </div>
+            </div>
           </div>
-          <div style="display:flex;justify-content:space-between;align-items:center;">
-            <span style="font-size:0.75rem;color:#0284c7;font-weight:600;">${store.chain_label || store.chain}</span>
-            ${distBadge}
-          </div>
-          ${freshnessBadgeHtml}
-          ${packsHtml ? `<div class="pack-tags">${packsHtml}</div>` : ''}
-          <div class="store-meta">
-            ${reportMeta}
-          </div>
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;padding-top:6px;border-top:1px dashed #e2e8f0;gap:8px;cursor:pointer;" onclick="event.stopPropagation(); toggleStoreHistoryAccordion('${store.id}')" title="Bấm để xem / thu gọn lịch sử báo cáo">
-            <div class="store-addr" style="margin-top:0;flex:1;min-width:0;">📍 ${store.address || ''}</div>
-            <button type="button" class="${toggleBtnClass}" id="toggle-btn-${store.id}" onclick="event.stopPropagation(); toggleStoreHistoryAccordion('${store.id}')" title="Bấm để xem / thu gọn lịch sử báo cáo">
-              <span class="accordion-arrow" id="arrow-${store.id}">${arrowChar}</span>
-              <span class="accordion-label" id="toggle-label-${store.id}">${toggleBtnLabel}</span>
-            </button>
-          </div>
-          <div class="store-accordion-body" id="accordion-${store.id}" onclick="event.stopPropagation();" style="${accordionStyle}">
-            <!-- Accordion content dynamically rendered -->
+          <div class="poketan-status-badge ${badgeClass}">
+            ${badgeText}
           </div>
         </div>
       `;
@@ -5395,13 +5328,63 @@ def index():
       }
     });
 
+    // ======================================
+    // DESKTOP SIDEBAR COLLAPSE / EXPAND TOGGLE
+    // ======================================
+    let isDesktopSidebarCollapsed = false;
+
+    function toggleDesktopSidebar() {
+      if (isMobileViewport()) {
+        mobileNavTo(currentMobileTab === 'list' ? 'map' : 'list');
+        return;
+      }
+      isDesktopSidebarCollapsed = !isDesktopSidebarCollapsed;
+      const sidebar = document.getElementById('sidebar');
+      const view = document.getElementById('view-stores-mode');
+      const edgeBtn = document.getElementById('sidebar-toggle-edge');
+      const mapBtnText = document.getElementById('btn-toggle-sidebar-map-text');
+      const headerBtn = document.getElementById('btn-hide-sidebar-header');
+
+      if (isDesktopSidebarCollapsed) {
+        sidebar.classList.add('desktop-collapsed');
+        view.classList.add('sidebar-hidden');
+        if (edgeBtn) {
+          edgeBtn.innerHTML = '▶';
+          edgeBtn.title = 'Hiện danh sách cửa hàng';
+        }
+        if (headerBtn) headerBtn.textContent = '▶';
+      } else {
+        sidebar.classList.remove('desktop-collapsed');
+        view.classList.remove('sidebar-hidden');
+        if (edgeBtn) {
+          edgeBtn.innerHTML = '◀';
+          edgeBtn.title = 'Ẩn danh sách cửa hàng';
+        }
+        if (headerBtn) headerBtn.textContent = '◀ Ẩn';
+      }
+
+      // Smoothly trigger Leaflet map resize
+      setTimeout(() => {
+        if (map) map.invalidateSize();
+      }, 300);
+    }
+    window.toggleDesktopSidebar = toggleDesktopSidebar;
+
+    // Keyboard shortcut: Press '[' or ']' to toggle sidebar
+    document.addEventListener('keydown', (e) => {
+      // Don't trigger if user is typing in an input
+      if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return;
+      if (e.key === '[' || e.key === ']') {
+        toggleDesktopSidebar();
+      }
+    });
+
     // On initial load: set mobile state if needed
     if (isMobileViewport()) {
       const sidebar = document.getElementById('sidebar');
       sidebar.classList.remove('mobile-visible');
-      // Default to map view on mobile
       currentMobileTab = 'map';
-      setTimeout(() => map.invalidateSize(), 300);
+      setTimeout(() => { if (map) map.invalidateSize(); }, 300);
     }
 
     startRealtimeEngine();
