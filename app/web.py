@@ -4872,16 +4872,20 @@ def index():
       const isNew = info.timestamp > 0 && ((Date.now() / 1000 - info.timestamp) < 3600);
       const newBadge = isNew ? `<span class="poketan-new-badge">NEW</span>` : '';
 
-      // Format distance from user GPS
-      const distStr = distanceKm !== null ? `📍 Cách bạn: ${formatDistance(distanceKm)}` : '';
-      
-      // Format distance from Imamiya Station (fixed: 34.6540, 135.4925)
+      // Format distance: GPS location if available, fallback to Imamiya Station
       const IMAMIYA_LAT = 34.6540;
       const IMAMIYA_LNG = 135.4925;
-      let imamiyaDistStr = '';
+      let locationDistStr = '';
       if (store.lat && store.lng) {
-        const imamiyaKm = calcDistanceKm(IMAMIYA_LAT, IMAMIYA_LNG, store.lat, store.lng);
-        imamiyaDistStr = `🚉 今宮駅: ${formatDistance(imamiyaKm)}`;
+        if (userLat !== null && userLng !== null) {
+          // User has GPS — show distance from their position
+          const km = calcDistanceKm(userLat, userLng, store.lat, store.lng);
+          locationDistStr = `📍 ${formatDistance(km)}`;
+        } else {
+          // No GPS — fallback to Imamiya Station
+          const km = calcDistanceKm(IMAMIYA_LAT, IMAMIYA_LNG, store.lat, store.lng);
+          locationDistStr = `🚉 今宮駅から ${formatDistance(km)}`;
+        }
       }
       
       // Format time: exact report time + relative time
@@ -4914,8 +4918,7 @@ def index():
                     ${exactTimeStr ? `<span style="color:#0f172a;font-weight:700;">🕒 ${exactTimeStr}</span> • ` : ''}
                     <span class="live-rel-time" data-live-timestamp="${info.timestamp || 0}" data-live-prefix="⏱ " style="color:#2563eb;font-weight:700;">⏱ ${timeStr}</span>
                   </span>
-                  ${distStr ? `<span>• ${distStr}</span>` : ''}
-                  ${imamiyaDistStr ? `<span>• ${imamiyaDistStr}</span>` : ''}
+                  ${locationDistStr ? `<span>• ${locationDistStr}</span>` : ''}
                   <span>• ${confirmStr}</span>
                   ${packStr ? `<span>• ${packStr}</span>` : ''}
                 </div>
