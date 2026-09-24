@@ -13,7 +13,12 @@
     "notifyLottery": true,
     "notifyChain": "",
     "maxReportAgeHours": 1,
-    "onlyOnsiteGps": false
+    "onlyOnsiteGps": false,
+    "discordWebhookUrl": "",
+    "discordEnabled": false,
+    "telegramBotToken": "8888535478:AAFtlcFhwjhlAvLZ4lPf7tGQtnZ8XIoKvSE",
+    "telegramChatId": "5572197416",
+    "telegramEnabled": false
   },
   "sidebarTab": "feed",
   "statusFilter": {
@@ -27,7 +32,7 @@
   "currentChain": "",
   "sortMode": "newest",
   "showExpired": false,
-  "feedFreshnessHours": 1,
+  "feedFreshnessHours": 9999,
   "feedChain": "",
   "feedSortMode": "newest",
   "allStatusFilter": "all",

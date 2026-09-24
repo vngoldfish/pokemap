@@ -152,7 +152,10 @@ async def send_webhook_notification(request: Request):
         if discord_url and discord_enabled:
             try:
                 packs_text = ", ".join(info.get("packs", [])) if info.get("packs") else "Gói thẻ Pokémon (Xem tại quán)"
-                maps_url = f"https://www.google.com/maps/search/?api=1&query={store.get('lat')},{store.get('lng')}" if store.get('lat') and store.get('lng') else ""
+                store_name = store.get('name', '')
+                store_addr = store.get('address', '')
+                maps_query = urllib.parse.quote_plus(f"{store_name} {store_addr}".strip())
+                maps_url = f"https://www.google.com/maps/search/?api=1&query={maps_query}" if maps_query else ""
                 
                 embed = {
                     "title": f"{'🧪 [TEST] ' if is_test else '🔥 '}{store.get('name', 'Cửa hàng')}",
@@ -168,7 +171,7 @@ async def send_webhook_notification(request: Request):
                     }
                 }
                 if maps_url:
-                    embed["fields"].append({"name": "🗺️ Google Maps", "value": f"[Mở bản đồ dẫn đường]({maps_url})", "inline": True})
+                    embed["fields"].append({"name": "🗺️ Google Maps", "value": f"[Mở bản đồ dẫn đường chính xác]({maps_url})", "inline": True})
 
                 payload = {
                     "username": "BAWUI Poke Radar",
@@ -195,7 +198,10 @@ async def send_webhook_notification(request: Request):
         if tg_token and tg_chat_id and tg_enabled:
             try:
                 packs_text = ", ".join(info.get("packs", [])) if info.get("packs") else "Gói thẻ Pokémon (Xem tại quán)"
-                maps_url = f"https://www.google.com/maps/search/?api=1&query={store.get('lat')},{store.get('lng')}" if store.get('lat') and store.get('lng') else ""
+                store_name = store.get('name', '')
+                store_addr = store.get('address', '')
+                maps_query = urllib.parse.quote_plus(f"{store_name} {store_addr}".strip())
+                maps_url = f"https://www.google.com/maps/search/?api=1&query={maps_query}" if maps_query else ""
                 
                 header_prefix = "🧪 <b>[THÔNG BÁO THỬ NGHIỆM]</b>\n" if is_test else "🔥 <b>CÓ HÀNG MỚI TẠI OSAKA!</b>\n"
                 msg_lines = [
@@ -207,7 +213,7 @@ async def send_webhook_notification(request: Request):
                     f"📍 <b>Địa chỉ:</b> {store.get('address') or 'Khu vực Osaka'}"
                 ]
                 if maps_url:
-                    msg_lines.append(f"\n🗺️ <a href=\"{maps_url}\">Mở Google Maps chỉ đường</a>")
+                    msg_lines.append(f"\n🗺️ <a href=\"{maps_url}\">Mở Google Maps chỉ đường chính xác</a>")
                 
                 tg_payload = {
                     "chat_id": tg_chat_id,
@@ -997,6 +1003,66 @@ def index():
       background: #f0fdf4;
       padding: 1px 6px;
       border-radius: 4px;
+    }
+
+    .poketan-row-addr {
+      font-size: 0.72rem;
+      color: #64748b;
+      margin-top: 3px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .poketan-row-addr-text {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .poketan-card-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 5px;
+    }
+    .poketan-btn-hist {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #0f172a;
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .poketan-btn-hist:hover {
+      background: #e2e8f0;
+      color: #0284c7;
+      border-color: #94a3b8;
+    }
+    .poketan-btn-maps {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 3px 8px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #1d4ed8;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 6px;
+      text-decoration: none;
+      transition: all 0.15s ease;
+    }
+    .poketan-btn-maps:hover {
+      background: #dbeafe;
+      border-color: #93c5fd;
     }
 
     /* POKETAN STATUS BADGES ON THE RIGHT */
@@ -4286,9 +4352,11 @@ def index():
           distanceKm = calcDistanceKm(userLat, userLng, store.lat, store.lng);
         }
 
+        // Accurate Google Maps Search & Directions URLs
+        const mapsDestQuery = encodeURIComponent((store.name || '') + ' ' + (store.address || ''));
         const dirUrl = (userLat && userLng) 
-          ? `https://www.google.com/maps/dir/?api=1&origin=${userLat},${userLng}&destination=${store.lat},${store.lng}&travelmode=walking`
-          : `https://www.google.com/maps/search/?api=1&query=${store.lat},${store.lng}`;
+          ? `https://www.google.com/maps/dir/?api=1&origin=${userLat},${userLng}&destination=${mapsDestQuery}&destination_place_id=&travelmode=walking`
+          : `https://www.google.com/maps/search/?api=1&query=${mapsDestQuery}`;
 
         const distHtml = distanceKm !== null ? `<div style="color:#2563eb;font-weight:700;font-size:0.8rem;margin:4px 0;">📍 Cách bạn: ${formatDistance(distanceKm)}</div>` : '';
 
@@ -4306,17 +4374,19 @@ def index():
         const freshnessWarning = info.freshness ? info.freshness.popupWarning : '';
 
         const popupContent = `
-          <div style="font-family:'Inter',sans-serif;min-width:220px;">
-            <b style="font-size:0.95rem;color:#0f172a;">${store.name}</b>
-            <div style="font-size:0.75rem;color:#0284c7;font-weight:700;">${store.chain_label || store.chain}</div>
+          <div style="font-family:'Inter',sans-serif;min-width:240px;max-width:320px;">
+            <b style="font-size:0.96rem;color:#0f172a;line-height:1.3;display:block;">${store.name}</b>
+            <div style="font-size:0.75rem;color:#0284c7;font-weight:700;margin-top:2px;">${store.chain_label || store.chain}</div>
             ${statusBadgeHtml}
             ${freshnessWarning}
             ${distHtml}
-            <div style="font-size:0.75rem;color:#64748b;margin-top:2px;">${store.address || ''}</div>
+            <div style="font-size:0.75rem;color:#475569;margin-top:3px;line-height:1.35;background:#f8fafc;padding:5px 8px;border-radius:6px;border:1px solid #e2e8f0;">
+              📍 <b>Địa chỉ:</b> ${store.address || 'Khu vực Osaka'}
+            </div>
             ${reportTimeHtml}
             ${packsHtml}
             <div style="margin-top:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-              <a href="${dirUrl}" target="_blank" style="display:inline-block;padding:5px 11px;background:#2563eb;color:white;text-decoration:none;border-radius:5px;font-size:0.75rem;font-weight:700;">Chỉ đường Maps ↗</a>
+              <a href="${dirUrl}" target="_blank" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;background:#2563eb;color:white;text-decoration:none;border-radius:6px;font-size:0.75rem;font-weight:700;">🗺️ Chỉ đường Maps ↗</a>
               <button type="button" id="popup-btn-${store.id}" onclick="event.stopPropagation(); togglePopupHistoryAccordion('${store.id}', event)" style="display:inline-flex;align-items:center;gap:5px;padding:6px 12px;background:#0f172a;color:white;border:none;border-radius:6px;font-size:0.75rem;font-weight:700;cursor:pointer;">
                 <span id="popup-arrow-${store.id}" style="font-weight:900;">▶</span> Lịch sử báo cáo
               </button>
@@ -4543,31 +4613,56 @@ def index():
       const distStr = distanceKm !== null ? `📍 ${formatDistance(distanceKm)}` : '';
       
       // Format time
-      const timeStr = info.timeAgo || 'Vừa cập nhật';
+      const timeStr = info.timeAgo || 'Vừa xong';
 
       // Packs or note
       const packStr = info.packs.length ? `<span class="poketan-meta-pack">📦 ${info.packs.join(', ')}</span>` : '';
-      const confirmStr = info.confirms ? `👥 ${info.confirms} người báo` : '匿名トレーナー';
+      const confirmStr = info.confirms ? `👥 ${info.confirms} người báo` : '👥 1 người báo';
+
+      // Precise Google Maps query
+      const mapsQuery = encodeURIComponent((store.name || '') + ' ' + (store.address || ''));
+      const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${mapsQuery}`;
+
+      const isExpanded = openAccordionStoreIds.has(store.id);
 
       return `
-        <div class="poketan-row" id="card-${store.id}" onclick="focusStore('${store.id}')" title="Bấm để xem vị trí trên bản đồ">
-          <div class="poketan-row-left">
-            <div class="status-dot ${dotClass}"></div>
-            <div class="poketan-row-main">
-              <div class="poketan-store-title-line">
-                <span class="poketan-store-name">${store.name}</span>
-                ${newBadge}
-              </div>
-              <div class="poketan-row-subline">
-                <span>⏱ ${timeStr}</span>
-                ${distStr ? `<span>• ${distStr}</span>` : ''}
-                ${packStr ? `<span>• ${packStr}</span>` : ''}
-                <span>• ${confirmStr}</span>
+        <div class="poketan-row-wrapper" id="card-${store.id}" style="border-bottom:1px solid #f1f5f9;padding:6px 0;">
+          <div class="poketan-row" onclick="focusStore('${store.id}')" title="Bấm để xem vị trí trên bản đồ">
+            <div class="poketan-row-left">
+              <div class="status-dot ${dotClass}"></div>
+              <div class="poketan-row-main">
+                <div class="poketan-store-title-line">
+                  <span class="poketan-store-name">${store.name}</span>
+                  ${newBadge}
+                </div>
+                <div class="poketan-row-subline">
+                  <span>⏱ ${timeStr}</span>
+                  ${distStr ? `<span>• ${distStr}</span>` : ''}
+                  <span>• ${confirmStr}</span>
+                  ${packStr ? `<span>• ${packStr}</span>` : ''}
+                </div>
+                ${store.address ? `
+                  <div class="poketan-row-addr" title="${store.address}">
+                    <span style="font-size:0.7rem;">📍</span>
+                    <span class="poketan-row-addr-text">${store.address}</span>
+                  </div>
+                ` : ''}
+                <div class="poketan-card-actions">
+                  <button type="button" class="poketan-btn-hist" id="toggle-btn-${store.id}" onclick="event.stopPropagation(); toggleStoreHistoryAccordion('${store.id}')">
+                    <span id="arrow-${store.id}">${isExpanded ? '▼' : '▶'}</span>
+                    <span id="toggle-label-${store.id}">${isExpanded ? 'Thu gọn' : 'Lịch sử báo cáo'}</span>
+                  </button>
+                  <a href="${mapsUrl}" target="_blank" class="poketan-btn-maps" onclick="event.stopPropagation();" title="Mở địa chỉ chuẩn xác trên Google Maps">
+                    🗺️ Google Maps ↗
+                  </a>
+                </div>
               </div>
             </div>
+            <div class="poketan-status-badge ${badgeClass}">
+              ${badgeText}
+            </div>
           </div>
-          <div class="poketan-status-badge ${badgeClass}">
-            ${badgeText}
+          <div id="accordion-${store.id}" class="store-accordion-body" style="display:${isExpanded ? 'block' : 'none'};margin:6px 8px 4px 8px;">
           </div>
         </div>
       `;
@@ -4687,10 +4782,11 @@ def index():
       }
 
       const store = storesDict[storeId];
+      const storeMapsQuery = store ? encodeURIComponent((store.name || '') + ' ' + (store.address || '')) : '';
       const dirUrl = (store && store.lat && store.lng) 
         ? ((userLat && userLng) 
-            ? `https://www.google.com/maps/dir/?api=1&origin=${userLat},${userLng}&destination=${store.lat},${store.lng}&travelmode=walking`
-            : `https://www.google.com/maps/search/?api=1&query=${store.lat},${store.lng}`)
+            ? `https://www.google.com/maps/dir/?api=1&origin=${userLat},${userLng}&destination=${storeMapsQuery}&travelmode=walking`
+            : `https://www.google.com/maps/search/?api=1&query=${storeMapsQuery}`)
         : '';
 
       const actionsBar = isPopup ? '' : `
@@ -4889,9 +4985,10 @@ def index():
       if (subEl) subEl.innerText = subText;
 
       if (dirBtn && store.lat && store.lng) {
+        const storeMapsQuery = encodeURIComponent((store.name || '') + ' ' + (store.address || ''));
         const dirUrl = (userLat && userLng) 
-          ? `https://www.google.com/maps/dir/?api=1&origin=${userLat},${userLng}&destination=${store.lat},${store.lng}&travelmode=walking`
-          : `https://www.google.com/maps/search/?api=1&query=${store.lat},${store.lng}`;
+          ? `https://www.google.com/maps/dir/?api=1&origin=${userLat},${userLng}&destination=${storeMapsQuery}&travelmode=walking`
+          : `https://www.google.com/maps/search/?api=1&query=${storeMapsQuery}`;
         dirBtn.href = dirUrl;
         dirBtn.style.display = 'inline-flex';
       } else if (dirBtn) {
