@@ -4281,6 +4281,23 @@ def index():
       return `${days} ngày trước`;
     }
 
+    function updateAllRelativeTimes() {
+      const now = Math.floor(Date.now() / 1000);
+      const elements = document.querySelectorAll('.live-rel-time');
+      for (const el of elements) {
+        const ts = parseInt(el.getAttribute('data-live-timestamp'), 10);
+        if (!ts || ts <= 0) continue;
+        const prefix = el.getAttribute('data-live-prefix') || '';
+        const suffix = el.getAttribute('data-live-suffix') || '';
+        const relText = formatTimeAgo(ts);
+        const newText = `${prefix}${relText}${suffix}`;
+        if (el.textContent !== newText) {
+          el.textContent = newText;
+        }
+      }
+    }
+    window.updateAllRelativeTimes = updateAllRelativeTimes;
+
     function getFreshnessInfo(code, timestamp) {
       if (code !== 'i') return null;
       if (!timestamp || timestamp <= 0) {
@@ -4438,7 +4455,7 @@ def index():
 
         const packsHtml = info.packs.length ? `<div style="margin-top:6px;"><b>Packs:</b> ${info.packs.join(', ')}</div>` : '';
         const reportTimeHtml = info.reported_at !== '-' && info.reported_at !== 'Chưa rõ' 
-          ? `<div style="font-size:0.75rem;margin-top:4px;"><b>Báo cáo:</b> ${info.reported_at} <span style="color:#2563eb;font-weight:700;">(${info.timeAgo})</span></div>` 
+          ? `<div style="font-size:0.75rem;margin-top:4px;"><b>Báo cáo:</b> ${info.reported_at} <span class="live-rel-time" data-live-timestamp="${info.timestamp || 0}" data-live-prefix="(" data-live-suffix=")" style="color:#2563eb;font-weight:700;">(${info.timeAgo})</span></div>` 
           : '';
 
         const freshnessWarning = info.freshness ? info.freshness.popupWarning : '';
@@ -4706,7 +4723,7 @@ def index():
                   ${newBadge}
                 </div>
                 <div class="poketan-row-subline">
-                  <span>⏱ ${timeStr}</span>
+                  <span class="live-rel-time" data-live-timestamp="${info.timestamp || 0}" data-live-prefix="⏱ ">⏱ ${timeStr}</span>
                   ${distStr ? `<span>• ${distStr}</span>` : ''}
                   <span>• ${confirmStr}</span>
                   ${packStr ? `<span>• ${packStr}</span>` : ''}
@@ -4840,7 +4857,7 @@ def index():
           <div class="accordion-hist-entry ${entryClass}">
             <div style="display:flex;justify-content:space-between;align-items:center;gap:4px;">
               <span class="hist-mini-badge ${badgeClass}">${item.status_label}</span>
-              <span style="font-size:0.72rem;font-weight:700;color:#2563eb;">⏱ ${itemTimeAgo}</span>
+              <span class="live-rel-time" data-live-timestamp="${item.timestamp || 0}" data-live-prefix="⏱ " style="font-size:0.72rem;font-weight:700;color:#2563eb;">⏱ ${itemTimeAgo}</span>
             </div>
             ${item.note ? `<div style="font-size:0.73rem;color:#1e293b;margin-top:2px;">📝 <b>Sản phẩm:</b> ${item.note}</div>` : ''}
             <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.68rem;color:#64748b;margin-top:2px;">
@@ -5191,7 +5208,7 @@ def index():
             <div class="hist-item ${itemClass}">
               <div class="hist-header">
                 <span class="hist-status-badge ${badgeClass}">${item.status_label}</span>
-                <span class="hist-time-ago">⏱ ${itemTimeAgo}</span>
+                <span class="hist-time-ago live-rel-time" data-live-timestamp="${item.timestamp || 0}" data-live-prefix="⏱ ">⏱ ${itemTimeAgo}</span>
               </div>
               ${item.note ? `<div class="hist-note">📝 <b>Ghi chú / Sản phẩm:</b> ${item.note}</div>` : ''}
               <div class="hist-meta">
@@ -5551,6 +5568,13 @@ def index():
       latestMergedStatus = { ...coldStatus, ...hotStatus };
       renderUI();
 
+      // Cập nhật phút/giờ liên tục mỗi 15 giây theo thời gian thực (không cần bấm reload/reset)
+      setInterval(() => {
+        try {
+          updateAllRelativeTimes();
+        } catch (e) {}
+      }, 15000);
+
       const checkSdk = setInterval(() => {
         if (window.FirebaseInit) {
           clearInterval(checkSdk);
@@ -5612,6 +5636,19 @@ def index():
       }, (err) => {
         console.error("Firestore Listen Error:", err);
       });
+
+      // Tự động đồng bộ kiểm tra trạng thái từ Firestore mỗi 45 giây đề phòng mạng chập chờn
+      setInterval(async () => {
+        try {
+          const res = await fetch('/api/hot_status');
+          const data = await res.json();
+          if (data && typeof data === 'object') {
+            hotStatus = data;
+            latestMergedStatus = { ...coldStatus, ...hotStatus };
+            renderUI();
+          }
+        } catch (e) {}
+      }, 45000);
     }
 
     // ======================================
