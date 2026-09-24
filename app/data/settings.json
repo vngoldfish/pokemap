@@ -1,6 +1,6 @@
 {
   "mapDisplay": {
-    "mode": "all",
+    "mode": "only_in",
     "chain": "",
     "includeCold": true
   },
@@ -18,16 +18,16 @@
   "sidebarTab": "feed",
   "statusFilter": {
     "i": true,
-    "o": true,
-    "n": true,
-    "u": true
+    "o": false,
+    "n": false,
+    "u": false
   },
   "maxReportAgeHours": 1,
   "includeCold": true,
   "currentChain": "",
   "sortMode": "newest",
   "showExpired": false,
-  "feedFreshnessHours": 24,
+  "feedFreshnessHours": 1,
   "feedChain": "",
   "feedSortMode": "newest",
   "allStatusFilter": "all",

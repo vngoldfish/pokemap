@@ -54,7 +54,12 @@ DEFAULT_SETTINGS = {
         "notifyLottery": True,        # Thông báo lịch bốc thăm mới
         "notifyChain": "",            # Lọc thông báo theo chuỗi
         "maxReportAgeHours": 24.0,    # Độ mới tin báo (giờ, 24h mặc định)
-        "onlyOnsiteGps": False        # Chỉ thông báo tin có GPS tại quán
+        "onlyOnsiteGps": False,       # Chỉ thông báo tin có GPS tại quán
+        "discordWebhookUrl": "",      # Webhook URL của kênh Discord
+        "discordEnabled": False,      # Bật gửi Discord khi có hàng
+        "telegramBotToken": "",       # Token bot Telegram (từ @BotFather)
+        "telegramChatId": "",         # ID chat hoặc nhóm Telegram
+        "telegramEnabled": False      # Bật gửi Telegram khi có hàng
     },
 
     # Chế độ xem danh sách sidebar: 'feed' (Thông báo có hàng) hoặc 'all' (Tất cả cửa hàng bản đồ)
@@ -116,6 +121,117 @@ async def update_settings(request: Request):
         return JSONResponse(content={"status": "ok", "settings": current})
     except Exception as e:
         return JSONResponse(status_code=400, content={"error": str(e)})
+
+
+@app.post("/api/notify/webhook")
+async def send_webhook_notification(request: Request):
+    """
+    Dispatch in-stock notifications to Discord Webhook and Telegram Bot.
+    Payload: {
+        "store": { "id", "name", "chain_label", "address", "lat", "lng" },
+        "info": { "label", "packs", "reported_at", "timeAgo", "confirms", "onsite" },
+        "is_test": bool
+    }
+    """
+    import urllib.request
+    import urllib.parse
+    
+    try:
+        body = await request.json()
+        store = body.get("store") or {}
+        info = body.get("info") or {}
+        is_test = bool(body.get("is_test", False))
+        
+        cfg = load_user_settings().get("notifications", {})
+        results = {}
+
+        # 1. DISCORD WEBHOOK
+        discord_url = (cfg.get("discordWebhookUrl") or "").strip()
+        discord_enabled = cfg.get("discordEnabled", False) or is_test
+        
+        if discord_url and discord_enabled:
+            try:
+                packs_text = ", ".join(info.get("packs", [])) if info.get("packs") else "Gói thẻ Pokémon (Xem tại quán)"
+                maps_url = f"https://www.google.com/maps/search/?api=1&query={store.get('lat')},{store.get('lng')}" if store.get('lat') and store.get('lng') else ""
+                
+                embed = {
+                    "title": f"{'🧪 [TEST] ' if is_test else '🔥 '}{store.get('name', 'Cửa hàng')}",
+                    "description": f"**Trạng thái:** 🟢 Có hàng (In Stock)\n**Chuỗi:** {store.get('chain_label', 'Tiện lợi')}",
+                    "color": 0x16a34a,
+                    "fields": [
+                        {"name": "📦 Sản phẩm", "value": packs_text, "inline": False},
+                        {"name": "⏱ Thời gian báo", "value": f"{info.get('reported_at', 'Vừa xong')} ({info.get('timeAgo', '')})", "inline": True},
+                        {"name": "📍 Địa chỉ", "value": store.get('address') or "Khu vực Osaka", "inline": False}
+                    ],
+                    "footer": {
+                        "text": "BAWUI POKE APP • Osaka Stock Radar"
+                    }
+                }
+                if maps_url:
+                    embed["fields"].append({"name": "🗺️ Google Maps", "value": f"[Mở bản đồ dẫn đường]({maps_url})", "inline": True})
+
+                payload = {
+                    "username": "BAWUI Poke Radar",
+                    "avatar_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png",
+                    "embeds": [embed]
+                }
+                req = urllib.request.Request(
+                    discord_url,
+                    data=json.dumps(payload).encode("utf-8"),
+                    headers={"Content-Type": "application/json", "User-Agent": "BAWUI-PokeApp"}
+                )
+                with urllib.request.urlopen(req, timeout=8) as resp:
+                    results["discord"] = "ok"
+            except Exception as de:
+                results["discord"] = f"error: {str(de)}"
+        elif not discord_url:
+            results["discord"] = "no_url"
+
+        # 2. TELEGRAM BOT
+        tg_token = (cfg.get("telegramBotToken") or "").strip()
+        tg_chat_id = (cfg.get("telegramChatId") or "").strip()
+        tg_enabled = cfg.get("telegramEnabled", False) or is_test
+        
+        if tg_token and tg_chat_id and tg_enabled:
+            try:
+                packs_text = ", ".join(info.get("packs", [])) if info.get("packs") else "Gói thẻ Pokémon (Xem tại quán)"
+                maps_url = f"https://www.google.com/maps/search/?api=1&query={store.get('lat')},{store.get('lng')}" if store.get('lat') and store.get('lng') else ""
+                
+                header_prefix = "🧪 <b>[THÔNG BÁO THỬ NGHIỆM]</b>\n" if is_test else "🔥 <b>CÓ HÀNG MỚI TẠI OSAKA!</b>\n"
+                msg_lines = [
+                    f"{header_prefix}",
+                    f"🏪 <b>{store.get('name', 'Cửa hàng')}</b> ({store.get('chain_label', 'Tiện lợi')})",
+                    f"🟢 <b>Trạng thái:</b> Có hàng (In Stock)",
+                    f"📦 <b>Sản phẩm:</b> {packs_text}",
+                    f"⏱ <b>Thời gian:</b> {info.get('reported_at', 'Vừa xong')} ({info.get('timeAgo', '')})",
+                    f"📍 <b>Địa chỉ:</b> {store.get('address') or 'Khu vực Osaka'}"
+                ]
+                if maps_url:
+                    msg_lines.append(f"\n🗺️ <a href=\"{maps_url}\">Mở Google Maps chỉ đường</a>")
+                
+                tg_payload = {
+                    "chat_id": tg_chat_id,
+                    "text": "\n".join(msg_lines),
+                    "parse_mode": "HTML",
+                    "disable_web_page_preview": False
+                }
+                tg_api_url = f"https://api.telegram.org/bot{tg_token}/sendMessage"
+                req = urllib.request.Request(
+                    tg_api_url,
+                    data=json.dumps(tg_payload).encode("utf-8"),
+                    headers={"Content-Type": "application/json"}
+                )
+                with urllib.request.urlopen(req, timeout=8) as resp:
+                    results["telegram"] = "ok"
+            except Exception as te:
+                results["telegram"] = f"error: {str(te)}"
+        elif not (tg_token and tg_chat_id):
+            results["telegram"] = "no_credentials"
+
+        return JSONResponse(content={"status": "ok", "results": results})
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"status": "error", "error": str(e)})
+
 
 _stores_cache = None
 _cold_cache = None
@@ -2782,11 +2898,57 @@ def index():
           </label>
         </div>
 
-        <!-- SECTION 6: THỬ NGHIỆM -->
+        <!-- SECTION 6: KẾT NỐI DISCORD & TELEGRAM WEBHOOK -->
+        <div class="setting-group" style="background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 10px; padding: 14px;">
+          <label class="setting-group-title" style="color: #0f172a; display: flex; align-items: center; justify-content: space-between;">
+            <span>🤖 THÔNG BÁO TỰ ĐỘNG VỀ DISCORD &amp; TELEGRAM</span>
+            <span style="font-size: 0.72rem; color: #16a34a; font-weight: 700; background: #dcfce7; padding: 2px 8px; border-radius: 12px;">Mới</span>
+          </label>
+          <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 12px;">
+            Nhận tin báo tức thì khi có cửa hàng vừa có hàng (kèm tên Pack, địa chỉ và link dẫn đường Google Maps).
+          </div>
+
+          <!-- DISCORD CONFIG -->
+          <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px; margin-bottom: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <label style="font-size: 0.82rem; font-weight: 700; color: #5865F2; display: flex; align-items: center; gap: 6px;">
+                <input type="checkbox" id="notif-check-discord" onchange="updateNotifSetting('discordEnabled', this.checked)" />
+                <span>🎮 Bật gửi về kênh Discord</span>
+              </label>
+              <button type="button" class="btn-test-action" onclick="testWebhookNotification('discord')" style="font-size:0.72rem; padding: 3px 8px;">
+                📨 Test Discord
+              </button>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <input type="text" id="notif-input-discord-url" class="search-box" placeholder="Dán Discord Webhook URL (https://discord.com/api/webhooks/...)" onchange="updateNotifSetting('discordWebhookUrl', this.value.trim())" style="height:32px; font-size:0.75rem;" />
+              <div style="font-size: 0.68rem; color: #94a3b8;">* Cách lấy: Vào Discord Server ➔ Cài đặt kênh ➔ Integrations ➔ Webhooks ➔ Tạo &amp; Copy URL</div>
+            </div>
+          </div>
+
+          <!-- TELEGRAM CONFIG -->
+          <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <label style="font-size: 0.82rem; font-weight: 700; color: #0284c7; display: flex; align-items: center; gap: 6px;">
+                <input type="checkbox" id="notif-check-telegram" onchange="updateNotifSetting('telegramEnabled', this.checked)" />
+                <span>✈️ Bật gửi về Telegram</span>
+              </label>
+              <button type="button" class="btn-test-action" onclick="testWebhookNotification('telegram')" style="font-size:0.72rem; padding: 3px 8px;">
+                📨 Test Telegram
+              </button>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 4px;">
+              <input type="text" id="notif-input-tg-token" class="search-box" placeholder="Bot Token (vd: 123456:ABC-DEF...)" onchange="updateNotifSetting('telegramBotToken', this.value.trim())" style="height:32px; font-size:0.75rem;" />
+              <input type="text" id="notif-input-tg-chatid" class="search-box" placeholder="Chat ID (vd: 987654321 hoặc @tenkenh)" onchange="updateNotifSetting('telegramChatId', this.value.trim())" style="height:32px; font-size:0.75rem;" />
+            </div>
+            <div style="font-size: 0.68rem; color: #94a3b8;">* Tạo Bot qua @BotFather để nhận Token, lấy Chat ID cá nhân/nhóm qua @userinfobot</div>
+          </div>
+        </div>
+
+        <!-- SECTION 7: THỬ NGHIỆM -->
         <div style="display:flex;justify-content:space-between;align-items:center;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 14px;flex-wrap:wrap;gap:8px;">
           <div>
             <div style="font-weight:700;font-size:0.85rem;color:#0f172a;">Kiểm tra chuông & thông báo hoạt động</div>
-            <div style="font-size:0.75rem;color:#64748b;">Gửi 1 thông báo mẫu kèm chuông để kiểm tra máy của bạn</div>
+            <div style="font-size:0.75rem;color:#64748b;">Gửi 1 thông báo mẫu kèm chuông &amp; đẩy thử về Webhook để kiểm tra</div>
           </div>
           <button type="button" class="btn-test-action" onclick="testNotifPopup()" style="background:#2563eb;color:white;border-color:#2563eb;">
             💬 Gửi thông báo mẫu
@@ -2869,7 +3031,12 @@ def index():
       notifyNotHandled: false,
       notifyLottery: true,
       notifyChain: '',
-      onlyOnsiteGps: false
+      onlyOnsiteGps: false,
+      discordWebhookUrl: '',
+      discordEnabled: false,
+      telegramBotToken: '',
+      telegramChatId: '',
+      telegramEnabled: false
     };
 
     if ("Notification" in window && Notification.permission === "default") {
@@ -2912,6 +3079,19 @@ def index():
 
       const onsiteCheck = document.getElementById('notif-check-onsite');
       if (onsiteCheck) onsiteCheck.checked = notifSettings.onlyOnsiteGps;
+
+      // Webhook Discord & Telegram UI sync
+      const discCheck = document.getElementById('notif-check-discord');
+      if (discCheck) discCheck.checked = !!notifSettings.discordEnabled;
+      const discUrlInput = document.getElementById('notif-input-discord-url');
+      if (discUrlInput && document.activeElement !== discUrlInput) discUrlInput.value = notifSettings.discordWebhookUrl || '';
+
+      const tgCheck = document.getElementById('notif-check-telegram');
+      if (tgCheck) tgCheck.checked = !!notifSettings.telegramEnabled;
+      const tgTokenInput = document.getElementById('notif-input-tg-token');
+      if (tgTokenInput && document.activeElement !== tgTokenInput) tgTokenInput.value = notifSettings.telegramBotToken || '';
+      const tgChatIdInput = document.getElementById('notif-input-tg-chatid');
+      if (tgChatIdInput && document.activeElement !== tgChatIdInput) tgChatIdInput.value = notifSettings.telegramChatId || '';
 
       // Sync max report age radio buttons in notif modal
       const ageRadios = document.querySelectorAll('input[name="notif-max-age"]');
@@ -3044,6 +3224,97 @@ def index():
     }
     window.testNotifSound = testNotifSound;
 
+    async function triggerWebhooks(store, info, isTest = false) {
+      if (!isTest && !notifSettings.discordEnabled && !notifSettings.telegramEnabled) return;
+      try {
+        await fetch('/api/notify/webhook', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            store: {
+              id: store.id,
+              name: store.name,
+              chain_label: store.chain_label || store.chain,
+              address: store.address || '',
+              lat: store.lat,
+              lng: store.lng
+            },
+            info: {
+              label: info.label,
+              packs: info.packs || [],
+              reported_at: info.reported_at,
+              timeAgo: info.timeAgo,
+              confirms: info.confirms || 0,
+              onsite: !!info.onsite
+            },
+            is_test: isTest
+          })
+        });
+      } catch (err) {
+        console.warn("Failed to dispatch webhook:", err);
+      }
+    }
+    window.triggerWebhooks = triggerWebhooks;
+
+    async function testWebhookNotification(platform) {
+      const demoStore = {
+        id: 'test_store_webhook',
+        name: '7-Eleven Ga Osaka (Tin Test Bot)',
+        chain: 'seven',
+        chain_label: '7-Eleven',
+        address: '1-1 Umeda, Kita-ku, Osaka',
+        lat: 34.7024,
+        lng: 135.4959
+      };
+      const demoInfo = {
+        code: 'i',
+        label: 'Có hàng (In Stock)',
+        packs: ['Terastal Festival ex', 'Battle Partners'],
+        timeAgo: 'Vừa xong',
+        reported_at: 'Hôm nay lúc ' + new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
+        confirms: 5,
+        onsite: true
+      };
+
+      if (platform === 'discord' && !notifSettings.discordWebhookUrl) {
+        alert('⚠️ Vui lòng dán Discord Webhook URL vào ô trước khi bấm Test!');
+        return;
+      }
+      if (platform === 'telegram' && (!notifSettings.telegramBotToken || !notifSettings.telegramChatId)) {
+        alert('⚠️ Vui lòng nhập Bot Token và Chat ID của Telegram trước khi bấm Test!');
+        return;
+      }
+
+      try {
+        const resp = await fetch('/api/notify/webhook', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            store: demoStore,
+            info: demoInfo,
+            is_test: true
+          })
+        });
+        const res = await resp.json();
+        if (platform === 'discord') {
+          if (res.results && res.results.discord === 'ok') {
+            alert('✅ Đã gửi tin nhắn mẫu đến Discord thành công! Hãy kiểm tra kênh Discord.');
+          } else {
+            alert('❌ Gửi Discord thất bại: ' + (res.results ? res.results.discord : 'Lỗi không xác định'));
+          }
+        } else if (platform === 'telegram') {
+          if (res.results && res.results.telegram === 'ok') {
+            alert('✅ Đã gửi tin nhắn mẫu đến Telegram thành công! Hãy kiểm tra Telegram.');
+          } else {
+            alert('❌ Gửi Telegram thất bại: ' + (res.results ? res.results.telegram : 'Lỗi không xác định'));
+          }
+        }
+      } catch (e) {
+        alert('❌ Lỗi kết nối máy chủ: ' + e.message);
+      }
+    }
+    window.testWebhookNotification = testWebhookNotification;
+
     function testNotifPopup() {
       const demoStore = {
         id: 'test_store_1',
@@ -3077,7 +3348,12 @@ def index():
         notifyNotHandled: false,
         notifyLottery: true,
         notifyChain: '',
-        onlyOnsiteGps: false
+        onlyOnsiteGps: false,
+        discordWebhookUrl: '',
+        discordEnabled: false,
+        telegramBotToken: '',
+        telegramChatId: '',
+        telegramEnabled: false
       };
       syncNotifUI();
       saveSettings();
@@ -3763,6 +4039,10 @@ def index():
       `;
 
       container.appendChild(toast);
+
+      // Tự động đẩy tin báo về Discord Webhook và Telegram Bot nếu được kích hoạt
+      triggerWebhooks(store, info, force);
+
       setTimeout(() => {
         toast.style.opacity = '0';
         toast.style.transform = 'translateX(120%)';
