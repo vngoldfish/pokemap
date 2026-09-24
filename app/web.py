@@ -3410,13 +3410,13 @@ def index():
       const locText = document.getElementById('location-text');
       const headerLoc = document.getElementById('header-loc-summary');
       if (!navigator.geolocation) {
-        locText.innerHTML = '<span style="color:#ef4444;">❌ Trình duyệt không hỗ trợ Geolocation</span>';
-        headerLoc.innerText = 'Chưa định vị';
+        if (locText) locText.innerHTML = '<span style="color:#ef4444;">❌ Trình duyệt không hỗ trợ Geolocation</span>';
+        if (headerLoc) headerLoc.innerText = 'Chưa định vị';
         return;
       }
 
-      locText.innerHTML = '<span>⏳ Đang định vị GPS...</span>';
-      headerLoc.innerText = 'Đang định vị...';
+      if (locText) locText.innerHTML = '<span>⏳ Đang định vị GPS...</span>';
+      if (headerLoc) headerLoc.innerText = 'Đang định vị...';
 
       navigator.geolocation.getCurrentPosition(
         (pos) => {
@@ -3425,27 +3425,35 @@ def index():
           userLng = pos.coords.longitude;
           userAccuracy = pos.coords.accuracy;
 
+          // Lưu cache vị trí vào sessionStorage để tránh giật bản đồ khi tải lại trang
+          try {
+            sessionStorage.setItem('bawui_last_lat', String(userLat));
+            sessionStorage.setItem('bawui_last_lng', String(userLng));
+            sessionStorage.setItem('bawui_last_acc', String(userAccuracy));
+          } catch(e) {}
+
           const distToOsaka = calcDistanceKm(userLat, userLng, 34.6937, 135.5023);
           let note = `(Cách Osaka ~${Math.round(distToOsaka)}km)`;
           if (distToOsaka < 30) note = `(Tại Osaka)`;
 
-          locText.innerHTML = `<span>📍 Vị trí của bạn ${note} • ±${Math.round(userAccuracy)}m</span>`;
-          headerLoc.innerText = `GPS của bạn ${note}`;
+          if (locText) locText.innerHTML = `<span>📍 Vị trí của bạn ${note} • ±${Math.round(userAccuracy)}m</span>`;
+          if (headerLoc) headerLoc.innerText = `GPS của bạn ${note}`;
           renderUserLocation(fly);
           renderUI();
         },
         (err) => {
           console.warn("GPS error:", err.message);
-          locText.innerHTML = `<span>⚠️ Chưa cấp quyền GPS. Dùng nút 'Giả lập Ga Umeda'</span>`;
-          headerLoc.innerText = 'Ga Umeda (Chưa bật GPS)';
-          setMockOsakaLocation();
+          // KHÔNG tự ý gọi setMockOsakaLocation() ở đây để tránh giật nhảy bản đồ sang Ga Umeda!
+          // Chỉ hiển thị hướng dẫn khi người dùng chưa cấp quyền hoặc GPS timeout
+          if (locText) locText.innerHTML = `<span>⚠️ Chưa bật GPS. Bấm '📍 Vị trí' hoặc 'Giả lập Ga Umeda'</span>`;
+          if (headerLoc) headerLoc.innerText = 'Chưa bật GPS';
         },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: fly ? 0 : 30000 }
       );
     }
     window.requestUserLocation = requestUserLocation;
 
-    function setMockOsakaLocation() {
+    function setMockOsakaLocation(fly = true) {
       isMockLocation = true;
       userLat = 34.702485;
       userLng = 135.495951;
@@ -3453,9 +3461,9 @@ def index():
 
       const locText = document.getElementById('location-text');
       const headerLoc = document.getElementById('header-loc-summary');
-      locText.innerHTML = `<span>🏢 Đang giả lập tại Ga Umeda (Osaka)</span>`;
-      headerLoc.innerText = 'Ga Umeda (Osaka)';
-      renderUserLocation(true);
+      if (locText) locText.innerHTML = `<span>🏢 Đang giả lập tại Ga Umeda (Osaka)</span>`;
+      if (headerLoc) headerLoc.innerText = 'Ga Umeda (Osaka)';
+      renderUserLocation(fly);
       renderUI();
     }
     window.setMockOsakaLocation = setMockOsakaLocation;
@@ -4771,6 +4779,19 @@ def index():
 
     // 11. ENGINE INITIALIZATION
     async function startRealtimeEngine() {
+      // Khôi phục vị trí cache gần nhất để không bị nhảy bản đồ sang nơi khác
+      try {
+        const cachedLat = sessionStorage.getItem('bawui_last_lat');
+        const cachedLng = sessionStorage.getItem('bawui_last_lng');
+        const cachedAcc = sessionStorage.getItem('bawui_last_acc');
+        if (cachedLat && cachedLng) {
+          userLat = parseFloat(cachedLat);
+          userLng = parseFloat(cachedLng);
+          userAccuracy = cachedAcc ? parseFloat(cachedAcc) : 50;
+          renderUserLocation(false);
+        }
+      } catch(e) {}
+
       requestUserLocation(false);
       loadCalendar();
 
@@ -5066,11 +5087,11 @@ def main():
         try:
             port = int(port_env)
         except ValueError:
-            port = 8000
+            port = 8080
     else:
         import socket
-        port = 8000
-        for test_port in [8000, 8080, 8081, 8082, 8888, 5000]:
+        port = 8080
+        for test_port in [8080, 8081, 8082, 8888, 5000]:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 if s.connect_ex(('127.0.0.1', test_port)) != 0:
                     port = test_port
