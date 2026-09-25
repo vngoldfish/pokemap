@@ -1929,7 +1929,7 @@ def index():
                 btn.innerHTML = '📍';
               }
               if (fly && (userLat === null || userLng === null)) {
-                alert('現在地を取得できませんでした。ブラウザの位置情報の権限（アクセス許可）を確認してください。\n(Không thể lấy vị trí. Vui lòng cho phép quyền vị trí trong trình duyệt.)');
+                alert("現在地を取得できませんでした。ブラウザの位置情報の権限（アクセス許可）を確認してください。 (Không thể lấy vị trí. Vui lòng cho phép quyền vị trí trong trình duyệt.)");
               }
             },
             { enableHighAccuracy: false, timeout: 12000, maximumAge: 60000 }
