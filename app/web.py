@@ -979,6 +979,7 @@ def index():
       transform: translateY(-50%);
       font-size: 0.75rem;
       color: #64748b;
+    }
     .list-sort-bar {
       padding: 7px 14px;
       border-bottom: 1px solid #e2e8f0;
