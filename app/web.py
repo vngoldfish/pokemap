@@ -27,7 +27,7 @@ from fastapi import FastAPI, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 import uvicorn
 
-from .fetcher import fetch_stores, fetch_firestore_document, DEFAULT_CACHE_DIR, fetch_store_history
+from .fetcher import fetch_stores, fetch_firestore_document, DEFAULT_CACHE_DIR, fetch_store_history, fetch_realtime_status
 from .parser import merge_stores_with_status
 from .calendar_tracker import fetch_calendar_events
 from .config import CHAIN_NAMES, PACK_CODES, FIREBASE_API_KEY, PROJECT_ID
@@ -422,6 +422,38 @@ def get_store_history(store_id: str):
     except Exception as e:
         print(f"Error fetching history for {store_id}:", e)
         return JSONResponse(content=[])
+
+
+_report_counts_cache = {}
+_report_counts_time = 0
+
+@app.get("/api/report_counts")
+def get_report_counts(pref: str = "osaka"):
+    global _report_counts_cache, _report_counts_time
+    import time
+    now = time.time()
+    if pref in _report_counts_cache and (now - _report_counts_time < 60):
+        return JSONResponse(content=_report_counts_cache[pref])
+
+    try:
+        hot = fetch_realtime_status(pref, include_cold=False)
+        in_stores = [k for k, v in hot.items() if str(v).startswith('i')]
+        counts = {}
+        for sid in in_stores:
+            try:
+                h = fetch_store_history(sid)
+                counts[sid] = {
+                    "in": sum(1 for x in h if x.get("status_code") == "i"),
+                    "out": sum(1 for x in h if x.get("status_code") == "o")
+                }
+            except Exception:
+                counts[sid] = {"in": 1, "out": 0}
+        _report_counts_cache[pref] = counts
+        _report_counts_time = now
+        return JSONResponse(content=counts)
+    except Exception as e:
+        print("Error fetching report counts:", e)
+        return JSONResponse(content=_report_counts_cache.get(pref, {}))
 
 
 
@@ -1478,8 +1510,43 @@ def index():
       font-size: 0.82rem;
       padding: 5px 10px;
       border-radius: 8px;
-      margin: 8px 0;
+      margin: 8px 0 6px 0;
       width: 100%;
+    }
+    .popup-report-counts-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin: 4px 0 8px 0;
+      flex-wrap: wrap;
+    }
+    .report-count-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 9px;
+      border-radius: 12px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+    .report-count-tag.tag-green {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      color: #15803d;
+    }
+    .report-count-tag.tag-red {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #b91c1c;
+    }
+    .report-count-tag .count-badge-icon {
+      font-size: 0.76rem;
+      line-height: 1;
+    }
+    .report-count-tag .count-badge-val {
+      font-size: 0.82rem;
+      font-weight: 800;
     }
     .popup-actions-grid {
       display: grid;
@@ -2488,6 +2555,52 @@ def index():
       }
     }
 
+    // Store Report Counts Cache (🟢 Có hàng / 🔴 Hết hàng)
+    const storeCountsCache = {};
+
+    function getStoreCounts(storeId, currentCode) {
+      if (storeCountsCache[storeId]) {
+        return storeCountsCache[storeId];
+      }
+      const history = storeHistoryCache[storeId];
+      if (history && Array.isArray(history)) {
+        const inC = history.filter(x => x.status_code === 'i' || x.status === 'in-stock').length;
+        const outC = history.filter(x => x.status_code === 'o' || x.status === 'out-of-stock').length;
+        storeCountsCache[storeId] = { in: inC, out: outC, loaded: true };
+        return storeCountsCache[storeId];
+      }
+      const defaultIn = (currentCode === 'i') ? 1 : 0;
+      const defaultOut = (currentCode === 'o') ? 1 : 0;
+      return { in: defaultIn, out: defaultOut, loaded: false };
+    }
+
+    async function loadStoreCounts(storeId) {
+      if (storeCountsCache[storeId] && storeCountsCache[storeId].loaded) return;
+      try {
+        let history = storeHistoryCache[storeId];
+        if (!history) {
+          const res = await fetch(`/api/store_history/${storeId}`);
+          history = await res.json();
+          storeHistoryCache[storeId] = history;
+        }
+        if (Array.isArray(history)) {
+          const inC = history.filter(x => x.status_code === 'i' || x.status === 'in-stock').length;
+          const outC = history.filter(x => x.status_code === 'o' || x.status === 'out-of-stock').length;
+          storeCountsCache[storeId] = { in: inC, out: outC, loaded: true };
+
+          const pIn = document.getElementById(`count-in-${storeId}`);
+          const pOut = document.getElementById(`count-out-${storeId}`);
+          if (pIn) pIn.innerText = inC;
+          if (pOut) pOut.innerText = outC;
+
+          const lIn = document.getElementById(`list-count-in-${storeId}`);
+          const lOut = document.getElementById(`list-count-out-${storeId}`);
+          if (lIn) lIn.innerText = inC;
+          if (lOut) lOut.innerText = outC;
+        }
+      } catch (e) {}
+    }
+
     function createPopupHtml(store, info) {
       let distHtml = '';
       if (userLat !== null && userLng !== null) {
@@ -2509,6 +2622,9 @@ def index():
       const chain = (configData.chainNames && configData.chainNames[store.chain]) || store.chain || 'Cửa hàng';
       const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent((store.name || '') + ' ' + (store.address || ''))}`;
 
+      const counts = getStoreCounts(store.id, info.code);
+      setTimeout(() => loadStoreCounts(store.id), 25);
+
       const isHistOpen = openPopupHistStoreIds.has(store.id);
       const histDisplay = isHistOpen ? 'flex' : 'none';
       const histArrow = isHistOpen ? '▲' : '▼';
@@ -2520,6 +2636,18 @@ def index():
           <div class="popup-store-title">${escapeHtml(store.name || '')}</div>
           <div class="popup-store-chain">${escapeHtml(chain)}</div>
           <div class="popup-status-badge" style="background:${statusBg}; color:${statusColor};">${statusText}</div>
+          <div class="popup-report-counts-bar" id="popup-counts-${store.id}">
+            <div class="report-count-tag tag-green" title="Số lần báo cáo có hàng">
+              <span class="count-badge-icon">🟢</span>
+              <span class="count-badge-label">Có hàng:</span>
+              <b class="count-badge-val" id="count-in-${store.id}">${counts.in}</b> lần
+            </div>
+            <div class="report-count-tag tag-red" title="Số lần báo cáo hết hàng">
+              <span class="count-badge-icon">🔴</span>
+              <span class="count-badge-label">Hết hàng:</span>
+              <b class="count-badge-val" id="count-out-${store.id}">${counts.out}</b> lần
+            </div>
+          </div>
           ${distHtml}
           ${time}
           ${packs}
@@ -3022,6 +3150,8 @@ def index():
         else if (info.code === 'o') { badgeClass = 'badge-out'; badgeText = '🔴 Hết hàng'; }
         else if (info.code === 'n') { badgeClass = 'badge-none'; badgeText = '⚪ Không bán'; }
 
+        const counts = getStoreCounts(store.id, info.code);
+
         const chain = (configData.chainNames && configData.chainNames[store.chain]) || store.chain || 'Cửa hàng';
         const distStr = dist !== null ? ` • 📍 Cách ${formatDist(dist)}` : '';
         const timeStr = info.timeAgo ? ` • 🕒 ${escapeHtml(info.timeAgo)}${info.reported_at ? ` • ${escapeHtml(info.reported_at)}` : ''}` : '';
@@ -3037,6 +3167,16 @@ def index():
                 <div class="card-store-name">${escapeHtml(store.name || '')}</div>
               </div>
               <div class="card-chain-time">${escapeHtml(chain)}${distStr}${timeStr}</div>
+              <div class="popup-report-counts-bar" style="margin:4px 0 2px 0;">
+                <span class="report-count-tag tag-green" style="padding:1px 7px; font-size:0.67rem; border-radius:10px;">
+                  <span class="count-badge-icon" style="font-size:0.7rem;">🟢</span>
+                  <span>Có: <b id="list-count-in-${store.id}">${counts.in}</b> lần</span>
+                </span>
+                <span class="report-count-tag tag-red" style="padding:1px 7px; font-size:0.67rem; border-radius:10px;">
+                  <span class="count-badge-icon" style="font-size:0.7rem;">🔴</span>
+                  <span>Hết: <b id="list-count-out-${store.id}">${counts.out}</b> lần</span>
+                </span>
+              </div>
               ${packHtml}
             </div>
             <div style="display:flex; flex-direction:column; align-items:flex-end; gap:5px; flex-shrink:0;">
@@ -3432,6 +3572,19 @@ def index():
           const res = await fetch(`/api/store_history/${storeId}`);
           history = await res.json();
           storeHistoryCache[storeId] = history;
+          if (Array.isArray(history)) {
+            const inC = history.filter(x => x.status_code === 'i' || x.status === 'in-stock').length;
+            const outC = history.filter(x => x.status_code === 'o' || x.status === 'out-of-stock').length;
+            storeCountsCache[storeId] = { in: inC, out: outC, loaded: true };
+            const pIn = document.getElementById(`count-in-${storeId}`);
+            const pOut = document.getElementById(`count-out-${storeId}`);
+            if (pIn) pIn.innerText = inC;
+            if (pOut) pOut.innerText = outC;
+            const lIn = document.getElementById(`list-count-in-${storeId}`);
+            const lOut = document.getElementById(`list-count-out-${storeId}`);
+            if (lIn) lIn.innerText = inC;
+            if (lOut) lOut.innerText = outC;
+          }
         } catch (err) {
           containerEl.innerHTML = `
             <div style="color:#ef4444; font-size:0.72rem; padding:6px; text-align:center;">
@@ -3501,10 +3654,22 @@ def index():
       const packInfo = info.packs.length ? `<div style="margin-top:4px; font-weight:700; color:#1e293b; font-size:0.75rem;">📦 パック: ${escapeHtml(info.packs.join(', '))}</div>` : '';
       const timeInfo = info.timeAgo ? `<div style="font-size:0.72rem; color:#64748b; margin-top:3px;">🕒 直近報告: ${escapeHtml(info.timeAgo)} (${escapeHtml(info.reported_at)})</div>` : '';
 
+      const counts = getStoreCounts(storeId, info.code);
+
       if (currEl) {
         currEl.innerHTML = `
           <div style="background:${currentBg}; border:1px solid #cbd5e1; border-radius:8px; padding:10px 12px;">
             <div style="font-weight:800; font-size:0.86rem; color:${currentColor};">${currentStatusBadge}</div>
+            <div class="popup-report-counts-bar" style="margin:6px 0 4px 0;">
+              <span class="report-count-tag tag-green">
+                <span class="count-badge-icon">🟢</span>
+                <span>Có hàng: <b id="hist-modal-count-in">${counts.in}</b> lần</span>
+              </span>
+              <span class="report-count-tag tag-red">
+                <span class="count-badge-icon">🔴</span>
+                <span>Hết hàng: <b id="hist-modal-count-out">${counts.out}</b> lần</span>
+              </span>
+            </div>
             ${packInfo}
             ${timeInfo}
           </div>
@@ -3533,6 +3698,16 @@ def index():
           const res = await fetch(`/api/store_history/${storeId}`);
           history = await res.json();
           storeHistoryCache[storeId] = history;
+        }
+
+        if (Array.isArray(history)) {
+          const inC = history.filter(x => x.status_code === 'i' || x.status === 'in-stock').length;
+          const outC = history.filter(x => x.status_code === 'o' || x.status === 'out-of-stock').length;
+          storeCountsCache[storeId] = { in: inC, out: outC, loaded: true };
+          const hmIn = document.getElementById('hist-modal-count-in');
+          const hmOut = document.getElementById('hist-modal-count-out');
+          if (hmIn) hmIn.innerText = inC;
+          if (hmOut) hmOut.innerText = outC;
         }
 
         renderStoreTimeline(history, info);
@@ -3789,6 +3964,24 @@ def index():
 
         // Render ALL markers once - smooth, instant, zero redundant cluster re-builds!
         renderMapMarkers();
+
+        // Prefetch precomputed report counts for in-stock stores
+        fetch(`/api/report_counts?pref=${currentPref}`).then(r => r.json()).then(data => {
+          if (data && typeof data === 'object') {
+            for (const [sid, c] of Object.entries(data)) {
+              storeCountsCache[sid] = { in: c.in, out: c.out, loaded: true };
+              const pIn = document.getElementById(`count-in-${sid}`);
+              const pOut = document.getElementById(`count-out-${sid}`);
+              if (pIn) pIn.innerText = c.in;
+              if (pOut) pOut.innerText = c.out;
+
+              const lIn = document.getElementById(`list-count-in-${sid}`);
+              const lOut = document.getElementById(`list-count-out-${sid}`);
+              if (lIn) lIn.innerText = c.in;
+              if (lOut) lOut.innerText = c.out;
+            }
+          }
+        }).catch(() => {});
 
         // Direct URL routing for /thongbao and /stores
         if (window.location.pathname === '/thongbao' || window.location.pathname === '/stores') {
