@@ -300,26 +300,14 @@ async def send_webhook_notification(request: Request):
                 # 5. Xuống dòng
                 # 6. - Lịch sử: Xuống dòng từng dòng với dấu gạch ngang (-)
                 # 7. Link mở Google Maps
+                # Format ngắn gọn giống toast trên bản đồ
+                dist_part = f" • 📍 ~{imamiya_dist_str}" if imamiya_dist_str else ""
                 msg_lines = [
-                    f"{header_prefix}",
-                    f"🏪 <b>Tên cửa hàng:</b> {store_name} ({store_chain})",
-                    f"📍 <b>Địa chỉ:</b> {store_addr}",
+                    f"🔥 <b>{store_name}</b> - CÓ HÀNG!",
+                    f"📦 {packs_text}{dist_part} • ⏱ {time_display}",
                 ]
-                if dist_line_tg:
-                    msg_lines.append(dist_line_tg)
-                
-                msg_lines.extend([
-                    f"🟢 <b>Trạng thái:</b> Có hàng • 📦 {packs_text} • ⏱ {time_display}",
-                    "" # Xuống dòng
-                ])
-
-                if hist_text_tg_lines:
-                    msg_lines.append("📜 <b>Lịch sử các lần báo trước:</b>")
-                    msg_lines.extend(hist_text_tg_lines)
-                    msg_lines.append("") # Xuống dòng
-
                 if maps_url:
-                    msg_lines.append(f"🗺️ <a href=\"{maps_url}\">Mở Google Maps chỉ đường chuẩn xác ↗</a>")
+                    msg_lines.append(f"🗺️ <a href=\"{maps_url}\">Google Maps ↗</a>")
                 
                 tg_payload = {
                     "chat_id": tg_chat_id,
