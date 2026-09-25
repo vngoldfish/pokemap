@@ -1061,59 +1061,203 @@ def index():
     .badge-out { background: #fee2e2; color: #b91c1c; }
     .badge-none { background: #f1f5f9; color: #64748b; }
 
-    /* 7. PREFECTURE MODAL (Area Changer) */
+    /* 7. PREFECTURE & AREA MODAL (Dead-centered on all screens) */
     .modal-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0,0,0,0.5);
-      z-index: 2000;
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      bottom: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      height: 100dvh !important;
+      background: rgba(15, 23, 42, 0.55) !important;
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      z-index: 9999 !important;
       display: none;
-      align-items: center;
-      justify-content: center;
+      align-items: center !important;
+      justify-content: center !important;
       padding: 16px;
+      box-sizing: border-box;
+      margin: 0 !important;
     }
     .modal-overlay.open {
-      display: flex;
+      display: flex !important;
     }
     .modal-card {
-      background: white;
-      border-radius: 16px;
+      background: #ffffff;
+      border-radius: 20px;
       width: 100%;
-      max-width: 400px;
+      max-width: 440px;
+      max-height: 88vh;
+      max-height: 88dvh;
+      display: flex;
+      flex-direction: column;
       overflow: hidden;
-      box-shadow: 0 12px 36px rgba(0,0,0,0.25);
-      animation: modalFadeIn 0.2s ease;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+      animation: modalFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+      margin: auto !important;
+      position: relative;
     }
     @keyframes modalFadeIn {
-      from { transform: scale(0.95); opacity: 0; }
-      to { transform: scale(1); opacity: 1; }
+      from { transform: scale(0.96) translateY(8px); opacity: 0; }
+      to { transform: scale(1) translateY(0); opacity: 1; }
     }
     .modal-header {
-      padding: 14px 18px;
-      border-bottom: 1px solid #e2e8f0;
+      padding: 16px 20px 14px 20px;
+      border-bottom: 1px solid #f1f5f9;
       display: flex;
       justify-content: space-between;
       align-items: center;
+      background: #ffffff;
     }
     .modal-header h3 {
-      font-size: 0.95rem;
+      font-size: 1.05rem;
       font-weight: 800;
       color: #0f172a;
+      margin: 0;
     }
     .modal-close-btn {
-      background: none;
+      background: #f1f5f9;
       border: none;
-      font-size: 1.1rem;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.95rem;
       color: #64748b;
       cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .modal-close-btn:hover {
+      background: #e2e8f0;
+      color: #0f172a;
     }
     .modal-body {
-      padding: 12px 18px;
-      max-height: 65vh;
+      padding: 16px 20px 22px 20px;
+      max-height: 75vh;
       overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* Area Search & Selection (Exact PokéTan Reference Replica) */
+    .area-search-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .area-search-input {
+      flex: 1;
+      height: 42px;
+      background: #f1f5f9;
+      border: 1.5px solid transparent;
+      border-radius: 12px;
+      padding: 0 14px;
+      font-size: 0.86rem;
+      color: #1e293b;
+      outline: none;
+      transition: all 0.15s ease;
+    }
+    .area-search-input:focus {
+      background: #ffffff;
+      border-color: #4f46e5;
+      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+    }
+    .area-search-btn {
+      height: 42px;
+      background: #4f46e5;
+      color: #ffffff;
+      border: none;
+      border-radius: 12px;
+      padding: 0 18px;
+      font-weight: 700;
+      font-size: 0.88rem;
+      cursor: pointer;
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+    .area-search-btn:hover {
+      background: #4338ca;
+    }
+    .area-gps-btn {
+      width: 100%;
+      height: 44px;
+      background: #f5f3ff;
+      border: 1px solid #e0e7ff;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: #4f46e5;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .area-gps-btn:hover {
+      background: #ede9fe;
+    }
+    .area-notice-text {
+      font-size: 0.72rem;
+      color: #64748b;
+      line-height: 1.45;
+      margin: 10px 0 12px 0;
+    }
+    .area-vote-box {
+      background: #f1f5fd;
+      border: 1px solid #e0e7ff;
+      border-radius: 14px;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .area-vote-box:hover {
+      background: #e8edfb;
+    }
+    .area-section {
+      margin-bottom: 14px;
+    }
+    .area-section-title {
+      font-size: 0.82rem;
+      font-weight: 800;
+      color: #1e293b;
+      margin-bottom: 8px;
+    }
+    .area-chips-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .area-chip {
+      padding: 6px 14px;
+      border-radius: 9999px;
+      border: 1px solid #d1d5db;
+      background: #ffffff;
+      color: #1e293b;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+    .area-chip:hover {
+      border-color: #6366f1;
+      background: #f8fafc;
+      color: #4f46e5;
+    }
+    .area-chip.active {
+      border: 1.5px solid #4f46e5;
+      color: #4f46e5;
+      background: #eef2ff;
+      font-weight: 800;
     }
     .pref-item-btn {
       width: 100%;
@@ -1290,7 +1434,7 @@ def index():
       <div class="location-pill" onclick="openPrefModal()">
         <div class="loc-main-title">
           <span>📍</span>
-          <span id="header-loc-name">大阪府</span>
+          <span id="header-loc-name">なんば周辺</span>
           <span style="font-size:0.6rem; color:#64748b;">▼</span>
         </div>
         <div class="loc-sub-title">エリアを変える</div>
@@ -1412,38 +1556,88 @@ def index():
     </button>
   </footer>
 
-  <!-- 6. PREFECTURE SELECTION MODAL -->
+  <!-- 6. PREFECTURE & AREA SELECTION MODAL (Exact PokéTan Replica) -->
   <div id="pref-modal" class="modal-overlay" onclick="if(event.target===this) closePrefModal()">
     <div class="modal-card">
       <div class="modal-header">
-        <h3>🗾 エリアを選択</h3>
+        <h3 style="font-weight: 800; font-size: 1.05rem; color: #1e1b4b;">エリアを選ぶ</h3>
         <button class="modal-close-btn" onclick="closePrefModal()">✕</button>
       </div>
       <div class="modal-body">
-        <button class="pref-item-btn selected" id="pref-btn-osaka" onclick="selectPrefecture('osaka', '大阪府')">
-          <span>🏯 大阪府 (Osaka)</span>
-          <span style="font-size:0.75rem; color:#64748b;">4,050店舗</span>
+        <!-- 1. Search Bar -->
+        <div class="area-search-row">
+          <input type="text" id="area-search-input" class="area-search-input" placeholder="駅名・店名・地名で探す" onkeydown="if(event.key==='Enter') searchAreaLocation()">
+          <button class="area-search-btn" onclick="searchAreaLocation()">検索</button>
+        </div>
+
+        <!-- 2. GPS Button -->
+        <button class="area-gps-btn" onclick="useGpsLocation()">
+          <span style="font-size:1.15rem; color:#4f46e5; transform: rotate(45deg); display:inline-block;">➤</span>
+          <span>現在地を使う</span>
         </button>
-        <button class="pref-item-btn" id="pref-btn-aichi" onclick="selectPrefecture('aichi', '愛知県')">
-          <span>🏯 愛知県 (Aichi)</span>
-          <span style="font-size:0.75rem; color:#64748b;">3,849店舗</span>
-        </button>
-        <button class="pref-item-btn" id="pref-btn-kanagawa" onclick="selectPrefecture('kanagawa', '神奈川県')">
-          <span>🏯 神奈川県 (Kanagawa)</span>
-          <span style="font-size:0.75rem; color:#64748b;">4,044店舗</span>
-        </button>
-        <button class="pref-item-btn" id="pref-btn-gifu" onclick="selectPrefecture('gifu', '岐阜県')">
-          <span>🏯 岐阜県 (Gifu)</span>
-          <span style="font-size:0.75rem; color:#64748b;">21店舗</span>
-        </button>
-        <button class="pref-item-btn" id="pref-btn-mie" onclick="selectPrefecture('mie', '三重県')">
-          <span>🏯 三重県 (Mie)</span>
-          <span style="font-size:0.75rem; color:#64748b;">4店舗</span>
-        </button>
-        <button class="pref-item-btn" id="pref-btn-all" onclick="selectPrefecture('all', '全エリア')">
-          <span>🗾 全エリア (全国)</span>
-          <span style="font-size:0.75rem; color:#64748b;">11,968店舗</span>
-        </button>
+
+        <!-- 3. Notice text -->
+        <div class="area-notice-text">
+          対応エリア：愛知・神奈川・大阪（順次拡大中）。現在地から探すには、Xなどのアプリ内ではなくSafariやChromeで開いてください
+        </div>
+
+        <!-- 4. Voting banner -->
+        <div class="area-vote-box" onclick="voteForNewPrefecture()">
+          <div>
+            <div style="font-weight: 800; font-size: 0.82rem; color: #1e1b4b;">お住まいの県がない？</div>
+            <div style="font-size: 0.72rem; color: #64748b; margin-top: 2px;">次に追加する県は投票で決めます（無料）</div>
+          </div>
+          <div style="font-weight: 700; font-size: 0.82rem; color: #4f46e5; display: flex; align-items: center; gap: 3px; white-space: nowrap;">
+            1票で投票 <span style="font-size: 0.95rem;">›</span>
+          </div>
+        </div>
+
+        <!-- 5. Aichi Section -->
+        <div class="area-section">
+          <div class="area-section-title">愛知</div>
+          <div class="area-chips-grid">
+            <button class="area-chip" data-pref="aichi" data-city="名古屋駅" onclick="selectCityArea('aichi', '名古屋駅', 35.1709, 136.8815, 14)">名古屋駅</button>
+            <button class="area-chip" data-pref="aichi" data-city="栄" onclick="selectCityArea('aichi', '栄', 35.1698, 136.9084, 14)">栄</button>
+            <button class="area-chip" data-pref="aichi" data-city="豊田" onclick="selectCityArea('aichi', '豊田', 35.0833, 137.1500, 13)">豊田</button>
+            <button class="area-chip" data-pref="aichi" data-city="岡崎" onclick="selectCityArea('aichi', '岡崎', 34.9550, 137.1683, 13)">岡崎</button>
+            <button class="area-chip" data-pref="aichi" data-city="一宮" onclick="selectCityArea('aichi', '一宮', 35.3039, 136.8000, 13)">一宮</button>
+            <button class="area-chip" data-pref="aichi" data-city="豊橋" onclick="selectCityArea('aichi', '豊橋', 34.7628, 137.3817, 13)">豊橋</button>
+          </div>
+        </div>
+
+        <!-- 6. Osaka Section -->
+        <div class="area-section">
+          <div class="area-section-title">大阪</div>
+          <div class="area-chips-grid">
+            <button class="area-chip" data-pref="osaka" data-city="梅田" onclick="selectCityArea('osaka', '梅田', 34.7024, 135.4959, 14)">梅田</button>
+            <button class="area-chip active" id="chip-namba" data-pref="osaka" data-city="なんば" onclick="selectCityArea('osaka', 'なんば', 34.6669, 135.5013, 14)">なんば</button>
+            <button class="area-chip" data-pref="osaka" data-city="天王寺" onclick="selectCityArea('osaka', '天王寺', 34.6472, 135.5139, 14)">天王寺</button>
+            <button class="area-chip" data-pref="osaka" data-city="堺" onclick="selectCityArea('osaka', '堺', 34.5733, 135.4830, 13)">堺</button>
+            <button class="area-chip" data-pref="osaka" data-city="枚方" onclick="selectCityArea('osaka', '枚方', 34.8148, 135.6508, 13)">枚方</button>
+          </div>
+        </div>
+
+        <!-- 7. Kanagawa Section -->
+        <div class="area-section">
+          <div class="area-section-title">神奈川</div>
+          <div class="area-chips-grid">
+            <button class="area-chip" data-pref="kanagawa" data-city="横浜" onclick="selectCityArea('kanagawa', '横浜', 35.4437, 139.6380, 14)">横浜</button>
+            <button class="area-chip" data-pref="kanagawa" data-city="川崎" onclick="selectCityArea('kanagawa', '川崎', 35.5308, 139.7029, 14)">川崎</button>
+            <button class="area-chip" data-pref="kanagawa" data-city="相模原" onclick="selectCityArea('kanagawa', '相模原', 35.5714, 139.3732, 13)">相模原</button>
+            <button class="area-chip" data-pref="kanagawa" data-city="藤沢" onclick="selectCityArea('kanagawa', '藤沢', 35.3389, 139.4889, 13)">藤沢</button>
+          </div>
+        </div>
+
+        <!-- 8. Other Areas Section -->
+        <div class="area-section" style="margin-top: 14px; padding-top: 12px; border-top: 1px dashed #e2e8f0;">
+          <div class="area-section-title">その他エリア</div>
+          <div class="area-chips-grid">
+            <button class="area-chip" data-pref="all" data-city="全エリア" onclick="selectCityArea('all', '全エリア', 34.6937, 135.5023, 10)">🗾 全エリア (全国)</button>
+            <button class="area-chip" data-pref="gifu" data-city="岐阜" onclick="selectCityArea('gifu', '岐阜', 35.4233, 136.7607, 12)">岐阜</button>
+            <button class="area-chip" data-pref="mie" data-city="三重" onclick="selectCityArea('mie', '三重', 34.7303, 136.5086, 12)">三重</button>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
@@ -2125,9 +2319,15 @@ def index():
     }
     window.focusStoreFromList = focusStoreFromList;
 
-    // 12. PREFECTURE MODAL
+    // 12. PREFECTURE & AREA MODAL (PokéTan replica handlers)
+    let currentCity = 'なんば';
+
     function openPrefModal() {
       document.getElementById('pref-modal').classList.add('open');
+      const input = document.getElementById('area-search-input');
+      if (input) {
+        setTimeout(() => input.focus(), 150);
+      }
     }
     window.openPrefModal = openPrefModal;
 
@@ -2136,26 +2336,113 @@ def index():
     }
     window.closePrefModal = closePrefModal;
 
-    function selectPrefecture(pref, label) {
+    function selectCityArea(pref, cityName, lat, lng, zoom) {
       currentPref = pref;
+      currentCity = cityName;
       dismissedToastStoreId = null;
-      document.getElementById('header-loc-name').innerText = label;
-      document.querySelectorAll('.pref-item-btn').forEach(b => b.classList.remove('selected'));
-      const activeBtn = document.getElementById(`pref-btn-${pref}`);
-      if (activeBtn) activeBtn.classList.add('selected');
-      closePrefModal();
 
-      const prefCenters = {
-        'osaka': [34.6937, 135.5023],
-        'aichi': [35.1815, 136.9066],
-        'kanagawa': [35.4437, 139.6380],
-        'gifu': [35.4233, 136.7607],
-        'mie': [34.7303, 136.5086]
-      };
-      if (prefCenters[pref]) {
-        map.flyTo(prefCenters[pref], 12, { duration: 0.8 });
+      // Update location pill title in header
+      const locLabel = (cityName === '全エリア' || cityName === '全国') ? '全エリア' : `${cityName}周辺`;
+      const headerLoc = document.getElementById('header-loc-name');
+      if (headerLoc) headerLoc.innerText = locLabel;
+
+      // Update active chip state
+      document.querySelectorAll('.area-chip').forEach(chip => {
+        if (chip.getAttribute('data-city') === cityName) {
+          chip.classList.add('active');
+        } else {
+          chip.classList.remove('active');
+        }
+      });
+
+      // Fly map to area
+      if (lat && lng) {
+        map.flyTo([lat, lng], zoom || 14, { animate: true, duration: 1.0 });
       }
+
+      // Re-render markers for the area
       renderMapMarkers();
+
+      // Close modal
+      closePrefModal();
+    }
+    window.selectCityArea = selectCityArea;
+
+    function useGpsLocation() {
+      closePrefModal();
+      locateUser(true);
+      const headerLoc = document.getElementById('header-loc-name');
+      if (headerLoc) headerLoc.innerText = '現在地周辺';
+      document.querySelectorAll('.area-chip').forEach(c => c.classList.remove('active'));
+    }
+    window.useGpsLocation = useGpsLocation;
+
+    function searchAreaLocation() {
+      const input = document.getElementById('area-search-input');
+      if (!input) return;
+      const q = input.value.trim().toLowerCase();
+      if (!q) return;
+
+      // 1. Check known cities
+      const cityMap = {
+        '名古屋': ['aichi', '名古屋駅', 35.1709, 136.8815, 14],
+        '栄': ['aichi', '栄', 35.1698, 136.9084, 14],
+        '豊田': ['aichi', '豊田', 35.0833, 137.1500, 13],
+        '岡崎': ['aichi', '岡崎', 34.9550, 137.1683, 13],
+        '一宮': ['aichi', '一宮', 35.3039, 136.8000, 13],
+        '豊橋': ['aichi', '豊橋', 34.7628, 137.3817, 13],
+        '梅田': ['osaka', '梅田', 34.7024, 135.4959, 14],
+        'なんば': ['osaka', 'なんば', 34.6669, 135.5013, 14],
+        '難波': ['osaka', 'なんば', 34.6669, 135.5013, 14],
+        '天王寺': ['osaka', '天王寺', 34.6472, 135.5139, 14],
+        '堺': ['osaka', '堺', 34.5733, 135.4830, 13],
+        '枚方': ['osaka', '枚方', 34.8148, 135.6508, 13],
+        '大阪': ['osaka', 'なんば', 34.6669, 135.5013, 14],
+        '愛知': ['aichi', '名古屋駅', 35.1709, 136.8815, 14],
+        '神奈川': ['kanagawa', '横浜', 35.4437, 139.6380, 14],
+        '横浜': ['kanagawa', '横浜', 35.4437, 139.6380, 14],
+        '川崎': ['kanagawa', '川崎', 35.5308, 139.7029, 14],
+        '相模原': ['kanagawa', '相模原', 35.5714, 139.3732, 13],
+        '藤沢': ['kanagawa', '藤沢', 35.3389, 139.4889, 13]
+      };
+
+      for (const [key, val] of Object.entries(cityMap)) {
+        if (key.includes(q) || q.includes(key)) {
+          selectCityArea(val[0], val[1], val[2], val[3], val[4]);
+          return;
+        }
+      }
+
+      // 2. Search in allStores
+      const matched = allStores.find(s => 
+        (s.name && s.name.toLowerCase().includes(q)) || 
+        (s.address && s.address.toLowerCase().includes(q))
+      );
+      if (matched) {
+        selectCityArea(matched.pref || 'osaka', matched.name, matched.lat, matched.lng, 16);
+        return;
+      }
+
+      alert('「' + input.value + '」に一致するエリアや店舗が見つかりませんでした。別のキーワードをお試しください。');
+    }
+    window.searchAreaLocation = searchAreaLocation;
+
+    function voteForNewPrefecture() {
+      alert('🗳️ 投票を受け付けました！\n今後のエリア拡大リクエストありがとうございます。');
+    }
+    window.voteForNewPrefecture = voteForNewPrefecture;
+
+    function selectPrefecture(pref, label) {
+      const cityMap = {
+        'osaka': ['なんば', 34.6669, 135.5013, 14],
+        'aichi': ['名古屋駅', 35.1709, 136.8815, 14],
+        'kanagawa': ['横浜', 35.4437, 139.6380, 14],
+        'gifu': ['岐阜', 35.4233, 136.7607, 12],
+        'mie': ['三重', 34.7303, 136.5086, 12],
+        'all': ['全エリア', 34.6937, 135.5023, 10]
+      };
+      const info = cityMap[pref] || ['全エリア', 34.6937, 135.5023, 10];
+      selectCityArea(pref, info[0], info[1], info[2], info[3]);
     }
     window.selectPrefecture = selectPrefecture;
 
@@ -2267,9 +2554,7 @@ def index():
     window.setSettingsFilter = setSettingsFilter;
 
     function openSearchModal() {
-      switchFooterTab('list');
-      const input = document.getElementById('list-search-input');
-      if (input) input.focus();
+      openPrefModal();
     }
     window.openSearchModal = openSearchModal;
 
