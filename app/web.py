@@ -359,6 +359,9 @@ def get_stores_metadata():
         for pref in ALL_PREFS:
             try:
                 stores = fetch_stores(pref=pref)
+                # Tag each store with its prefecture
+                for sid, store in stores.items():
+                    store["pref"] = pref
                 all_stores.update(stores)
                 print(f"  Loaded {len(stores)} stores from {pref}")
             except Exception as e:
@@ -2674,6 +2677,29 @@ def index():
       </div>
       <div class="drawer-body">
         <div class="drawer-section">
+          <div class="drawer-section-title">🗾 Hiển thị theo tỉnh</div>
+          <label class="drawer-menu-item" style="cursor:pointer;">
+            <input type="checkbox" value="osaka" checked onchange="togglePrefFilter(this)" style="width:18px;height:18px;margin-right:6px;cursor:pointer;" />
+            <span>🏯 大阪府 (Osaka) — 4,050</span>
+          </label>
+          <label class="drawer-menu-item" style="cursor:pointer;">
+            <input type="checkbox" value="aichi" checked onchange="togglePrefFilter(this)" style="width:18px;height:18px;margin-right:6px;cursor:pointer;" />
+            <span>🏯 愛知県 (Aichi) — 3,849</span>
+          </label>
+          <label class="drawer-menu-item" style="cursor:pointer;">
+            <input type="checkbox" value="kanagawa" checked onchange="togglePrefFilter(this)" style="width:18px;height:18px;margin-right:6px;cursor:pointer;" />
+            <span>🏯 神奈川県 (Kanagawa) — 4,044</span>
+          </label>
+          <label class="drawer-menu-item" style="cursor:pointer;">
+            <input type="checkbox" value="gifu" checked onchange="togglePrefFilter(this)" style="width:18px;height:18px;margin-right:6px;cursor:pointer;" />
+            <span>🏯 岐阜県 (Gifu) — 21</span>
+          </label>
+          <label class="drawer-menu-item" style="cursor:pointer;">
+            <input type="checkbox" value="mie" checked onchange="togglePrefFilter(this)" style="width:18px;height:18px;margin-right:6px;cursor:pointer;" />
+            <span>🏯 三重県 (Mie) — 4</span>
+          </label>
+        </div>
+        <div class="drawer-section">
           <div class="drawer-section-title">📍 Vị trí GPS</div>
           <div class="drawer-menu-item" onclick="requestUserLocation(true); closeSideDrawer();">
             <span class="dm-icon">📍</span>
@@ -4290,6 +4316,7 @@ def index():
         if (!notifSettings.notifyInStock) return;
         if (notifSettings.notifyChain && store.chain !== notifSettings.notifyChain) return;
         if (notifSettings.onlyOnsiteGps && !info.onsite) return;
+        if (!storePassesPrefFilter(store)) return;
       }
 
       playChime(force);
@@ -4606,6 +4633,9 @@ def index():
       for (const store of allStores) {
         if (!store.lat || !store.lng) continue;
 
+        // Prefecture filter
+        if (!storePassesPrefFilter(store)) continue;
+
         // Check mapDisplay chain filter
         if (mapDisplay.chain && store.chain !== mapDisplay.chain) continue;
 
@@ -4767,6 +4797,9 @@ def index():
         const sid = store.id;
         const rawVal = effectiveStatus[sid];
         const info = decodeStatus(rawVal, effectiveStatus[sid + '_c']);
+
+        // 0. Lọc theo tỉnh (prefecture filter)
+        if (!storePassesPrefFilter(store)) continue;
 
         // 1. Lọc theo trạng thái PokéTan (tất cả / có hàng / hết hàng / chưa rõ)
         if (poketanStatus !== 'all') {
@@ -5960,6 +5993,42 @@ def index():
       if (headerLoc && drawerLoc) {
         drawerLoc.textContent = headerLoc.textContent || '◎ 大阪エリア';
       }
+    }
+
+    // PREFECTURE FILTER
+    const enabledPrefs = new Set(['osaka', 'aichi', 'kanagawa', 'gifu', 'mie']);
+
+    function togglePrefFilter(checkbox) {
+      const pref = checkbox.value;
+      if (checkbox.checked) {
+        enabledPrefs.add(pref);
+      } else {
+        enabledPrefs.delete(pref);
+      }
+      // Save to localStorage
+      try { localStorage.setItem('pokemap_prefs', JSON.stringify([...enabledPrefs])); } catch(e) {}
+      renderUI();
+    }
+    window.togglePrefFilter = togglePrefFilter;
+
+    // Restore saved pref filter from localStorage
+    try {
+      const saved = localStorage.getItem('pokemap_prefs');
+      if (saved) {
+        const arr = JSON.parse(saved);
+        enabledPrefs.clear();
+        arr.forEach(p => enabledPrefs.add(p));
+        // Sync checkboxes
+        document.querySelectorAll('#side-drawer input[type=checkbox][value]').forEach(cb => {
+          cb.checked = enabledPrefs.has(cb.value);
+        });
+      }
+    } catch(e) {}
+
+    // Helper: check if store passes pref filter
+    function storePassesPrefFilter(store) {
+      if (!store.pref) return true; // no pref info = show
+      return enabledPrefs.has(store.pref);
     }
 
     // Sync mobile bottom nav badges with stock counts
