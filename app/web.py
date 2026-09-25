@@ -66,7 +66,7 @@ DEFAULT_SETTINGS = {
         "telegramStatus": "in",       # 'in' (chỉ có hàng), 'onsite' (tại quán), 'recent', 'all'
         "telegramChain": "all",       # 'all', 'conbini', 'seven', ...
         "telegramTime": "24",         # '1', '3', '6', '24', 'all'
-        "telegramRegion": "all",      # 'all', 'osaka', 'tokyo', 'nagoya'
+        "telegramRegion": "osaka",    # 'osaka', 'tokyo', 'nagoya', 'all'
         "notifyPrefs": ["osaka", "aichi", "kanagawa", "gifu", "mie"]  # Các tỉnh nhận thông báo
     },
 
@@ -289,11 +289,17 @@ async def send_webhook_notification(request: Request):
             return JSONResponse(content={"status": "disabled", "reason": "telegram notifications disabled in settings"})
 
         # 2. Telegram Region Check
-        tg_region = notif_cfg.get("telegramRegion", "all")
+        tg_region = notif_cfg.get("telegramRegion", "osaka")
         if not is_test and tg_region != "all":
             allowed_prefs = REGION_PREFS.get(tg_region, ["osaka"])
-            store_pref = (store.get("pref") or "").lower()
-            if store_pref and store_pref not in allowed_prefs:
+            store_pref = (store.get("pref") or "").strip().lower()
+            if not store_pref:
+                sid = store.get("id")
+                for p_name in ALL_PREFS:
+                    if sid in get_stores_by_pref(p_name):
+                        store_pref = p_name.lower()
+                        break
+            if not store_pref or store_pref not in allowed_prefs:
                 return JSONResponse(content={"status": "filtered", "reason": f"pref '{store_pref}' not in telegram region '{tg_region}'"})
 
         # 3. Telegram Status Filter Check
@@ -356,6 +362,7 @@ def telegram_background_watcher():
     import time
     time.sleep(8)
     print("  [TelegramDaemon] Background stock monitor daemon started (polling every 35s)")
+    is_first_scan = True
     while True:
         try:
             settings = load_user_settings()
@@ -370,8 +377,8 @@ def telegram_background_watcher():
                 time.sleep(30)
                 continue
             
-            tg_reg = notif_cfg.get("telegramRegion", "all")
-            target_prefs = REGION_PREFS.get(tg_reg, ALL_PREFS)
+            tg_reg = notif_cfg.get("telegramRegion", "osaka")
+            target_prefs = REGION_PREFS.get(tg_reg, ["osaka"])
             if tg_reg == "all":
                 target_prefs = ALL_PREFS
             
@@ -389,13 +396,21 @@ def telegram_background_watcher():
                         parsed = parse_store_status(str(raw))
                         if not parsed:
                             continue
+                        
+                        ts = parsed.get("timestamp") or 0
+                        report_key = f"{sid}_{ts}"
+
+                        if is_first_scan:
+                            # Seed existing reports on startup so we only notify for fresh incoming reports
+                            _recent_notified_keys[report_key] = now_sec
+                            continue
+
                         code = parsed.get("status_code")
                         if tg_status == "in" and code != "i":
                             continue
                         if tg_status == "onsite" and (code != "i" or not parsed.get("onsite")):
                             continue
                         
-                        ts = parsed.get("timestamp") or 0
                         if ts > 0 and (now_sec - ts > max_age_sec):
                             continue
 
@@ -412,13 +427,13 @@ def telegram_background_watcher():
                             elif tg_chain not in ["conbini", "specialty", "electronics"] and st_chain != tg_chain:
                                 continue
 
-                        report_key = f"{sid}_{ts}"
                         if report_key not in _recent_notified_keys:
                             _recent_notified_keys[report_key] = now_sec
                             print(f"  [TelegramDaemon] Auto-dispatching Telegram alert for {st.get('name')}")
                             send_telegram_alert(st, parsed, notif_cfg, is_test=False)
                 except Exception:
                     pass
+            is_first_scan = False
         except Exception:
             pass
         time.sleep(35)
@@ -570,7 +585,7 @@ def get_config():
         "telegramStatus": notif.get("telegramStatus", "in"),
         "telegramChain": notif.get("telegramChain", "all"),
         "telegramTime": str(notif.get("telegramTime", "24")),
-        "telegramRegion": notif.get("telegramRegion", "all"),
+        "telegramRegion": notif.get("telegramRegion", "osaka"),
         "currentRegion": user_settings.get("currentRegion", "osaka"),
         "activeFilter": user_settings.get("activeFilter", "all"),
         "activeTime": user_settings.get("activeTime", "all")
@@ -2044,6 +2059,28 @@ def index():
       </div>
 
       <div class="modal-body" style="padding:14px 16px; overflow-y:auto; display:flex; flex-direction:column; gap:16px;">
+        <!-- SECTION 0: KHU VỰC HIỂN THỊ -->
+        <div>
+          <div class="filter-section-title">
+            <span>📍</span>
+            <span>Khu vực hiển thị (地域・エリア)</span>
+          </div>
+          <div class="filter-options-grid" id="modal-region-group">
+            <button class="filter-option-btn active" data-val="osaka" onclick="selectModalRegion('osaka')">
+              🔵 Osaka &amp; Kansai
+            </button>
+            <button class="filter-option-btn" data-val="tokyo" onclick="selectModalRegion('tokyo')">
+              🟣 Tokyo &amp; Kanto
+            </button>
+            <button class="filter-option-btn" data-val="nagoya" onclick="selectModalRegion('nagoya')">
+              🟢 Nagoya &amp; Tokai
+            </button>
+            <button class="filter-option-btn" data-val="all" onclick="selectModalRegion('all')">
+              🌐 Toàn quốc (~12.000 quán)
+            </button>
+          </div>
+        </div>
+
         <!-- SECTION 1: TRẠNG THÁI HÀNG HÓA -->
         <div>
           <div class="filter-section-title">
@@ -2298,10 +2335,10 @@ def index():
             📍 4. Khu vực nhận tin (Vùng dữ liệu):
           </label>
           <select id="tg-cfg-region" style="width:100%; padding:9px 12px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; font-weight:700; color:#1e293b; font-size:0.8rem; outline:none;">
-            <option value="all">🌐 Toàn bộ 3 vùng / Toàn quốc (~12.000 quán)</option>
             <option value="osaka">🔵 大阪・関西 (Osaka & Lân cận)</option>
             <option value="tokyo">🟣 東京・神奈川 (Tokyo & Lân cận)</option>
             <option value="nagoya">🟢 名古屋・東海 (Nagoya & Lân cận)</option>
+            <option value="all">🌐 Toàn bộ 3 vùng / Toàn quốc (~12.000 quán)</option>
           </select>
         </div>
         <!-- In-modal save notification banner -->
@@ -2426,50 +2463,7 @@ def index():
         <h3>⚙️ 設定 / Cài đặt tùy chỉnh</h3>
         <button class="modal-close-btn" onclick="closeSettingsModal()">✕</button>
       </div>
-      <div class="modal-body" style="font-size:0.82rem; max-height:75vh; overflow-y:auto;">
-        <!-- Real-time Synchronization Notice -->
-        <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:9px 12px; margin-bottom:14px; font-size:0.73rem; color:#1e40af; line-height:1.45;">
-          <div style="font-weight:800; display:flex; align-items:center; gap:6px; margin-bottom:2px;">
-            <span>⚡ Đồng bộ hóa tự động:</span>
-          </div>
-          <span>Mọi cài đặt ở đây (Vùng, Trạng thái, Thời gian) sẽ áp dụng ngay cho cả <b>Trang Báo Cáo (📋 一覧)</b> và <b>Thông báo gửi tới Telegram (✈️)</b>.</span>
-        </div>
-
-        <!-- Store Display Filter Section -->
-        <div style="margin-bottom:14px;">
-          <div style="font-weight:800; font-size:0.85rem; color:#1e293b; margin-bottom:6px;">🗺️ Cài đặt hiển thị bản đồ / 表示設定</div>
-          <div style="display:flex; flex-direction:column; gap:6px;">
-            <label style="display:flex; align-items:center; gap:8px; padding:8px 10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; cursor:pointer; font-weight:600;">
-              <input type="radio" name="set-filter-radio" value="none" onchange="setSettingsFilter('none')">
-              <span>🌐 Hiện tất cả cửa hàng (全店舗)</span>
-            </label>
-            <label style="display:flex; align-items:center; gap:8px; padding:8px 10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; cursor:pointer; font-weight:600;">
-              <input type="radio" name="set-filter-radio" value="in" onchange="setSettingsFilter('in')">
-              <span>🟢 Chỉ hiện có hàng (在庫ありのみ)</span>
-            </label>
-            <label style="display:flex; align-items:center; gap:8px; padding:8px 10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; cursor:pointer; font-weight:600;">
-              <input type="radio" name="set-filter-radio" value="onsite" onchange="setSettingsFilter('onsite')">
-              <span>📸 Có hàng tại chỗ / 現地確認済</span>
-            </label>
-            <label style="display:flex; align-items:center; gap:8px; padding:8px 10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; cursor:pointer; font-weight:600;">
-              <input type="radio" name="set-filter-radio" value="hidenone" onchange="setSettingsFilter('hidenone')">
-              <span>⚪ Ẩn cửa hàng không có thông tin (扱無を非表示)</span>
-            </label>
-          </div>
-        </div>
-
-        <!-- Time Window Filter Section -->
-        <div style="margin-bottom:14px;">
-          <div style="font-weight:800; font-size:0.85rem; color:#1e293b; margin-bottom:6px;">⏱️ Thời gian hiển thị báo cáo / 表示期間</div>
-          <select id="settings-time-select" onchange="setTimeFilter(this.value)" style="width:100%; padding:9px 12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; font-weight:700; color:#334155; outline:none; font-size:0.8rem;">
-            <option value="all">⏱️ Toàn bộ thời gian (全期間)</option>
-            <option value="1">⚡ Trong 1 giờ (1時間以内)</option>
-            <option value="3">⏱️ Trong 3 giờ (3時間以内)</option>
-            <option value="6">⏱️ Trong 6 giờ (6時間以内)</option>
-            <option value="24">⏱️ Trong 24 giờ / 1 ngày (24時間以内)</option>
-            <option value="72">⏱️ Trong 3 ngày (3日以内)</option>
-          </select>
-        </div>
+      <div class="modal-body" style="font-size:0.82rem; max-height:75vh; overflow-y:auto; display:flex; flex-direction:column; gap:16px;">
 
         <!-- REGION SELECTION: Load by Region to maximize performance -->
         <div style="margin-bottom:16px;">
@@ -2661,6 +2655,7 @@ def index():
     let activeChain = 'all';     // backward compatible alias
     let activeRadius = null;
     let activeTime = 'all';
+    let listRegionFilter = currentRegion || 'osaka'; // 'osaka' | 'tokyo' | 'nagoya' | 'all' (Dùng cho Báo cáo)
     let listStatusFilter = 'all'; // 'all' | 'in' | 'onsite' | 'out' | 'recent' | 'unknown' (Dùng cho Báo cáo)
     let listChainFilter = 'all';  // 'all' | 'conbini' | 'seven' | ... (Dùng cho Báo cáo)
     let listTimeFilter = 'all';   // 'all' | '1' | '3' | '6' | '24' | '72' (Dùng cho Báo cáo)
@@ -3257,7 +3252,8 @@ def index():
     }
     window.hideToast = hideToast;
 
-    // 8. FILTER & SORT MODAL HANDLERS (Dành riêng cho Trang Báo Cáo - 5 Tiêu chí)
+    // 8. FILTER & SORT MODAL HANDLERS (Dành riêng cho Trang Báo Cáo - Khu vực + 5 Tiêu chí)
+    let modalTempRegion = currentRegion || 'osaka';
     let modalTempFilter = 'all';
     let modalTempChain = 'all';
     let modalTempTime = 'all';
@@ -3265,6 +3261,7 @@ def index():
     let modalTempSort = 'newest';
 
     function openFilterModal() {
+      modalTempRegion = listRegionFilter || currentRegion || 'osaka';
       modalTempFilter = listStatusFilter || 'all';
       modalTempChain = listChainFilter || 'all';
       modalTempTime = String(listTimeFilter || 'all');
@@ -3283,6 +3280,10 @@ def index():
     window.closeFilterModal = closeFilterModal;
 
     function syncFilterModalUI() {
+      // 0. Khu vực hiển thị
+      document.querySelectorAll('#modal-region-group .filter-option-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-val') === modalTempRegion);
+      });
       // 1. Trạng thái hàng hóa
       document.querySelectorAll('#modal-status-group .filter-option-btn').forEach(btn => {
         btn.classList.toggle('active', btn.getAttribute('data-val') === modalTempFilter);
@@ -3304,6 +3305,12 @@ def index():
         btn.classList.toggle('active', btn.getAttribute('data-val') === modalTempSort);
       });
     }
+
+    function selectModalRegion(val) {
+      modalTempRegion = val;
+      syncFilterModalUI();
+    }
+    window.selectModalRegion = selectModalRegion;
 
     function selectModalStatus(val) {
       modalTempFilter = val;
@@ -3342,6 +3349,7 @@ def index():
     window.selectModalSort = selectModalSort;
 
     function resetAllFilters() {
+      modalTempRegion = currentRegion || 'osaka';
       modalTempFilter = 'all';
       modalTempChain = 'all';
       modalTempTime = 'all';
@@ -3352,6 +3360,7 @@ def index():
     window.resetAllFilters = resetAllFilters;
 
     function applyAndCloseFilterModal() {
+      listRegionFilter = modalTempRegion;
       listStatusFilter = modalTempFilter;
       listChainFilter = modalTempChain;
       listTimeFilter = modalTempTime;
@@ -3379,6 +3388,7 @@ def index():
 
     function updateListFilterBadges() {
       let count = 0;
+      if (listRegionFilter && listRegionFilter !== 'all') count++;
       if (listStatusFilter && listStatusFilter !== 'all') count++;
       if (listChainFilter && listChainFilter !== 'all') count++;
       if (listTimeFilter && listTimeFilter !== 'all') count++;
@@ -3606,9 +3616,16 @@ def index():
       const q = query.toLowerCase().trim();
 
       // Update real-time synchronization banner text matching active list filters
+      // 0. Khu vực / Vùng hiển thị (Region Filter)
+      const targetRegion = listRegionFilter || currentRegion || 'osaka';
+      let regName = 'Osaka';
+      if (targetRegion === 'tokyo') regName = 'Tokyo & Kanagawa';
+      else if (targetRegion === 'nagoya') regName = 'Nagoya & Tokai';
+      else if (targetRegion === 'all') regName = 'Toàn quốc';
+
+      // Update real-time synchronization banner text matching active list filters
       const bannerTextEl = document.getElementById('list-active-settings-text');
       if (bannerTextEl) {
-        const regName = REGIONS[currentRegion] ? REGIONS[currentRegion].name : 'Osaka';
         let statusName = 'Tất cả trạng thái';
         if (listStatusFilter === 'in') statusName = '🟢 Có hàng';
         else if (listStatusFilter === 'onsite') statusName = '📍 Tại quán (GPS)';
@@ -3637,7 +3654,7 @@ def index():
           radiusName = `Bán kính ${listRadiusFilter}km`;
         }
 
-        bannerTextEl.innerText = `${statusName} • ${chainName} • ${timeName} • ${radiusName}`;
+        bannerTextEl.innerText = `${regName} • ${statusName} • ${chainName} • ${timeName} • ${radiusName}`;
       }
 
       const tgTag = document.getElementById('list-tg-status-tag');
@@ -3649,7 +3666,15 @@ def index():
       }
 
       let matched = [];
+      const allowedPrefs = (REGIONS[targetRegion] ? REGIONS[targetRegion].prefs : [targetRegion]) || ['osaka'];
+
       for (const store of allStores) {
+        // 0. Lọc đúng khu vực / vùng đã chọn (Ví dụ: Osaka chỉ hiện quán ở Osaka!)
+        if (targetRegion !== 'all') {
+          const storePref = (store.pref || '').toLowerCase();
+          if (!allowedPrefs.includes(storePref)) continue;
+        }
+
         const info = decodeStatus(effectiveStatus[store.id] || effectiveStatus[store.id + '_c']);
 
         // 1. Trạng thái hàng hóa (List Status Tab / Modal Filter)
@@ -3861,6 +3886,7 @@ def index():
 
       currentRegion = regionId;
       window.currentRegion = currentRegion;
+      listRegionFilter = regionId;
       localStorage.setItem('poketan_selected_region', regionId);
       updateSettings('currentRegion', regionId);
 
@@ -3913,6 +3939,10 @@ def index():
 
       // Render markers on map
       renderMapMarkers();
+      const listContainer = document.getElementById('view-list-container');
+      if (listContainer && listContainer.classList.contains('open')) {
+        renderStoreList();
+      }
 
       const count = Object.keys(storesDict).length;
       showRegionToast(`Đã chuyển tới ${regObj.name} (${count} quán)`, '⚡');
@@ -4198,7 +4228,7 @@ def index():
       if (statusEl) statusEl.value = configData.telegramStatus || 'in';
       if (chainEl) chainEl.value = configData.telegramChain || 'all';
       if (timeEl) timeEl.value = String(configData.telegramTime || '24');
-      if (regionEl) regionEl.value = configData.telegramRegion || 'all';
+      if (regionEl) regionEl.value = configData.telegramRegion || 'osaka';
       if (resEl) resEl.style.display = 'none';
 
       const saveResEl = document.getElementById('modal-save-tg-result');
@@ -4320,7 +4350,7 @@ def index():
       const status = document.getElementById('tg-cfg-status') ? document.getElementById('tg-cfg-status').value : 'in';
       const chain = document.getElementById('tg-cfg-chain') ? document.getElementById('tg-cfg-chain').value : 'all';
       const time = document.getElementById('tg-cfg-time') ? document.getElementById('tg-cfg-time').value : '24';
-      const region = document.getElementById('tg-cfg-region') ? document.getElementById('tg-cfg-region').value : 'all';
+      const region = document.getElementById('tg-cfg-region') ? document.getElementById('tg-cfg-region').value : 'osaka';
 
       if (btn) {
         btn.disabled = true;
@@ -5052,11 +5082,14 @@ def index():
       if (!configData.telegramEnabled) return;
       if (!newData || typeof newData !== 'object') return;
 
-      const tgRegion = configData.telegramRegion || 'all';
-      if (tgRegion !== 'all') {
-        const allowedPrefs = (REGIONS[tgRegion] ? REGIONS[tgRegion].prefs : [tgRegion]) || [];
-        if (pref && !allowedPrefs.includes(pref)) return;
-      }
+      const tgRegion = configData.telegramRegion || 'osaka';
+      let allowedPrefs = ['osaka'];
+      if (tgRegion === 'tokyo') allowedPrefs = ['kanagawa', 'tokyo'];
+      else if (tgRegion === 'nagoya') allowedPrefs = ['aichi', 'gifu', 'mie'];
+      else if (tgRegion === 'all') allowedPrefs = ['osaka', 'kanagawa', 'aichi', 'gifu', 'mie'];
+      else if (REGIONS[tgRegion] && REGIONS[tgRegion].prefs) allowedPrefs = REGIONS[tgRegion].prefs;
+
+      if (tgRegion !== 'all' && (!pref || !allowedPrefs.includes(pref.toLowerCase()))) return;
 
       const tgStatus = configData.telegramStatus || 'in';
       const tgChain = configData.telegramChain || 'all';
@@ -5077,6 +5110,8 @@ def index():
         if (info.timestamp && (nowSec - info.timestamp > maxAgeSec)) continue;
 
         const store = storesDict[sid] || { id: sid, name: sid, pref: pref };
+        const storePref = (store.pref || pref || '').toLowerCase();
+        if (tgRegion !== 'all' && !allowedPrefs.includes(storePref)) continue;
 
         // Dedicated Telegram chain filter check
         if (!matchesChainFilter(store.chain, tgChain)) continue;
@@ -5133,10 +5168,22 @@ def index():
         // Listen to all prefectures nationwide
         const targetPrefs = ['osaka', 'kanagawa', 'aichi', 'gifu', 'mie'];
         targetPrefs.forEach(p => {
+          let isInitial = true;
           const unsub = onSnapshot(doc(realtimeDb, 'status', p), (snap) => {
             if (snap.exists()) {
               const data = snap.data();
-              processRealtimeTelegramAlerts(data, p);
+              if (isInitial) {
+                // Seed initial keys so past reports on page load are NOT alerted
+                for (const [sid, raw] of Object.entries(data)) {
+                  const info = decodeStatus(raw);
+                  if (info && info.timestamp) {
+                    notifiedRealtimeKeys.add(`${sid}_${info.timestamp}`);
+                  }
+                }
+                isInitial = false;
+              } else {
+                processRealtimeTelegramAlerts(data, p);
+              }
               Object.assign(hotStatus, data);
               requestRenderMarkers();
               const listContainer = document.getElementById('view-list-container');
