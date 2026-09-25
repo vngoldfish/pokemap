@@ -979,6 +979,36 @@ def index():
       transform: translateY(-50%);
       font-size: 0.75rem;
       color: #64748b;
+    .list-sort-bar {
+      padding: 7px 14px;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #ffffff;
+    }
+    .list-sort-btn {
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      border-radius: 20px;
+      padding: 4px 10px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #475569;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      transition: all 0.15s ease;
+    }
+    .list-sort-btn:hover {
+      background: #e2e8f0;
+    }
+    .list-sort-btn.active {
+      background: #3b82f6;
+      border-color: #2563eb;
+      color: #ffffff;
+      box-shadow: 0 1px 4px rgba(37, 99, 235, 0.25);
     }
 
     .list-cards-scroll {
@@ -1329,6 +1359,18 @@ def index():
       <button id="list-filter-in-btn" onclick="toggleListInStockFilter()" style="background:#f1f5f9; border:1px solid #cbd5e1; border-radius:8px; padding:7px 10px; font-size:0.72rem; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px; color:#334155;">
         🟢 Chỉ có hàng
       </button>
+    </div>
+    <!-- Sort controls bar -->
+    <div class="list-sort-bar">
+      <span style="font-size:0.72rem; color:#64748b; font-weight:700;">Sắp xếp theo:</span>
+      <div style="display:flex; gap:6px;">
+        <button id="sort-btn-newest" onclick="setListSortMode('newest')" class="list-sort-btn active">
+          🕒 Mới nhất
+        </button>
+        <button id="sort-btn-nearest" onclick="setListSortMode('nearest')" class="list-sort-btn">
+          📍 Gần nhất
+        </button>
+      </div>
     </div>
     <div class="list-cards-scroll" id="store-cards-list"></div>
   </div>
@@ -1929,6 +1971,24 @@ def index():
     window.switchFooterTab = switchFooterTab;
 
     let listOnlyInStock = false;
+    let listSortMode = 'newest'; // 'newest' | 'nearest'
+
+    function setListSortMode(mode) {
+      listSortMode = mode;
+      document.querySelectorAll('.list-sort-btn').forEach(b => b.classList.remove('active'));
+      const activeBtn = document.getElementById(`sort-btn-${mode}`);
+      if (activeBtn) activeBtn.classList.add('active');
+
+      if (mode === 'nearest') {
+        if (userLat === null || userLng === null) {
+          locateUser(false);
+        }
+      }
+
+      const q = document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '';
+      renderStoreList(q);
+    }
+    window.setListSortMode = setListSortMode;
 
     function toggleListInStockFilter() {
       listOnlyInStock = !listOnlyInStock;
@@ -1960,7 +2020,7 @@ def index():
       let matched = [];
       for (const store of allStores) {
         if (currentPref !== 'all' && store.pref !== currentPref) continue;
-        const info = decodeStatus(effectiveStatus[store.id]);
+        const info = decodeStatus(effectiveStatus[store.id] || effectiveStatus[store.id + '_c']);
 
         if (listOnlyInStock && info.code !== 'i') continue;
 
@@ -1977,12 +2037,23 @@ def index():
         matched.push({ store, info, dist });
       }
 
-      // Sort: in-stock first, then nearest or newest
+      // Sort: in-stock first, then by selected sort mode (nearest or newest)
       matched.sort((a,b) => {
         if (a.info.code === 'i' && b.info.code !== 'i') return -1;
         if (b.info.code === 'i' && a.info.code !== 'i') return 1;
-        if (a.dist !== null && b.dist !== null) return a.dist - b.dist;
-        return (b.info.timestamp || 0) - (a.info.timestamp || 0);
+
+        if (listSortMode === 'nearest') {
+          if (a.dist !== null && b.dist !== null) return a.dist - b.dist;
+          if (a.dist !== null) return -1;
+          if (b.dist !== null) return 1;
+          return (b.info.timestamp || 0) - (a.info.timestamp || 0);
+        } else {
+          // 'newest' by report timestamp
+          const diffTs = (b.info.timestamp || 0) - (a.info.timestamp || 0);
+          if (diffTs !== 0) return diffTs;
+          if (a.dist !== null && b.dist !== null) return a.dist - b.dist;
+          return 0;
+        }
       });
 
       if (matched.length === 0) {
@@ -2102,8 +2173,14 @@ def index():
       
       const inStockList = allStores.filter(s => {
         if (currentPref !== 'all' && s.pref !== currentPref) return false;
-        const info = decodeStatus(effectiveStatus[s.id]);
+        const info = decodeStatus(effectiveStatus[s.id] || effectiveStatus[s.id + '_c']);
         return info.code === 'i';
+      });
+
+      inStockList.sort((a, b) => {
+        const infoA = decodeStatus(effectiveStatus[a.id] || effectiveStatus[a.id + '_c']);
+        const infoB = decodeStatus(effectiveStatus[b.id] || effectiveStatus[b.id + '_c']);
+        return (infoB.timestamp || 0) - (infoA.timestamp || 0);
       });
 
       if (inStockList.length === 0) {
