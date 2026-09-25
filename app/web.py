@@ -1349,12 +1349,19 @@ def index():
       right: 0;
       bottom: calc(56px + env(safe-area-inset-bottom, 0px));
       background: #ffffff;
-      z-index: 800;
+      z-index: 1200;
       display: none;
       flex-direction: column;
     }
     #view-list-container.open {
       display: flex;
+    }
+
+    body.tab-list-active #filter-bar-container,
+    body.tab-list-active #gps-btn {
+      display: none !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
     }
 
     .list-header-bar {
@@ -3498,6 +3505,7 @@ def index():
 
     function focusStockStore() {
       if (!latestStockStoreId || !storesDict[latestStockStoreId]) return;
+      switchFooterTab('map');
       const s = storesDict[latestStockStoreId];
       map.flyTo([s.lat, s.lng], 16, { duration: 0.8 });
       setTimeout(() => {
@@ -3944,12 +3952,21 @@ def index():
       } catch(e) {}
       document.querySelectorAll('.footer-tab-btn').forEach(b => b.classList.remove('active'));
 
+      const filterBar = document.getElementById('filter-bar-container');
+      const gpsBtn = document.getElementById('gps-btn');
+
       if (tab === 'map') {
+        document.body.classList.remove('tab-list-active');
         document.getElementById('f-tab-map').classList.add('active');
         document.getElementById('view-list-container').classList.remove('open');
+        if (filterBar) filterBar.style.display = 'flex';
+        if (gpsBtn) gpsBtn.style.display = 'flex';
         setTimeout(() => map.invalidateSize(), 50);
       } else if (tab === 'list') {
+        document.body.classList.add('tab-list-active');
         document.getElementById('f-tab-list').classList.add('active');
+        if (filterBar) filterBar.style.display = 'none';
+        if (gpsBtn) gpsBtn.style.display = 'none';
         renderStoreList();
         document.getElementById('view-list-container').classList.add('open');
       }
