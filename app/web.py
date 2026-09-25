@@ -466,8 +466,110 @@ def index():
     html, body {
       width: 100%;
       height: 100%;
+      height: 100dvh;
       overflow: hidden;
       background: #0f172a;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* 1. HEADER */
+    #app-header {
+      height: 56px;
+      background: #0f172a;
+      border-bottom: 1px solid #1e293b;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 14px;
+      gap: 10px;
+      z-index: 1000;
+      flex-shrink: 0;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .brand-logo {
+      font-weight: 900;
+      font-size: 1.05rem;
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #f8fafc;
+      white-space: nowrap;
+      text-decoration: none;
+    }
+    .brand-logo .brand-icon {
+      font-size: 1.2rem;
+      color: #f59e0b;
+    }
+
+    .pref-dropdown {
+      background: #1e293b;
+      color: #f8fafc;
+      border: 1px solid #334155;
+      padding: 5px 10px;
+      border-radius: 8px;
+      font-size: 0.76rem;
+      font-weight: 700;
+      outline: none;
+      cursor: pointer;
+      max-width: 150px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+      justify-content: flex-end;
+      min-width: 0;
+    }
+
+    .header-search-box {
+      position: relative;
+      width: 100%;
+      max-width: 240px;
+    }
+    .header-search-box input {
+      width: 100%;
+      height: 34px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 0 10px 0 28px;
+      font-size: 0.76rem;
+      color: white;
+      outline: none;
+    }
+    .header-search-box input:focus {
+      border-color: #3b82f6;
+    }
+    .header-search-box .search-icon {
+      position: absolute;
+      left: 9px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.72rem;
+      color: #64748b;
+      pointer-events: none;
+    }
+
+    /* 2. MAIN MAP CONTAINER */
+    #app-main {
+      flex: 1;
+      width: 100%;
+      position: relative;
+      overflow: hidden;
     }
 
     #map {
@@ -479,169 +581,58 @@ def index():
       z-index: 1;
     }
 
-    /* TOP FLOATING HEADER */
-    #top-bar {
+    /* FLOATING QUICK STATS PILL (OVER MAP) */
+    #map-stat-pill {
       position: absolute;
-      top: 12px;
-      left: 12px;
-      right: 12px;
-      z-index: 1000;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      pointer-events: none;
-      max-width: 680px;
-      margin: 0 auto;
-    }
-
-    .top-panel {
-      pointer-events: auto;
-      background: rgba(15, 23, 42, 0.92);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 500;
+      background: rgba(15, 23, 42, 0.88);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
       border: 1px solid rgba(255, 255, 255, 0.15);
-      border-radius: 14px;
-      padding: 10px 14px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
-      color: white;
-    }
-
-    .top-row-1 {
+      border-radius: 20px;
+      padding: 5px 14px;
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-    }
-
-    .brand-title {
-      font-weight: 900;
-      font-size: 1.05rem;
-      letter-spacing: -0.02em;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      color: #f8fafc;
-    }
-    .brand-title span.badge {
-      font-size: 0.65rem;
+      gap: 12px;
+      font-size: 0.72rem;
       font-weight: 700;
-      padding: 2px 6px;
-      background: #2563eb;
-      border-radius: 6px;
-      text-transform: uppercase;
-    }
-
-    .pref-select {
-      background: #1e293b;
-      color: #f8fafc;
-      border: 1px solid #334155;
-      padding: 5px 10px;
-      border-radius: 8px;
-      font-size: 0.78rem;
-      font-weight: 700;
-      outline: none;
-      cursor: pointer;
-    }
-
-    /* FILTER BUTTONS ROW */
-    .filter-pills {
-      display: flex;
-      gap: 6px;
-      margin-top: 8px;
-      overflow-x: auto;
-      scrollbar-width: none;
-      -webkit-overflow-scrolling: touch;
-      padding-bottom: 2px;
-    }
-    .filter-pills::-webkit-scrollbar { display: none; }
-
-    .pill-btn {
-      flex: 1;
-      min-width: fit-content;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 5px;
-      padding: 6px 10px;
-      border-radius: 8px;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      background: #1e293b;
-      color: #94a3b8;
-      font-size: 0.74rem;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all 0.15s ease;
+      color: #cbd5e1;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+      pointer-events: none;
       white-space: nowrap;
     }
-    .pill-btn:hover {
-      background: #334155;
-      color: white;
-    }
-    .pill-btn.active {
-      background: #2563eb;
-      border-color: #3b82f6;
-      color: white;
-      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4);
-    }
-    .pill-btn .cnt {
-      font-size: 0.7rem;
-      font-weight: 800;
-      opacity: 0.9;
-    }
+    #map-stat-pill span.in { color: #4ade80; }
+    #map-stat-pill span.out { color: #f87171; }
+    #map-stat-pill span.all { color: #60a5fa; }
 
-    /* SEARCH BAR */
-    .search-row {
-      margin-top: 8px;
-      position: relative;
-    }
-    .search-input {
-      width: 100%;
-      height: 34px;
-      background: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 8px;
-      padding: 0 10px 0 32px;
-      font-size: 0.78rem;
-      color: white;
-      outline: none;
-    }
-    .search-input:focus {
-      border-color: #3b82f6;
-    }
-    .search-icon {
-      position: absolute;
-      left: 10px;
-      top: 50%;
-      transform: translateY(-50%);
-      font-size: 0.75rem;
-      color: #64748b;
-    }
-
-    /* GPS FLOATING BUTTON */
+    /* GPS BUTTON */
     #gps-btn {
       position: absolute;
-      bottom: 24px;
-      right: 20px;
-      z-index: 1000;
+      bottom: 16px;
+      right: 16px;
+      z-index: 500;
       width: 48px;
       height: 48px;
       border-radius: 50%;
       background: #ffffff;
       border: 2px solid #2563eb;
-      box-shadow: 0 4px 18px rgba(0,0,0,0.3);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 1.3rem;
-      transition: transform 0.2s, background 0.2s;
+      transition: transform 0.15s, background 0.15s;
     }
     #gps-btn:active {
       transform: scale(0.92);
       background: #eff6ff;
     }
 
-    /* USER LOCATION PULSE */
+    /* USER LOCATION MARKER */
     .user-location-marker {
       width: 18px;
       height: 18px;
@@ -665,6 +656,84 @@ def index():
     @keyframes pulse {
       0% { transform: scale(0.9); opacity: 1; }
       100% { transform: scale(2.2); opacity: 0; }
+    }
+
+    /* 3. FOOTER (BOTTOM NAVIGATION) */
+    #app-footer {
+      height: calc(58px + env(safe-area-inset-bottom, 0px));
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+      background: #0f172a;
+      border-top: 1px solid #1e293b;
+      display: flex;
+      align-items: stretch;
+      justify-content: space-around;
+      z-index: 1000;
+      flex-shrink: 0;
+      box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.25);
+    }
+
+    .footer-nav-btn {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      background: none;
+      border: none;
+      color: #64748b;
+      font-size: 0.65rem;
+      font-weight: 700;
+      cursor: pointer;
+      position: relative;
+      padding: 6px 0;
+      transition: color 0.15s, background 0.15s;
+    }
+    .footer-nav-btn .nav-icon {
+      font-size: 1.25rem;
+      line-height: 1;
+    }
+    .footer-nav-btn .nav-label {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+    }
+    .footer-nav-btn.active {
+      color: #60a5fa;
+    }
+    .footer-nav-btn.active::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 20%;
+      right: 20%;
+      height: 3px;
+      background: #3b82f6;
+      border-radius: 0 0 3px 3px;
+    }
+
+    .footer-badge {
+      position: absolute;
+      top: 4px;
+      right: 50%;
+      transform: translateX(calc(50% + 12px));
+      font-size: 0.58rem;
+      font-weight: 800;
+      padding: 1px 5px;
+      border-radius: 8px;
+      min-width: 16px;
+      text-align: center;
+      line-height: 1.3;
+      background: #334155;
+      color: #f8fafc;
+    }
+    .footer-badge.badge-in {
+      background: #16a34a;
+      color: white;
+    }
+    .footer-badge.badge-out {
+      background: #dc2626;
+      color: white;
     }
 
     /* LEAFLET POPUP STYLES */
@@ -797,60 +866,75 @@ def index():
     </div>
   </div>
 
-  <!-- TOP BAR -->
-  <div id="top-bar">
-    <div class="top-panel">
-      <!-- ROW 1: BRAND & PREFECTURE SELECTOR -->
-      <div class="top-row-1">
-        <div class="brand-title">
-          <span>⚡ PokéMap</span>
-          <span class="badge" id="live-indicator">LIVE</span>
-        </div>
-        <select class="pref-select" id="pref-select" onchange="changePrefecture(this.value)">
-          <option value="all" selected>🗾 Tất cả tỉnh (11,968)</option>
-          <option value="osaka">🏯 大阪府 Osaka (4,050)</option>
-          <option value="aichi">🏯 愛知県 Aichi (3,849)</option>
-          <option value="kanagawa">🏯 神奈川県 Kanagawa (4,044)</option>
-          <option value="gifu">🏯 岐阜県 Gifu (21)</option>
-          <option value="mie">🏯 三重県 Mie (4)</option>
-        </select>
-      </div>
+  <!-- 1. HEADER -->
+  <header id="app-header">
+    <div class="header-left">
+      <a href="/" class="brand-logo">
+        <span class="brand-icon">⚡</span>
+        <span>PokéMap</span>
+      </a>
+      <select class="pref-dropdown" id="pref-select" onchange="changePrefecture(this.value)">
+        <option value="all" selected>🗾 Tất cả (11,968)</option>
+        <option value="osaka">🏯 大阪府 Osaka (4,050)</option>
+        <option value="aichi">🏯 愛知県 Aichi (3,849)</option>
+        <option value="kanagawa">🏯 神奈川県 Kanagawa (4,044)</option>
+        <option value="gifu">🏯 岐阜県 Gifu (21)</option>
+        <option value="mie">🏯 三重県 Mie (4)</option>
+      </select>
+    </div>
 
-      <!-- ROW 2: 3 STATUS FILTER PILLS -->
-      <div class="filter-pills">
-        <button class="pill-btn active" id="btn-filter-all" onclick="setStatusFilter('all')">
-          <span>🏢 Tất cả</span>
-          <span class="cnt" id="cnt-all">...</span>
-        </button>
-        <button class="pill-btn" id="btn-filter-in" onclick="setStatusFilter('in')">
-          <span>🟢 Có hàng</span>
-          <span class="cnt" id="cnt-in">0</span>
-        </button>
-        <button class="pill-btn" id="btn-filter-out" onclick="setStatusFilter('out')">
-          <span>🔴 Hết hàng</span>
-          <span class="cnt" id="cnt-out">0</span>
-        </button>
-        <button class="pill-btn" id="btn-filter-unknown" onclick="setStatusFilter('unknown')">
-          <span>🔘 Chưa có tin</span>
-          <span class="cnt" id="cnt-unknown">...</span>
-        </button>
-      </div>
-
-      <!-- ROW 3: SEARCH -->
-      <div class="search-row">
+    <div class="header-right">
+      <div class="header-search-box">
         <span class="search-icon">🔍</span>
-        <input type="text" class="search-input" id="search-input" placeholder="Tìm tên cửa hàng, ga tàu, địa chỉ..." oninput="onSearch(this.value)" />
+        <input type="text" id="search-input" placeholder="Tìm tiệm, ga..." oninput="onSearch(this.value)" />
       </div>
     </div>
-  </div>
+  </header>
 
-  <!-- MAP -->
-  <div id="map"></div>
+  <!-- 2. MAIN MAP AREA -->
+  <main id="app-main">
+    <!-- Quick status floating pill over map -->
+    <div id="map-stat-pill">
+      <span>🟢 Có hàng: <b id="stat-in" class="in">0</b></span>
+      <span>🔴 Hết hàng: <b id="stat-out" class="out">0</b></span>
+      <span>🏢 Tổng: <b id="stat-all" class="all">0</b></span>
+    </div>
 
-  <!-- GPS BUTTON -->
-  <button id="gps-btn" onclick="locateUser(true)" title="Định vị vị trí của tôi">
-    📍
-  </button>
+    <div id="map"></div>
+
+    <!-- GPS Button -->
+    <button id="gps-btn" onclick="locateUser(true)" title="Định vị vị trí của tôi">
+      📍
+    </button>
+  </main>
+
+  <!-- 3. FOOTER (BOTTOM NAVIGATION) -->
+  <footer id="app-footer">
+    <button class="footer-nav-btn active" id="tab-all" onclick="setStatusFilter('all')">
+      <span class="nav-icon">🗺️</span>
+      <span class="nav-label">Tất cả</span>
+      <span class="footer-badge" id="badge-all">...</span>
+    </button>
+    <button class="footer-nav-btn" id="tab-in" onclick="setStatusFilter('in')">
+      <span class="nav-icon">🟢</span>
+      <span class="nav-label">Có hàng</span>
+      <span class="footer-badge badge-in" id="badge-in">0</span>
+    </button>
+    <button class="footer-nav-btn" id="tab-out" onclick="setStatusFilter('out')">
+      <span class="nav-icon">🔴</span>
+      <span class="nav-label">Hết hàng</span>
+      <span class="footer-badge badge-out" id="badge-out">0</span>
+    </button>
+    <button class="footer-nav-btn" id="tab-unknown" onclick="setStatusFilter('unknown')">
+      <span class="nav-icon">🔘</span>
+      <span class="nav-label">Chưa rõ</span>
+      <span class="footer-badge" id="badge-unknown">...</span>
+    </button>
+    <button class="footer-nav-btn" id="tab-gps" onclick="locateUser(true)">
+      <span class="nav-icon">📍</span>
+      <span class="nav-label">Vị trí</span>
+    </button>
+  </footer>
 
   <script>
     // 1. STATE & DATA
@@ -1075,18 +1159,22 @@ def index():
         markersLayer.addLayer(marker);
       }
 
-      // Update counters in top bar
-      document.getElementById('cnt-all').innerText = cntTotal.toLocaleString();
-      document.getElementById('cnt-in').innerText = cntIn.toLocaleString();
-      document.getElementById('cnt-out').innerText = cntOut.toLocaleString();
-      document.getElementById('cnt-unknown').innerText = cntUnknown.toLocaleString();
+      // Update Header & Footer Counters
+      document.getElementById('stat-all').innerText = cntTotal.toLocaleString();
+      document.getElementById('stat-in').innerText = cntIn.toLocaleString();
+      document.getElementById('stat-out').innerText = cntOut.toLocaleString();
+
+      document.getElementById('badge-all').innerText = cntTotal.toLocaleString();
+      document.getElementById('badge-in').innerText = cntIn.toLocaleString();
+      document.getElementById('badge-out').innerText = cntOut.toLocaleString();
+      document.getElementById('badge-unknown').innerText = cntUnknown.toLocaleString();
     }
 
     // 6. FILTER CONTROLS
     function setStatusFilter(filter) {
       currentFilter = filter;
-      document.querySelectorAll('.pill-btn').forEach(btn => btn.classList.remove('active'));
-      const activeBtn = document.getElementById(`btn-filter-${filter}`);
+      document.querySelectorAll('.footer-nav-btn').forEach(btn => btn.classList.remove('active'));
+      const activeBtn = document.getElementById(`tab-${filter}`);
       if (activeBtn) activeBtn.classList.add('active');
       renderMarkers();
     }
@@ -1206,6 +1294,9 @@ def index():
         hotStatus = await hotRes.json();
         coldStatus = await coldRes.json();
 
+        // Invalidate map size to ensure full container measurement
+        setTimeout(() => map.invalidateSize(), 100);
+
         // Render markers
         renderMarkers();
 
@@ -1258,6 +1349,7 @@ def index():
     }
 
     window.addEventListener('DOMContentLoaded', initData);
+    window.addEventListener('resize', () => map.invalidateSize());
   </script>
 </body>
 </html>"""
