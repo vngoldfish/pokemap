@@ -4300,13 +4300,26 @@ def index():
       if (!overlay) return;
 
       const packsText = info.packs && info.packs.length ? info.packs.join(', ') : 'Thẻ Pokémon';
+      
+      // Calculate distance for toast
+      let toastDistStr = '';
+      if (store.lat && store.lng) {
+        if (userLat !== null && userLng !== null) {
+          const km = calcDistanceKm(userLat, userLng, store.lat, store.lng);
+          toastDistStr = `📍 ${formatDistance(km)}`;
+        } else {
+          const km = calcDistanceKm(34.6540, 135.4925, store.lat, store.lng);
+          toastDistStr = `🚉 ${formatDistance(km)}`;
+        }
+      }
+      
       const toast = document.createElement('div');
       toast.className = 'map-toast';
       toast.innerHTML = `
         <div class="map-toast-icon">🔥</div>
         <div class="map-toast-content">
           <div class="map-toast-title">${store.name} - CÓ HÀNG!</div>
-          <div class="map-toast-sub">📦 ${packsText} • ${info.timeAgo || 'Vừa xong'}</div>
+          <div class="map-toast-sub">📦 ${packsText} ${toastDistStr ? '• ' + toastDistStr : ''} • ${info.timeAgo || 'Vừa xong'}</div>
         </div>
         <div class="map-toast-arrow">→</div>
       `;
