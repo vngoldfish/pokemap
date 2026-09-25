@@ -1832,16 +1832,9 @@ def index():
       100% { transform: scale(1.8); opacity: 0; }
     }
     
-    /* TOAST NOTIFICATION CONTAINER */
+    /* OLD TOAST CONTAINER - DISABLED, replaced by map-toast-overlay */
     #toast-container {
-      position: fixed;
-      top: 72px;
-      right: 20px;
-      z-index: 9999;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      pointer-events: none;
+      display: none;
     }
     .toast {
       pointer-events: auto;
@@ -4293,29 +4286,9 @@ def index():
         } catch(e) {}
       }
 
-      const container = document.getElementById('toast-container');
-      const toast = document.createElement('div');
-      toast.className = 'toast';
-      toast.innerHTML = `
-        <div class="toast-header">
-          <span>🟢 VỪA BÁO CÓ HÀNG!</span>
-          <span class="toast-time">${info.timeAgo}</span>
-        </div>
-        <div class="toast-body">${store.name}</div>
-        <div class="toast-pack">📦 ${info.packs.length ? info.packs.join(', ') : 'Gói thẻ Pokémon'}</div>
-        <button class="toast-btn" onclick="openStoreHistoryModal('${store.id}')">Xem lịch sử & vị trí 📜📍</button>
-      `;
-
-      container.appendChild(toast);
 
       // Tự động đẩy tin báo về Discord Webhook và Telegram Bot nếu được kích hoạt
       triggerWebhooks(store, info, force);
-
-      setTimeout(() => {
-        toast.style.opacity = '0';
-        toast.style.transform = 'translateX(120%)';
-        setTimeout(() => toast.remove(), 400);
-      }, 10000);
     }
     window.showToast = showToast;
 
