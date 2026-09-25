@@ -1442,19 +1442,57 @@ def index():
     let userLng = null;
     let userMarker = null;
     let userCircle = null;
+    let hasCenteredOnUser = false;
 
-    // 2. LEAFLET MAP WITH GOOGLE MAPS TILES (Zero watermarks, ultra fast CDN)
+    const prefCenters = {
+      'osaka': [34.6937, 135.5023],
+      'aichi': [35.1815, 136.9066],
+      'kanagawa': [35.4437, 139.6380],
+      'gifu': [35.4233, 136.7607],
+      'mie': [34.7303, 136.5086],
+      'all': [34.6937, 135.5023]
+    };
+
+    function isCoordInJapan(lat, lng) {
+      return typeof lat === 'number' && typeof lng === 'number' &&
+             lat >= 24.0 && lat <= 46.0 && lng >= 122.0 && lng <= 154.0;
+    }
+
+    // Determine initial center before map creation (avoids sudden jumps)
+    let initialCenter = prefCenters[currentPref] || [34.6937, 135.5023];
+    let initialZoom = 13;
+
+    try {
+      const savedLat = parseFloat(localStorage.getItem('poketan_user_lat') || sessionStorage.getItem('poketan_user_lat'));
+      const savedLng = parseFloat(localStorage.getItem('poketan_user_lng') || sessionStorage.getItem('poketan_user_lng'));
+      if (!isNaN(savedLat) && !isNaN(savedLng)) {
+        userLat = savedLat;
+        userLng = savedLng;
+        if (isCoordInJapan(userLat, userLng)) {
+          initialCenter = [userLat, userLng];
+          initialZoom = 14;
+          hasCenteredOnUser = true;
+        }
+      }
+    } catch(e) {}
+
+    // 2. LEAFLET MAP WITH GOOGLE MAPS TILES (Smooth, buffered, zero watermarks)
     const map = L.map('map', {
-      center: [34.6937, 135.5023], // Osaka center
-      zoom: 13,
+      center: initialCenter,
+      zoom: initialZoom,
       zoomControl: false,
-      preferCanvas: true
+      preferCanvas: true,
+      zoomAnimation: true,
+      fadeAnimation: true,
+      markerZoomAnimation: true
     });
 
-    // High performance Google Maps Streets Tiles
+    // High performance Google Maps Streets Tiles with pre-buffering
     L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
       maxZoom: 20,
-      attribution: '&copy; Google Maps'
+      attribution: '&copy; Google Maps',
+      updateWhenIdle: true,
+      keepBuffer: 3
     }).addTo(map);
 
     L.control.zoom({ position: 'bottomleft' }).addTo(map);
@@ -1980,20 +2018,9 @@ def index():
     }
     window.updateSettings = updateSettings;
 
-    // 14. ROBUST GPS USER LOCATION (Instant fly + High/Low accuracy fallback)
-    let hasCenteredOnUser = false;
-
-    // Restore cached position from storage immediately
-    try {
-      const savedLat = parseFloat(localStorage.getItem('poketan_user_lat') || sessionStorage.getItem('poketan_user_lat'));
-      const savedLng = parseFloat(localStorage.getItem('poketan_user_lng') || sessionStorage.getItem('poketan_user_lng'));
-      if (!isNaN(savedLat) && !isNaN(savedLng)) {
-        userLat = savedLat;
-        userLng = savedLng;
-      }
-    } catch(e) {}
-
+    // 14. ROBUST GPS USER LOCATION (Smooth, non-jittering, one-time centering)
     function updateUserMarker(lat, lng, accuracy = 30) {
+      const displayRadius = Math.min(Math.max(accuracy, 15), 150);
       if (!userMarker) {
         const icon = L.divIcon({
           className: 'user-location-marker',
@@ -2003,7 +2030,7 @@ def index():
         userMarker = L.marker([lat, lng], { icon, zIndexOffset: 2000 }).addTo(map);
         userMarker.bindPopup('📍 <b>あなたの現在地</b><br><span style="font-size:0.75rem;color:#64748b;">(Vị trí hiện tại của bạn)</span>');
         userCircle = L.circle([lat, lng], {
-          radius: accuracy,
+          radius: displayRadius,
           color: '#4f46e5',
           fillColor: '#818cf8',
           fillOpacity: 0.15,
@@ -2013,17 +2040,17 @@ def index():
         userMarker.setLatLng([lat, lng]);
         if (userCircle) {
           userCircle.setLatLng([lat, lng]);
-          userCircle.setRadius(accuracy);
+          userCircle.setRadius(displayRadius);
         }
       }
     }
 
-    function onGpsSuccess(pos, fly = true) {
+    function onGpsSuccess(pos, userInitiated = false) {
       userLat = pos.coords.latitude;
       userLng = pos.coords.longitude;
       const accuracy = pos.coords.accuracy || 30;
 
-      // Save to storage
+      // Save to storage for instant recall on next launch
       try {
         localStorage.setItem('poketan_user_lat', String(userLat));
         localStorage.setItem('poketan_user_lng', String(userLng));
@@ -2037,18 +2064,30 @@ def index():
         btn.innerHTML = '📍';
       }
 
-      if (fly) {
+      const inJapan = isCoordInJapan(userLat, userLng);
+
+      // Only fly/pan if user explicitly clicked GPS button, OR if this is the very first auto-fix in Japan
+      if (userInitiated) {
+        map.flyTo([userLat, userLng], 15, { duration: 0.8 });
+      } else if (!hasCenteredOnUser && inJapan) {
         hasCenteredOnUser = true;
-        map.flyTo([userLat, userLng], 15, { duration: 1.0 });
+        const curCenter = map.getCenter();
+        const d = calcDistanceKm(curCenter.lat, curCenter.lng, userLat, userLng);
+        if (d > 0.1) {
+          map.panTo([userLat, userLng], { animate: true, duration: 0.6 });
+        }
       }
 
-      // Re-render list and popups with accurate distances
-      renderMapMarkers();
+      // If store list is open, re-sort and update distances quietly (no marker re-cluster)
+      const listContainer = document.getElementById('view-list-container');
+      if (listContainer && listContainer.classList.contains('open')) {
+        renderStoreList();
+      }
     }
 
-    function locateUser(fly = true) {
+    function locateUser(userInitiated = true) {
       const btn = document.getElementById('gps-btn');
-      if (btn) {
+      if (btn && userInitiated) {
         btn.classList.add('locating');
         btn.innerHTML = '⏳';
       }
@@ -2058,12 +2097,12 @@ def index():
           btn.classList.remove('locating');
           btn.innerHTML = '📍';
         }
-        if (fly) alert('お使いのブラウザはGPS位置情報に対応していません。(Trình duyệt không hỗ trợ GPS)');
+        if (userInitiated) alert('お使いのブラウザはGPS位置情報に対応していません。(Trình duyệt không hỗ trợ GPS)');
         return;
       }
 
-      // Fast response: If we already have coordinates and user clicked, fly immediately!
-      if (fly && userLat !== null && userLng !== null) {
+      // Fast response: If user clicked and we already have coordinates, fly immediately!
+      if (userInitiated && userLat !== null && userLng !== null) {
         updateUserMarker(userLat, userLng, 30);
         map.flyTo([userLat, userLng], 15, { duration: 0.8 });
         if (btn) {
@@ -2072,17 +2111,17 @@ def index():
         }
       }
 
-      // Attempt 1: High accuracy GPS
+      // High accuracy GPS request
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          onGpsSuccess(pos, fly);
+          onGpsSuccess(pos, userInitiated);
         },
         (err1) => {
-          console.warn('High-accuracy GPS failed, trying fallback:', err1.message);
-          // Attempt 2: Low accuracy fallback (Wifi/Cellular/IP)
+          console.warn('High-accuracy GPS notice:', err1.message);
+          // Fallback to low accuracy (WiFi/Cellular/IP)
           navigator.geolocation.getCurrentPosition(
             (pos) => {
-              onGpsSuccess(pos, fly);
+              onGpsSuccess(pos, userInitiated);
             },
             (err2) => {
               console.warn('All GPS attempts failed:', err2.message);
@@ -2090,19 +2129,19 @@ def index():
                 btn.classList.remove('locating');
                 btn.innerHTML = '📍';
               }
-              if (fly && (userLat === null || userLng === null)) {
+              if (userInitiated && (userLat === null || userLng === null)) {
                 alert("現在地を取得できませんでした。ブラウザの位置情報の権限（アクセス許可）を確認してください。 (Không thể lấy vị trí. Vui lòng cho phép quyền vị trí trong trình duyệt.)");
               }
             },
-            { enableHighAccuracy: false, timeout: 12000, maximumAge: 60000 }
+            { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
           );
         },
-        { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
+        { enableHighAccuracy: true, timeout: 6000, maximumAge: 30000 }
       );
     }
     window.locateUser = locateUser;
 
-    // Continuous background watchPosition to keep position updated as user moves
+    // Continuous background watchPosition: purely updates the blue marker dot as user moves, NEVER interrupts map view!
     function startContinuousGpsWatch() {
       if (!navigator.geolocation) return;
       navigator.geolocation.watchPosition(
@@ -2110,10 +2149,9 @@ def index():
           userLat = pos.coords.latitude;
           userLng = pos.coords.longitude;
           updateUserMarker(userLat, userLng, pos.coords.accuracy || 30);
-          // If first fix arrived and not yet centered, fly to user automatically!
-          if (!hasCenteredOnUser) {
-            hasCenteredOnUser = true;
-            map.flyTo([userLat, userLng], 15, { duration: 1.0 });
+          const listContainer = document.getElementById('view-list-container');
+          if (listContainer && listContainer.classList.contains('open')) {
+            renderStoreList();
           }
         },
         (err) => console.warn('Continuous GPS watch notice:', err.message),
@@ -2123,37 +2161,43 @@ def index():
 
     // 15. DATA INITIALIZATION & REALTIME FIRESTORE LISTENER
     async function initData() {
-      // Safety auto-dismiss timer: Under NO circumstances will overlay block user for >2.5s
       const safetyTimer = setTimeout(() => {
         const overlay = document.getElementById('loading-overlay');
         if (overlay) overlay.remove();
       }, 2500);
 
       try {
-        // If cached user location exists, show marker and center on startup immediately!
+        // Show cached marker on map if available
         if (userLat !== null && userLng !== null) {
           updateUserMarker(userLat, userLng);
-          map.setView([userLat, userLng], 14);
-          hasCenteredOnUser = true;
         }
 
-        // AUTO-LOCATE ON STARTUP: Request GPS immediately
-        locateUser(true);
+        // Silent GPS check on startup (userInitiated = false, zero jerky jumps)
+        locateUser(false);
         startContinuousGpsWatch();
 
-        // Step 1: Fetch config and stores data (from local cache, super fast ~50ms)
-        const [cfgRes, storesRes] = await Promise.all([
+        // Step 1: Fetch config, stores, hot_status, and cold_status ALL IN PARALLEL!
+        const [cfgRes, storesRes, hotRes, coldRes] = await Promise.all([
           fetch('/api/config'),
-          fetch('/api/stores_data')
+          fetch('/api/stores_data'),
+          fetch('/api/hot_status').catch(() => null),
+          fetch('/api/cold_status').catch(() => null)
         ]);
 
         configData = await cfgRes.json();
         storesDict = await storesRes.json();
 
-        // Render store locations immediately so user sees map instantly!
+        if (hotRes && hotRes.ok) {
+          try { hotStatus = await hotRes.json(); } catch(e) {}
+        }
+        if (coldRes && coldRes.ok) {
+          try { coldStatus = await coldRes.json(); } catch(e) {}
+        }
+
+        // Render ALL markers once - smooth, instant, zero redundant cluster re-builds!
         renderMapMarkers();
 
-        // Dismiss loading screen right away (within 100ms)
+        // Dismiss loading screen right away
         clearTimeout(safetyTimer);
         const overlay = document.getElementById('loading-overlay');
         if (overlay) {
@@ -2161,24 +2205,7 @@ def index():
           setTimeout(() => overlay.remove(), 150);
         }
 
-        // Step 2: Fetch statuses in background (parallelized)
-        fetch('/api/hot_status')
-          .then(r => r.json())
-          .then(data => {
-            hotStatus = data;
-            renderMapMarkers();
-          })
-          .catch(e => console.warn('hotStatus load warning:', e));
-
-        fetch('/api/cold_status')
-          .then(r => r.json())
-          .then(data => {
-            coldStatus = data;
-            renderMapMarkers();
-          })
-          .catch(e => console.warn('coldStatus load warning:', e));
-
-        // Realtime sync
+        // Realtime Firestore sync (debounced)
         setupRealtime();
       } catch (e) {
         console.error('Init error:', e);
@@ -2190,8 +2217,8 @@ def index():
 
     function refreshData() {
       Promise.all([
-        fetch('/api/hot_status').then(r => r.json()),
-        fetch('/api/cold_status').then(r => r.json())
+        fetch('/api/hot_status').then(r => r.json()).catch(() => ({})),
+        fetch('/api/cold_status').then(r => r.json()).catch(() => ({}))
       ]).then(([hot, cold]) => {
         hotStatus = hot;
         coldStatus = cold;
@@ -2199,6 +2226,14 @@ def index():
       });
     }
     window.refreshData = refreshData;
+
+    let renderDebounceTimer = null;
+    function requestRenderMarkers() {
+      if (renderDebounceTimer) cancelAnimationFrame(renderDebounceTimer);
+      renderDebounceTimer = requestAnimationFrame(() => {
+        renderMapMarkers();
+      });
+    }
 
     function setupRealtime() {
       if (!window.FirebaseInit || !configData.apiKey) return;
@@ -2211,7 +2246,7 @@ def index():
           onSnapshot(doc(db, 'status', p), (snap) => {
             if (snap.exists()) {
               Object.assign(hotStatus, snap.data());
-              renderMapMarkers();
+              requestRenderMarkers();
             }
           });
         });
