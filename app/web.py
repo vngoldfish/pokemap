@@ -348,36 +348,51 @@ async def send_webhook_notification(request: Request):
 _stores_cache = None
 _cold_cache = None
 
+from typing import Optional, List, Dict, Any
+from concurrent.futures import ThreadPoolExecutor
+
 # All available prefectures on PokéTan
 ALL_PREFS = ["osaka", "aichi", "kanagawa", "gifu", "mie"]
 
+# Defined 3 core regions + all (matching user specification)
+REGION_PREFS = {
+    "osaka": ["osaka"],
+    "tokyo": ["kanagawa"],
+    "kanagawa": ["kanagawa"],
+    "nagoya": ["aichi", "gifu", "mie"],
+    "aichi": ["aichi", "gifu", "mie"],
+    "all": ["osaka", "aichi", "kanagawa", "gifu", "mie"],
+}
 
-def get_stores_metadata():
-    global _stores_cache
-    if _stores_cache is None:
-        all_stores = {}
-        for pref in ALL_PREFS:
-            try:
-                stores = fetch_stores(pref=pref)
-                # Tag each store with its prefecture
-                for sid, store in stores.items():
-                    store["pref"] = pref
-                all_stores.update(stores)
-                print(f"  Loaded {len(stores)} stores from {pref}")
-            except Exception as e:
-                print(f"  Error loading stores from {pref}: {e}")
-        _stores_cache = all_stores
-        print(f"Total stores loaded: {len(all_stores)}")
-    return _stores_cache
+_pref_stores_cache = {}
+_cold_cache = {}
 
+def get_stores_by_pref(pref: str) -> dict:
+    global _pref_stores_cache
+    if pref not in _pref_stores_cache:
+        try:
+            stores = fetch_stores(pref=pref)
+            for sid, store in stores.items():
+                store["pref"] = pref
+            _pref_stores_cache[pref] = stores
+            print(f"  [RegionLoader] Loaded {len(stores)} stores from {pref}")
+        except Exception as e:
+            print(f"  [RegionLoader] Error loading stores from {pref}: {e}")
+            _pref_stores_cache[pref] = {}
+    return _pref_stores_cache[pref]
 
-@app.get("/api/stores_data")
-def get_stores_data():
-    stores = get_stores_metadata()
-    return JSONResponse(content=stores)
-
-
-from concurrent.futures import ThreadPoolExecutor
+def get_target_prefs(region: Optional[str] = None, pref: Optional[str] = None) -> List[str]:
+    if region:
+        r = region.strip().lower()
+        if r in REGION_PREFS:
+            return REGION_PREFS[r]
+    if pref:
+        p = pref.strip().lower()
+        if p in REGION_PREFS:
+            return REGION_PREFS[p]
+        if p in ALL_PREFS:
+            return [p]
+    return ["osaka"]
 
 def fetch_single_pref_status(pref, is_cold=False):
     doc_path = f"status/{pref}_cold" if is_cold else f"status/{pref}"
@@ -386,34 +401,47 @@ def fetch_single_pref_status(pref, is_cold=False):
     except Exception as e:
         return {}
 
+@app.get("/api/stores_data")
+def get_stores_data(region: Optional[str] = None, pref: Optional[str] = None):
+    target_prefs = get_target_prefs(region, pref)
+    all_stores = {}
+    for p in target_prefs:
+        all_stores.update(get_stores_by_pref(p))
+    return JSONResponse(content=all_stores)
+
 @app.get("/api/cold_status")
-def get_cold_status():
+def get_cold_status(region: Optional[str] = None, pref: Optional[str] = None):
     global _cold_cache
-    if _cold_cache is None:
-        _cold_cache = {}
+    target_prefs = get_target_prefs(region, pref)
+    missing_prefs = [p for p in target_prefs if p not in _cold_cache]
+    if missing_prefs:
         try:
-            with ThreadPoolExecutor(max_workers=5) as ex:
-                futures = [ex.submit(fetch_single_pref_status, p, True) for p in ALL_PREFS]
-                for f in futures:
-                    _cold_cache.update(f.result())
+            with ThreadPoolExecutor(max_workers=min(5, len(missing_prefs))) as ex:
+                futures = {ex.submit(fetch_single_pref_status, p, True): p for p in missing_prefs}
+                for f, p in futures.items():
+                    _cold_cache[p] = f.result()
         except Exception as e:
             print("Cold status error:", e)
-    return JSONResponse(content=_cold_cache)
-
+    
+    merged = {}
+    for p in target_prefs:
+        if p in _cold_cache:
+            merged.update(_cold_cache[p])
+    return JSONResponse(content=merged)
 
 @app.get("/api/hot_status")
-def get_hot_status():
+def get_hot_status(region: Optional[str] = None, pref: Optional[str] = None):
+    target_prefs = get_target_prefs(region, pref)
     try:
         merged = {}
-        with ThreadPoolExecutor(max_workers=5) as ex:
-            futures = [ex.submit(fetch_single_pref_status, p, False) for p in ALL_PREFS]
+        with ThreadPoolExecutor(max_workers=min(5, len(target_prefs))) as ex:
+            futures = [ex.submit(fetch_single_pref_status, p, False) for p in target_prefs]
             for f in futures:
                 merged.update(f.result())
         return JSONResponse(content=merged)
     except Exception as e:
         print("Error fetching hot status:", e)
         return JSONResponse(content={})
-
 
 @app.get("/api/store_history/{store_id}")
 def get_store_history(store_id: str):
@@ -423,37 +451,44 @@ def get_store_history(store_id: str):
         print(f"Error fetching history for {store_id}:", e)
         return JSONResponse(content=[])
 
-
 _report_counts_cache = {}
-_report_counts_time = 0
+_report_counts_time = {}
 
 @app.get("/api/report_counts")
-def get_report_counts(pref: str = "osaka"):
+def get_report_counts(region: Optional[str] = None, pref: Optional[str] = None):
     global _report_counts_cache, _report_counts_time
     import time
     now = time.time()
-    if pref in _report_counts_cache and (now - _report_counts_time < 60):
-        return JSONResponse(content=_report_counts_cache[pref])
+    target_prefs = get_target_prefs(region, pref)
+    cache_key = "_".join(sorted(target_prefs))
+
+    if cache_key in _report_counts_cache and (now - _report_counts_time.get(cache_key, 0) < 60):
+        return JSONResponse(content=_report_counts_cache[cache_key])
 
     try:
-        hot = fetch_realtime_status(pref, include_cold=False)
-        in_stores = [k for k, v in hot.items() if str(v).startswith('i')]
-        counts = {}
-        for sid in in_stores:
+        merged_counts = {}
+        for p in target_prefs:
             try:
-                h = fetch_store_history(sid)
-                counts[sid] = {
-                    "in": sum(1 for x in h if x.get("status_code") == "i"),
-                    "out": sum(1 for x in h if x.get("status_code") == "o")
-                }
-            except Exception:
-                counts[sid] = {"in": 1, "out": 0}
-        _report_counts_cache[pref] = counts
-        _report_counts_time = now
-        return JSONResponse(content=counts)
+                hot = fetch_realtime_status(p, include_cold=False)
+                in_stores = [k for k, v in hot.items() if str(v).startswith('i')]
+                for sid in in_stores:
+                    try:
+                        h = fetch_store_history(sid)
+                        merged_counts[sid] = {
+                            "in": sum(1 for x in h if x.get("status_code") == "i"),
+                            "out": sum(1 for x in h if x.get("status_code") == "o")
+                        }
+                    except Exception:
+                        merged_counts[sid] = {"in": 1, "out": 0}
+            except Exception as pe:
+                print(f"Error fetching counts for pref {p}:", pe)
+
+        _report_counts_cache[cache_key] = merged_counts
+        _report_counts_time[cache_key] = now
+        return JSONResponse(content=merged_counts)
     except Exception as e:
         print("Error fetching report counts:", e)
-        return JSONResponse(content=_report_counts_cache.get(pref, {}))
+        return JSONResponse(content=_report_counts_cache.get(cache_key, {}))
 
 
 
@@ -861,6 +896,26 @@ def index():
       font-weight: 700;
       cursor: pointer;
       padding: 0 4px;
+    }
+
+    /* REGION SWITCH & LOAD TOAST */
+    #region-load-toast {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      margin: 2px auto 0 auto;
+      padding: 6px 14px;
+      background: #0f172a;
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      border-radius: 9999px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+      animation: slideDown 0.25s ease;
+      z-index: 1000;
+      white-space: nowrap;
+      pointer-events: auto;
     }
 
     /* 3. MAIN MAP AREA (Full viewport coverage, zero gray cutoffs) */
@@ -1733,6 +1788,12 @@ def index():
       </div>
       <button class="toast-close-btn" onclick="event.stopPropagation(); hideToast()">✕</button>
     </div>
+
+    <!-- Region loading & switch toast -->
+    <div id="region-load-toast" style="display:none;">
+      <span id="region-load-icon">⚡</span>
+      <span id="region-load-text">Đang chuyển vùng...</span>
+    </div>
   </div>
 
   <!-- 3. MAIN MAP AREA -->
@@ -2149,13 +2210,56 @@ def index():
           </select>
         </div>
 
-        <!-- Area / Prefecture Selection -->
-        <div style="margin-bottom:14px;">
-          <div style="font-weight:800; font-size:0.85rem; color:#1e293b; margin-bottom:6px;">🗾 Khu vực tỉnh thành / エリア</div>
-          <button onclick="closeSettingsModal(); openPrefModal();" style="width:100%; display:flex; justify-content:space-between; align-items:center; padding:9px 12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; font-weight:700; color:#334155; cursor:pointer;">
-            <span>📍 Khu vực đang chọn: <b id="settings-current-pref" style="color:#4f46e5;">大阪府</b></span>
-            <span>Thay đổi ❯</span>
-          </button>
+        <!-- REGION SELECTION: Load by Region to maximize performance -->
+        <div style="margin-bottom:16px;">
+          <div style="font-weight:800; font-size:0.85rem; color:#1e293b; margin-bottom:4px; display:flex; align-items:center; justify-content:space-between;">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span>📍 Vùng dữ liệu hiển thị (表示エリア)</span>
+            </div>
+            <span style="font-size:0.65rem; background:#dcfce7; color:#15803d; font-weight:800; padding:2px 7px; border-radius:6px;">⚡ Tải nhanh theo vùng</span>
+          </div>
+          <div style="font-size:0.72rem; color:#64748b; margin-bottom:8px;">Chọn vùng để chỉ tải dữ liệu của vùng đó, giúp bản đồ mượt và load siêu tốc:</div>
+
+          <div style="display:flex; flex-direction:column; gap:6px;" id="settings-region-selector">
+            <label style="display:flex; align-items:center; gap:10px; padding:10px 12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; cursor:pointer; transition:all 0.15s;">
+              <input type="radio" name="set-region-radio" value="osaka" onchange="selectRegion('osaka')">
+              <div style="flex:1;">
+                <div style="font-weight:800; font-size:0.82rem; color:#1e293b;">🔵 大阪・関西 (Osaka &amp; Lân cận)</div>
+                <div style="font-size:0.69rem; color:#64748b; margin-top:1px;">Osaka, Namba, Umeda, Tennoji, Sakai, Hirakata... (~4.050 quán)</div>
+              </div>
+            </label>
+
+            <label style="display:flex; align-items:center; gap:10px; padding:10px 12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; cursor:pointer; transition:all 0.15s;">
+              <input type="radio" name="set-region-radio" value="tokyo" onchange="selectRegion('tokyo')">
+              <div style="flex:1;">
+                <div style="font-weight:800; font-size:0.82rem; color:#1e293b;">🟣 東京・神奈川 (Tokyo &amp; Lân cận)</div>
+                <div style="font-size:0.69rem; color:#64748b; margin-top:1px;">Yokohama, Kawasaki, Sagamihara, Fujisawa... (~4.040 quán)</div>
+              </div>
+            </label>
+
+            <label style="display:flex; align-items:center; gap:10px; padding:10px 12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; cursor:pointer; transition:all 0.15s;">
+              <input type="radio" name="set-region-radio" value="nagoya" onchange="selectRegion('nagoya')">
+              <div style="flex:1;">
+                <div style="font-weight:800; font-size:0.82rem; color:#1e293b;">🟢 名古屋・東海 (Nagoya &amp; Lân cận)</div>
+                <div style="font-size:0.69rem; color:#64748b; margin-top:1px;">Nagoya Station, Sakae, Toyota, Okazaki, Gifu, Mie... (~3.870 quán)</div>
+              </div>
+            </label>
+
+            <label style="display:flex; align-items:center; gap:10px; padding:10px 12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; cursor:pointer; transition:all 0.15s;">
+              <input type="radio" name="set-region-radio" value="all" onchange="selectRegion('all')">
+              <div style="flex:1;">
+                <div style="font-weight:800; font-size:0.82rem; color:#1e293b;">🌐 全エリア (Tất cả 3 vùng / Toàn quốc)</div>
+                <div style="font-size:0.69rem; color:#64748b; margin-top:1px;">Tải dữ liệu toàn bộ cả 3 vùng cùng lúc (~12.000 quán)</div>
+              </div>
+            </label>
+          </div>
+
+          <div style="margin-top:8px;">
+            <button type="button" onclick="closeSettingsModal(); openPrefModal();" style="width:100%; display:flex; justify-content:space-between; align-items:center; padding:8px 12px; background:#f1f5f9; border:1px dashed #cbd5e1; border-radius:8px; font-weight:700; font-size:0.75rem; color:#475569; cursor:pointer;">
+              <span>📍 Chọn chi tiết từng thành phố / khu vực</span>
+              <span>Mở danh sách ❯</span>
+            </button>
+          </div>
         </div>
 
         <!-- Telegram & Notifications -->
@@ -2224,12 +2328,67 @@ def index():
   </div>
 
   <script>
-    // 1. APP STATE
+    // 1. APP STATE & 3-REGION ON-DEMAND LOADING
+    const REGIONS = {
+      'osaka': {
+        id: 'osaka',
+        name: '大阪・関西',
+        label: 'Osaka & Kansai (大阪・関西)',
+        center: [34.6937, 135.5023],
+        zoom: 13,
+        defaultCity: 'なんば',
+        prefs: ['osaka']
+      },
+      'tokyo': {
+        id: 'tokyo',
+        name: '東京・神奈川',
+        label: 'Tokyo & Kanto (東京・神奈川・関東)',
+        center: [35.4437, 139.6380],
+        zoom: 13,
+        defaultCity: '横浜',
+        prefs: ['kanagawa']
+      },
+      'nagoya': {
+        id: 'nagoya',
+        name: '名古屋・東海',
+        label: 'Nagoya & Tokai (愛知・岐阜・三重・東海)',
+        center: [35.1815, 136.9066],
+        zoom: 13,
+        defaultCity: '名古屋駅',
+        prefs: ['aichi', 'gifu', 'mie']
+      },
+      'all': {
+        id: 'all',
+        name: '全エリア (全国)',
+        label: 'Toàn quốc / 全エリア (Tất cả vùng)',
+        center: [34.6937, 135.5023],
+        zoom: 10,
+        defaultCity: '全エリア',
+        prefs: ['osaka', 'aichi', 'kanagawa', 'gifu', 'mie']
+      }
+    };
+
+    function getRegionForPref(pref) {
+      if (!pref) return 'osaka';
+      pref = pref.toLowerCase();
+      if (pref === 'osaka') return 'osaka';
+      if (pref === 'kanagawa' || pref === 'tokyo') return 'tokyo';
+      if (pref === 'aichi' || pref === 'gifu' || pref === 'mie' || pref === 'nagoya') return 'nagoya';
+      return 'all';
+    }
+
+    let savedRegion = localStorage.getItem('poketan_selected_region') || 'osaka';
+    if (!REGIONS[savedRegion]) savedRegion = 'osaka';
+    let currentRegion = savedRegion;
+    let currentPref = REGIONS[currentRegion].prefs[0] || 'osaka';
+
     let storesDict = {};
+    window.REGIONS = REGIONS;
+    window.currentRegion = currentRegion;
+    window.storesDict = storesDict;
     let hotStatus = {};
     let coldStatus = {};
     let configData = {};
-    let currentPref = 'osaka';
     let activeFilter = 'all'; // 'all' | 'in' | 'onsite' | 'out' | 'recent' | 'hidenone' | 'unknown'
     let activeChain = 'all';  // 'all' | 'conbini' | 'seven' | 'lawson' | 'familymart' | 'ministop' | 'specialty' | 'electronics'
     let activeRadius = null;  // null | 1 | 3 | 5 | 10
@@ -2262,9 +2421,9 @@ def index():
              lat >= 24.0 && lat <= 46.0 && lng >= 122.0 && lng <= 154.0;
     }
 
-    // Determine initial center before map creation (avoids sudden jumps)
-    let initialCenter = prefCenters[currentPref] || [34.6937, 135.5023];
-    let initialZoom = 13;
+    // Determine initial center based on active region
+    let initialCenter = REGIONS[currentRegion] ? REGIONS[currentRegion].center : [34.6937, 135.5023];
+    let initialZoom = REGIONS[currentRegion] ? REGIONS[currentRegion].zoom : 13;
 
     try {
       const savedLat = parseFloat(localStorage.getItem('poketan_user_lat') || sessionStorage.getItem('poketan_user_lat'));
@@ -2627,7 +2786,8 @@ def index():
 
         // Find the newest in-stock report (prioritizing the currently selected area)
         if (info.code === 'i') {
-          const isPrefMatch = (currentPref === 'all' || store.pref === currentPref);
+          const targetPrefs = REGIONS[currentRegion] ? REGIONS[currentRegion].prefs : ['osaka'];
+          const isPrefMatch = (currentRegion === 'all' || targetPrefs.includes(store.pref) || store.pref === currentPref);
           const ts = info.timestamp || 0;
           if (isPrefMatch && ts > maxTimestamp) {
             maxTimestamp = ts;
@@ -3228,8 +3388,9 @@ def index():
       const q = query.toLowerCase().trim();
 
       let matched = [];
+      const listTargetPrefs = REGIONS[currentRegion] ? REGIONS[currentRegion].prefs : ['osaka'];
       for (const store of allStores) {
-        if (currentPref !== 'all' && store.pref !== currentPref) continue;
+        if (currentRegion !== 'all' && !listTargetPrefs.includes(store.pref) && store.pref !== currentPref) continue;
         const info = decodeStatus(effectiveStatus[store.id] || effectiveStatus[store.id + '_c']);
 
         // List Status Tab Filter
@@ -3382,7 +3543,134 @@ def index():
     }
     window.closePrefModal = closePrefModal;
 
-    function selectCityArea(pref, cityName, lat, lng, zoom) {
+    // REGION TOAST & SELECTOR HANDLERS
+    let regionToastTimer = null;
+    function showRegionToast(msg, icon = '🔄') {
+      const toast = document.getElementById('region-load-toast');
+      if (!toast) return;
+      if (regionToastTimer) clearTimeout(regionToastTimer);
+      const iconEl = document.getElementById('region-load-icon');
+      const textEl = document.getElementById('region-load-text');
+      if (iconEl) iconEl.innerText = icon;
+      if (textEl) textEl.innerText = msg;
+      toast.style.display = 'inline-flex';
+    }
+    window.showRegionToast = showRegionToast;
+
+    function hideRegionToast(delay = 0) {
+      if (regionToastTimer) clearTimeout(regionToastTimer);
+      if (delay > 0) {
+        regionToastTimer = setTimeout(() => {
+          const toast = document.getElementById('region-load-toast');
+          if (toast) toast.style.display = 'none';
+        }, delay);
+      } else {
+        const toast = document.getElementById('region-load-toast');
+        if (toast) toast.style.display = 'none';
+      }
+    }
+    window.hideRegionToast = hideRegionToast;
+
+    let isRegionLoading = false;
+    async function selectRegion(regionId, flyToRegion = true) {
+      if (!REGIONS[regionId]) regionId = 'osaka';
+      if (isRegionLoading) return;
+
+      currentRegion = regionId;
+      window.currentRegion = currentRegion;
+      localStorage.setItem('poketan_selected_region', regionId);
+
+      // Sync radio in Settings Modal
+      const radios = document.querySelectorAll('input[name="set-region-radio"]');
+      radios.forEach(r => {
+        r.checked = (r.value === regionId);
+      });
+
+      const regObj = REGIONS[regionId];
+      currentPref = regObj.prefs[0] || 'osaka';
+      if (flyToRegion) {
+        currentCity = regObj.defaultCity;
+        const headerLoc = document.getElementById('header-loc-name');
+        if (headerLoc) {
+          headerLoc.innerText = (regObj.id === 'all') ? '全エリア' : `${regObj.defaultCity}周辺`;
+        }
+      }
+
+      showRegionToast(`Đang tải dữ liệu ${regObj.name}...`, '⏳');
+      isRegionLoading = true;
+
+      try {
+        const [storesRes, hotRes, coldRes] = await Promise.all([
+          fetch(`/api/stores_data?region=${regionId}`),
+          fetch(`/api/hot_status?region=${regionId}`).catch(() => null),
+          fetch(`/api/cold_status?region=${regionId}`).catch(() => null)
+        ]);
+
+        if (storesRes && storesRes.ok) {
+          storesDict = await storesRes.json();
+          window.storesDict = storesDict;
+        }
+        if (hotRes && hotRes.ok) {
+          try { hotStatus = await hotRes.json(); } catch(e) {}
+        }
+        if (coldRes && coldRes.ok) {
+          try { coldStatus = await coldRes.json(); } catch(e) {}
+        }
+
+        // Fly map if requested
+        if (flyToRegion && regObj.center) {
+          map.flyTo(regObj.center, regObj.zoom, { animate: true, duration: 1.0 });
+        }
+
+        // Render markers on map
+        renderMapMarkers();
+
+        // If list view is open, refresh it
+        const listContainer = document.getElementById('view-list-container');
+        if (listContainer && listContainer.classList.contains('open')) {
+          renderStoreList();
+        }
+
+        // Prefetch report counts for this region
+        fetch(`/api/report_counts?region=${regionId}`).then(r => r.json()).then(data => {
+          if (data && typeof data === 'object') {
+            for (const [sid, c] of Object.entries(data)) {
+              storeCountsCache[sid] = { in: c.in, out: c.out, loaded: true };
+              const pIn = document.getElementById(`count-in-${sid}`);
+              const pOut = document.getElementById(`count-out-${sid}`);
+              if (pIn) pIn.innerText = c.in;
+              if (pOut) pOut.innerText = c.out;
+
+              const lIn = document.getElementById(`list-count-in-${sid}`);
+              const lOut = document.getElementById(`list-count-out-${sid}`);
+              if (lIn) lIn.innerText = c.in;
+              if (lOut) lOut.innerText = c.out;
+            }
+          }
+        }).catch(() => {});
+
+        // Reconnect realtime listeners for active region
+        setupRealtime();
+
+        const count = Object.keys(storesDict).length;
+        showRegionToast(`Đã nạp ${count} quán (${regObj.name})`, '⚡');
+        hideRegionToast(2000);
+      } catch (err) {
+        console.error('Error switching region:', err);
+        showRegionToast('Lỗi khi tải dữ liệu vùng', '⚠️');
+        hideRegionToast(2500);
+      } finally {
+        isRegionLoading = false;
+      }
+    }
+    window.selectRegion = selectRegion;
+
+    async function selectCityArea(pref, cityName, lat, lng, zoom) {
+      const targetRegion = getRegionForPref(pref);
+      if (currentRegion !== 'all' && currentRegion !== targetRegion) {
+        await selectRegion(targetRegion, false);
+      }
+
       currentPref = pref;
       currentCity = cityName;
       dismissedToastStoreId = null;
@@ -3506,8 +3794,9 @@ def index():
       const allStores = Object.values(storesDict);
       const effectiveStatus = Object.assign({}, coldStatus, hotStatus);
       
+      const targetPrefs = REGIONS[currentRegion] ? REGIONS[currentRegion].prefs : ['osaka'];
       const inStockList = allStores.filter(s => {
-        if (currentPref !== 'all' && s.pref !== currentPref) return false;
+        if (currentRegion !== 'all' && !targetPrefs.includes(s.pref) && s.pref !== currentPref) return false;
         const info = decodeStatus(effectiveStatus[s.id] || effectiveStatus[s.id + '_c']);
         return info.code === 'i';
       });
@@ -4092,6 +4381,17 @@ def index():
       }, 2500);
 
       try {
+        // Sync radio button in settings modal
+        const activeRadio = document.querySelector(`input[name="set-region-radio"][value="${currentRegion}"]`);
+        if (activeRadio) activeRadio.checked = true;
+
+        if (REGIONS[currentRegion]) {
+          const headerLoc = document.getElementById('header-loc-name');
+          if (headerLoc) {
+            headerLoc.innerText = (currentRegion === 'all') ? '全エリア' : `${REGIONS[currentRegion].defaultCity}周辺`;
+          }
+        }
+
         // Show cached marker on map if available
         if (userLat !== null && userLng !== null) {
           updateUserMarker(userLat, userLng);
@@ -4101,16 +4401,17 @@ def index():
         locateUser(false);
         startContinuousGpsWatch();
 
-        // Step 1: Fetch config, stores, hot_status, and cold_status ALL IN PARALLEL!
+        // Step 1: Fetch config, stores, hot_status, and cold_status ALL IN PARALLEL for currentRegion!
         const [cfgRes, storesRes, hotRes, coldRes] = await Promise.all([
           fetch('/api/config'),
-          fetch('/api/stores_data'),
-          fetch('/api/hot_status').catch(() => null),
-          fetch('/api/cold_status').catch(() => null)
+          fetch(`/api/stores_data?region=${currentRegion}`),
+          fetch(`/api/hot_status?region=${currentRegion}`).catch(() => null),
+          fetch(`/api/cold_status?region=${currentRegion}`).catch(() => null)
         ]);
 
         configData = await cfgRes.json();
         storesDict = await storesRes.json();
+        window.storesDict = storesDict;
 
         if (hotRes && hotRes.ok) {
           try { hotStatus = await hotRes.json(); } catch(e) {}
@@ -4119,11 +4420,11 @@ def index():
           try { coldStatus = await coldRes.json(); } catch(e) {}
         }
 
-        // Render ALL markers once - smooth, instant, zero redundant cluster re-builds!
+        // Render markers for selected region - smooth, fast, zero unnecessary memory overhead!
         renderMapMarkers();
 
-        // Prefetch precomputed report counts for in-stock stores
-        fetch(`/api/report_counts?pref=${currentPref}`).then(r => r.json()).then(data => {
+        // Prefetch precomputed report counts for in-stock stores of this region
+        fetch(`/api/report_counts?region=${currentRegion}`).then(r => r.json()).then(data => {
           if (data && typeof data === 'object') {
             for (const [sid, c] of Object.entries(data)) {
               storeCountsCache[sid] = { in: c.in, out: c.out, loaded: true };
@@ -4158,7 +4459,7 @@ def index():
         setTimeout(() => map.invalidateSize(), 150);
         setTimeout(() => map.invalidateSize(), 500);
 
-        // Realtime Firestore sync (debounced)
+        // Realtime Firestore sync for active region
         setupRealtime();
       } catch (e) {
         console.error('Init error:', e);
@@ -4170,8 +4471,8 @@ def index():
 
     function refreshData() {
       Promise.all([
-        fetch('/api/hot_status').then(r => r.json()).catch(() => ({})),
-        fetch('/api/cold_status').then(r => r.json()).catch(() => ({}))
+        fetch(`/api/hot_status?region=${currentRegion}`).then(r => r.json()).catch(() => ({})),
+        fetch(`/api/cold_status?region=${currentRegion}`).then(r => r.json()).catch(() => ({}))
       ]).then(([hot, cold]) => {
         hotStatus = hot;
         coldStatus = cold;
@@ -4188,22 +4489,37 @@ def index():
       });
     }
 
+    let realtimeDb = null;
+    let realtimeUnsubscribes = [];
+
     function setupRealtime() {
       if (!window.FirebaseInit || !configData.apiKey) return;
       try {
         const { initializeApp, initializeFirestore, doc, onSnapshot } = window.FirebaseInit;
-        const app = initializeApp({ apiKey: configData.apiKey, projectId: configData.projectId });
-        const db = initializeFirestore(app, {});
+        if (!realtimeDb) {
+          const app = initializeApp({ apiKey: configData.apiKey, projectId: configData.projectId });
+          realtimeDb = initializeFirestore(app, {});
+        }
 
-        ['osaka', 'aichi', 'kanagawa', 'gifu', 'mie'].forEach(p => {
-          onSnapshot(doc(db, 'status', p), (snap) => {
+        // Unsubscribe old listeners
+        realtimeUnsubscribes.forEach(unsub => {
+          try { unsub(); } catch(e) {}
+        });
+        realtimeUnsubscribes = [];
+
+        const targetPrefs = REGIONS[currentRegion] ? REGIONS[currentRegion].prefs : ['osaka'];
+        targetPrefs.forEach(p => {
+          const unsub = onSnapshot(doc(realtimeDb, 'status', p), (snap) => {
             if (snap.exists()) {
               Object.assign(hotStatus, snap.data());
               requestRenderMarkers();
             }
           });
+          realtimeUnsubscribes.push(unsub);
         });
-      } catch(e) {}
+      } catch(e) {
+        console.warn('Realtime sync setup error:', e);
+      }
     }
 
     if (document.readyState === 'loading') {
