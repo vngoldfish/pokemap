@@ -348,11 +348,23 @@ async def send_webhook_notification(request: Request):
 _stores_cache = None
 _cold_cache = None
 
+# All available prefectures on PokéTan
+ALL_PREFS = ["osaka", "aichi", "kanagawa", "gifu", "mie"]
+
 
 def get_stores_metadata():
     global _stores_cache
     if _stores_cache is None:
-        _stores_cache = fetch_stores(pref="osaka")
+        all_stores = {}
+        for pref in ALL_PREFS:
+            try:
+                stores = fetch_stores(pref=pref)
+                all_stores.update(stores)
+                print(f"  Loaded {len(stores)} stores from {pref}")
+            except Exception as e:
+                print(f"  Error loading stores from {pref}: {e}")
+        _stores_cache = all_stores
+        print(f"Total stores loaded: {len(all_stores)}")
     return _stores_cache
 
 
@@ -366,18 +378,27 @@ def get_stores_data():
 def get_cold_status():
     global _cold_cache
     if _cold_cache is None:
-        try:
-            _cold_cache = fetch_firestore_document("status/osaka_cold")
-        except Exception as e:
-            print("Error fetching cold status:", e)
-            _cold_cache = {}
+        _cold_cache = {}
+        for pref in ALL_PREFS:
+            try:
+                data = fetch_firestore_document(f"status/{pref}_cold")
+                _cold_cache.update(data)
+            except Exception as e:
+                print(f"Cold status {pref}: {e}")
     return JSONResponse(content=_cold_cache)
 
 
 @app.get("/api/hot_status")
 def get_hot_status():
     try:
-        return JSONResponse(content=fetch_firestore_document("status/osaka"))
+        merged = {}
+        for pref in ALL_PREFS:
+            try:
+                data = fetch_firestore_document(f"status/{pref}")
+                merged.update(data)
+            except Exception:
+                pass
+        return JSONResponse(content=merged)
     except Exception as e:
         print("Error fetching hot status:", e)
         return JSONResponse(content={})
@@ -5775,49 +5796,62 @@ def index():
       });
       const db = initializeFirestore(app, {});
 
-      onSnapshot(doc(db, 'status', 'osaka'), (docSnap) => {
-        if (!docSnap.exists()) return;
-        const nextData = docSnap.data();
-        hotStatus = nextData;
+      const ALL_PREFS = ['osaka', 'aichi', 'kanagawa', 'gifu', 'mie'];
+      const prefHotData = {};
+      
+      ALL_PREFS.forEach(pref => {
+        prefHotData[pref] = {};
+        
+        onSnapshot(doc(db, 'status', pref), (docSnap) => {
+          if (!docSnap.exists()) return;
+          const nextData = docSnap.data();
+          prefHotData[pref] = nextData;
 
-        const currentInStockIds = new Set();
-        for (const [k, v] of Object.entries(nextData)) {
-          if (typeof v === 'string' && v.length > 0 && v[0].toLowerCase() === 'i') {
-            currentInStockIds.add(k);
+          // Merge all pref hot data
+          const mergedHot = {};
+          for (const p of ALL_PREFS) {
+            Object.assign(mergedHot, prefHotData[p]);
           }
-        }
 
-        if (previousRawStatus !== null) {
-          for (const [k, v] of Object.entries(nextData)) {
-            if (k.endsWith('_c')) continue;
-            const prevV = previousRawStatus[k];
-            if (prevV !== v) {
-              const store = storesDict[k] || { id: k, name: 'Cửa hàng', chain: 'other', address: '', lat: null, lng: null };
-              const info = decodeStatus(v, nextData[k + '_c']);
-              if (info) {
-                if (info.code === 'i') {
-                  showToast(store, info);
-                  setTimeout(() => {
-                    const card = document.getElementById('card-' + k);
-                    if (card) card.classList.add('just-updated');
-                  }, 300);
-                } else if (info.code === 'o') {
-                  showOutOfStockToast(store, info);
-                } else if (info.code === 'n') {
-                  showNotHandledToast(store, info);
+          const currentInStockIds = new Set();
+          for (const [k, v] of Object.entries(mergedHot)) {
+            if (typeof v === 'string' && v.length > 0 && v[0].toLowerCase() === 'i') {
+              currentInStockIds.add(k);
+            }
+          }
+
+          if (previousRawStatus !== null) {
+            for (const [k, v] of Object.entries(nextData)) {
+              if (k.endsWith('_c')) continue;
+              const prevV = previousRawStatus[k];
+              if (prevV !== v) {
+                const store = storesDict[k] || { id: k, name: 'Cửa hàng', chain: 'other', address: '', lat: null, lng: null };
+                const info = decodeStatus(v, nextData[k + '_c']);
+                if (info) {
+                  if (info.code === 'i') {
+                    showToast(store, info);
+                    setTimeout(() => {
+                      const card = document.getElementById('card-' + k);
+                      if (card) card.classList.add('just-updated');
+                    }, 300);
+                  } else if (info.code === 'o') {
+                    showOutOfStockToast(store, info);
+                  } else if (info.code === 'n') {
+                    showNotHandledToast(store, info);
+                  }
                 }
               }
             }
           }
-        }
 
-        previousRawStatus = { ...nextData };
-        previousInStockIds = currentInStockIds;
-
-        latestMergedStatus = { ...coldStatus, ...hotStatus };
-        renderUI();
-      }, (err) => {
-        console.error("Firestore Listen Error:", err);
+          previousRawStatus = { ...previousRawStatus, ...nextData };
+          previousInStockIds = currentInStockIds;
+          hotStatus = mergedHot;
+          latestMergedStatus = { ...coldStatus, ...hotStatus };
+          renderUI();
+        }, (err) => {
+          console.error(`Firestore Listen Error (${pref}):`, err);
+        });
       });
 
       // Tự động đồng bộ kiểm tra trạng thái từ Firestore mỗi 45 giây đề phòng mạng chập chờn
