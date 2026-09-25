@@ -1190,6 +1190,23 @@ def index():
     .btn-popup-hist:hover {
       background: #1e293b;
     }
+    .popup-hist-scroll {
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px dashed #cbd5e1;
+      max-height: 190px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .popup-hist-scroll::-webkit-scrollbar {
+      width: 4px;
+    }
+    .popup-hist-scroll::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
 
     /* LOADING SPINNER */
     #loading-overlay {
@@ -1780,8 +1797,11 @@ def index():
           ${packs}
           <div class="popup-actions-grid">
             <a href="${mapsUrl}" target="_blank" class="btn-popup-maps">🗺️ ルート案内 ↗</a>
-            <button type="button" class="btn-popup-hist" onclick="openStoreHistoryModal('${store.id}')">📜 入荷履歴 ❯</button>
+            <button type="button" class="btn-popup-hist" id="btn-hist-toggle-${store.id}" onclick="event.stopPropagation(); togglePopupHistory('${store.id}')">
+              📜 入荷履歴 <span id="arrow-hist-${store.id}">▼</span>
+            </button>
           </div>
+          <div id="popup-hist-container-${store.id}" class="popup-hist-scroll" style="display:none;"></div>
         </div>
       `;
     }
@@ -2094,8 +2114,148 @@ def index():
     }
     window.updateSettings = updateSettings;
 
-    // 13c. STORE HISTORY MODAL (📜 入荷履歴 / Lịch sử báo cáo)
+    // 13c. STORE HISTORY & POPUP ACCORDION (📜 入荷履歴 / Lịch sử báo cáo)
     const storeHistoryCache = {};
+
+    function updateLeafletPopup() {
+      if (typeof map !== 'undefined' && map.eachLayer) {
+        map.eachLayer(l => {
+          if (l.getPopup && l.getPopup() && l.getPopup().isOpen()) {
+            l.getPopup().update();
+          }
+        });
+      }
+    }
+
+    async function togglePopupHistory(storeId) {
+      const containerEl = document.getElementById(`popup-hist-container-${storeId}`);
+      const arrowEl = document.getElementById(`arrow-hist-${storeId}`);
+      if (!containerEl) return;
+
+      const isOpen = containerEl.style.display !== 'none';
+      if (isOpen) {
+        containerEl.style.display = 'none';
+        if (arrowEl) arrowEl.innerText = '▼';
+        updateLeafletPopup();
+        return;
+      }
+
+      containerEl.style.display = 'flex';
+      if (arrowEl) arrowEl.innerText = '▲';
+
+      if (!storeHistoryCache[storeId]) {
+        containerEl.innerHTML = `
+          <div style="text-align:center; padding:10px 4px; color:#64748b; font-size:0.73rem;">
+            <span style="display:inline-block; animation:pulse 1s infinite;">⏳</span>
+            <div style="margin-top:2px; font-weight:600;">入荷履歴を読込中...</div>
+          </div>
+        `;
+        updateLeafletPopup();
+      }
+
+      try {
+        let history = storeHistoryCache[storeId];
+        if (!history) {
+          const res = await fetch(`/api/store_history/${storeId}`);
+          history = await res.json();
+          storeHistoryCache[storeId] = history;
+        }
+
+        renderPopupHistoryContent(storeId, containerEl, history);
+      } catch (err) {
+        containerEl.innerHTML = `
+          <div style="color:#ef4444; font-size:0.72rem; padding:6px; text-align:center;">
+            ⚠️ 履歴の取得に失敗しました: ${escapeHtml(err.message)}
+          </div>
+        `;
+      }
+
+      updateLeafletPopup();
+    }
+    window.togglePopupHistory = togglePopupHistory;
+
+    function renderPopupHistoryContent(storeId, containerEl, history) {
+      const effectiveStatus = Object.assign({}, coldStatus, hotStatus);
+      const currentRaw = effectiveStatus[storeId] || effectiveStatus[storeId + '_c'];
+      const info = decodeStatus(currentRaw);
+
+      if (!history || history.length === 0) {
+        let statusBadge = '⚪ 不明 (Chưa rõ)';
+        let itemBg = '#f8fafc';
+        let itemBorder = '#e2e8f0';
+        let itemColor = '#475569';
+
+        if (info.code === 'i') {
+          statusBadge = '🟢 在庫あり (Có hàng)';
+          itemBg = '#f0fdf4';
+          itemBorder = '#bbf7d0';
+          itemColor = '#15803d';
+        } else if (info.code === 'o') {
+          statusBadge = '🔴 売り切れ (Hết hàng)';
+          itemBg = '#fef2f2';
+          itemBorder = '#fecaca';
+          itemColor = '#b91c1c';
+        } else if (info.code === 'n') {
+          statusBadge = '⚪ 扱無 (Không bán thẻ)';
+          itemBg = '#f8fafc';
+          itemBorder = '#e2e8f0';
+          itemColor = '#64748b';
+        }
+
+        const packName = (info.packs && info.packs.length > 0) ? info.packs.join(', ') : '';
+
+        containerEl.innerHTML = `
+          <div style="background:${itemBg}; border:1px solid ${itemBorder}; border-radius:6px; padding:6px 8px; font-size:0.72rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <b style="color:${itemColor};">${statusBadge}</b>
+              <span style="color:#64748b; font-size:0.68rem;">🕒 ${escapeHtml(info.timeAgo || info.reported_at || '最新')}</span>
+            </div>
+            ${packName ? `<div style="color:#1e293b; font-weight:700; margin-top:2px;">📦 商品: ${escapeHtml(packName)}</div>` : ''}
+            <div style="color:#64748b; font-size:0.66rem; margin-top:2px;">👤 報告者: 匿名トレーナー (アプリ共有)</div>
+          </div>
+          <div style="font-size:0.67rem; color:#94a3b8; text-align:center; padding:2px;">(過去の追加ログはありません)</div>
+        `;
+        return;
+      }
+
+      containerEl.innerHTML = history.map(item => {
+        let statusBadge = '⚪ 不明';
+        let itemBg = '#f8fafc';
+        let itemBorder = '#e2e8f0';
+        let itemColor = '#475569';
+
+        if (item.status_code === 'i') {
+          statusBadge = '🟢 在庫あり (Có hàng)';
+          itemBg = '#f0fdf4';
+          itemBorder = '#bbf7d0';
+          itemColor = '#15803d';
+        } else if (item.status_code === 'o') {
+          statusBadge = '🔴 売り切れ (Hết hàng)';
+          itemBg = '#fef2f2';
+          itemBorder = '#fecaca';
+          itemColor = '#b91c1c';
+        } else if (item.status_code === 'n') {
+          statusBadge = '⚪ 扱無 (Không bán)';
+          itemBg = '#f8fafc';
+          itemBorder = '#e2e8f0';
+          itemColor = '#64748b';
+        }
+
+        const noteHtml = item.note ? `<div style="color:#1e293b; font-weight:700; margin-top:2px;">📦 商品: ${escapeHtml(item.note)}</div>` : '';
+        const userHtml = `👤 報告者: ${escapeHtml(item.user || '匿名トレーナー')}${item.onsite ? ' • 📸 現地確認済' : ''}`;
+
+        return `
+          <div style="background:${itemBg}; border:1px solid ${itemBorder}; border-radius:6px; padding:6px 8px; font-size:0.72rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <b style="color:${itemColor};">${statusBadge}</b>
+              <span style="color:#64748b; font-size:0.68rem;">🕒 ${escapeHtml(item.formatted_time || '')}</span>
+            </div>
+            ${noteHtml}
+            <div style="color:#64748b; font-size:0.66rem; margin-top:2px;">${userHtml}</div>
+          </div>
+        `;
+      }).join('');
+    }
 
     async function openStoreHistoryModal(storeId) {
       const modal = document.getElementById('store-history-modal');
