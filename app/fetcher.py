@@ -125,12 +125,13 @@ def fetch_store_history(store_id: str) -> list:
     """Fetch history reports for a specific store from Firestore subcollection stores/{storeId}/history."""
     import time
     now = time.time()
-    if store_id in _history_cache:
-        cached = _history_cache[store_id]
+    clean_id = store_id[:-2] if store_id.endswith("_c") else store_id
+    if clean_id in _history_cache:
+        cached = _history_cache[clean_id]
         if now - cached["time"] < 30:  # 30 second cache
             return cached["data"]
 
-    url = f"{FIRESTORE_BASE_URL}/stores/{store_id}/history?key={FIREBASE_API_KEY}&pageSize=20"
+    url = f"{FIRESTORE_BASE_URL}/stores/{clean_id}/history?key={FIREBASE_API_KEY}&pageSize=20"
     history = []
     try:
         doc_json = fetch_json(url)

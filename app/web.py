@@ -1145,20 +1145,50 @@ def index():
       margin: 8px 0;
       width: 100%;
     }
-    .btn-maps-route {
+    .popup-actions-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-top: 10px;
+    }
+    .btn-popup-maps {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 6px;
-      width: 100%;
-      padding: 8px 12px;
-      margin-top: 10px;
+      gap: 4px;
+      padding: 8px 6px;
       background: #4f46e5;
       color: white;
       text-decoration: none;
       border-radius: 8px;
       font-weight: 700;
-      font-size: 0.78rem;
+      font-size: 0.74rem;
+      border: none;
+      cursor: pointer;
+      text-align: center;
+      transition: background 0.15s;
+    }
+    .btn-popup-maps:hover {
+      background: #4338ca;
+    }
+    .btn-popup-hist {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      padding: 8px 6px;
+      background: #0f172a;
+      color: white;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.74rem;
+      border: none;
+      cursor: pointer;
+      text-align: center;
+      transition: background 0.15s;
+    }
+    .btn-popup-hist:hover {
+      background: #1e293b;
     }
 
     /* LOADING SPINNER */
@@ -1423,6 +1453,44 @@ def index():
         <button onclick="refreshData(); closeSettingsModal();" style="width:100%;padding:11px;background:#4f46e5;color:white;border:none;border-radius:8px;font-weight:800;font-size:0.84rem;cursor:pointer;box-shadow:0 2px 6px rgba(79,70,229,0.3);">
           🔄 Cập nhật dữ liệu mới nhất (データ更新)
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 9. STORE HISTORY MODAL (📜 入荷履歴 / Lịch sử báo cáo) -->
+  <div id="store-history-modal" class="modal-overlay" onclick="if(event.target===this) closeStoreHistoryModal()">
+    <div class="modal-card" style="max-width:440px;">
+      <div class="modal-header">
+        <div style="min-width:0; flex:1; text-align:left;">
+          <h3 id="hist-modal-title" style="margin:0; font-size:1.0rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">📜 入荷履歴 / Lịch sử báo cáo</h3>
+          <div id="hist-modal-subtitle" style="font-size:0.72rem; color:#64748b; margin-top:2px;"></div>
+        </div>
+        <button class="modal-close-btn" onclick="closeStoreHistoryModal()">✕</button>
+      </div>
+      <div class="modal-body" style="font-size:0.82rem; max-height:75vh; overflow-y:auto;">
+        <!-- Current Status Banner -->
+        <div id="hist-modal-current" style="margin-bottom:12px;"></div>
+
+        <!-- History Timeline Header -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; font-weight:800; font-size:0.8rem; color:#1e293b;">
+          <span>📋 過去の報告ログ (Nhật ký báo cáo)</span>
+          <span id="hist-modal-count" style="font-size:0.72rem; color:#4f46e5; font-weight:700;"></span>
+        </div>
+
+        <!-- Timeline Items List -->
+        <div id="hist-modal-timeline" style="display:flex; flex-direction:column; gap:8px;">
+          <!-- Loaded dynamically -->
+        </div>
+
+        <!-- Bottom Actions -->
+        <div style="margin-top:14px; display:flex; gap:8px;">
+          <a id="hist-modal-maps-link" href="#" target="_blank" class="btn-popup-maps" style="flex:1; padding:10px; font-size:0.8rem;">
+            🗺️ Googleマップでルート案内 ↗
+          </a>
+          <button type="button" onclick="closeStoreHistoryModal()" style="padding:10px 16px; background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; border-radius:8px; font-weight:700; font-size:0.8rem; cursor:pointer;">
+            閉じる
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -1710,8 +1778,10 @@ def index():
           ${distHtml}
           ${time}
           ${packs}
-          <div style="font-size:0.72rem; color:#64748b; margin-top:6px; background:#f8fafc; padding:4px 6px; border-radius:4px;">📍 ${store.address || ''}</div>
-          <a href="${mapsUrl}" target="_blank" class="btn-maps-route">🗺️ Googleマップでルート案内 ↗</a>
+          <div class="popup-actions-grid">
+            <a href="${mapsUrl}" target="_blank" class="btn-popup-maps">🗺️ ルート案内 ↗</a>
+            <button type="button" class="btn-popup-hist" onclick="openStoreHistoryModal('${store.id}')">📜 入荷履歴 ❯</button>
+          </div>
         </div>
       `;
     }
@@ -1848,7 +1918,13 @@ def index():
               <div class="card-store-name">${store.name}</div>
               <div class="card-chain-time">${chain}${distStr}${timeStr}</div>
             </div>
-            <div class="card-badge ${badgeClass}">${badgeText}</div>
+            <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px; flex-shrink:0;">
+              <div class="card-badge ${badgeClass}">${badgeText}</div>
+              <button type="button" onclick="event.stopPropagation(); openStoreHistoryModal('${store.id}')"
+                      style="background:#f1f5f9; border:1px solid #cbd5e1; border-radius:4px; padding:2px 6px; font-size:0.62rem; font-weight:700; color:#334155; cursor:pointer;">
+                📜 履歴
+              </button>
+            </div>
           </div>
         `;
       }).join('');
@@ -2017,6 +2093,172 @@ def index():
       }).catch(e => console.warn(e));
     }
     window.updateSettings = updateSettings;
+
+    // 13c. STORE HISTORY MODAL (📜 入荷履歴 / Lịch sử báo cáo)
+    const storeHistoryCache = {};
+
+    async function openStoreHistoryModal(storeId) {
+      const modal = document.getElementById('store-history-modal');
+      const titleEl = document.getElementById('hist-modal-title');
+      const subEl = document.getElementById('hist-modal-subtitle');
+      const currEl = document.getElementById('hist-modal-current');
+      const countEl = document.getElementById('hist-modal-count');
+      const timelineEl = document.getElementById('hist-modal-timeline');
+      const mapsLinkEl = document.getElementById('hist-modal-maps-link');
+
+      if (!modal) return;
+
+      const store = storesDict[storeId] || { name: '店舗情報', address: '' };
+      const chain = (configData.chainNames && configData.chainNames[store.chain]) || store.chain || 'コンビニ・カード店';
+
+      if (titleEl) titleEl.innerText = store.name;
+      
+      let subText = `${chain} • 📍 ${store.address || 'エリア'}`;
+      if (userLat !== null && userLng !== null && store.lat && store.lng) {
+        const d = calcDistanceKm(userLat, userLng, store.lat, store.lng);
+        subText += ` • 現在地から ${formatDist(d)}`;
+      }
+      if (subEl) subEl.innerText = subText;
+
+      const mapsQuery = encodeURIComponent((store.name || '') + ' ' + (store.address || ''));
+      if (mapsLinkEl) {
+        mapsLinkEl.href = `https://www.google.com/maps/dir/?api=1&destination=${mapsQuery}`;
+      }
+
+      // Current status summary banner
+      const effectiveStatus = Object.assign({}, coldStatus, hotStatus);
+      const currentRaw = effectiveStatus[storeId] || effectiveStatus[storeId + '_c'];
+      const info = decodeStatus(currentRaw);
+
+      let currentStatusBadge = '⚪ 不明 / 扱無';
+      let currentBg = '#f1f5f9';
+      let currentColor = '#475569';
+      if (info.code === 'i') {
+        currentStatusBadge = '🟢 在庫あり (In Stock)';
+        currentBg = '#dcfce7';
+        currentColor = '#15803d';
+      } else if (info.code === 'o') {
+        currentStatusBadge = '🔴 在庫なし (Out of Stock)';
+        currentBg = '#fee2e2';
+        currentColor = '#b91c1c';
+      } else if (info.code === 'n') {
+        currentStatusBadge = '⚪ 扱ってない (Not handled)';
+        currentBg = '#f1f5f9';
+        currentColor = '#64748b';
+      }
+
+      const packInfo = info.packs.length ? `<div style="margin-top:4px; font-weight:700; color:#1e293b; font-size:0.75rem;">📦 パック: ${escapeHtml(info.packs.join(', '))}</div>` : '';
+      const timeInfo = info.timeAgo ? `<div style="font-size:0.72rem; color:#64748b; margin-top:3px;">🕒 直近報告: ${escapeHtml(info.timeAgo)} (${escapeHtml(info.reported_at)})</div>` : '';
+
+      if (currEl) {
+        currEl.innerHTML = `
+          <div style="background:${currentBg}; border:1px solid #cbd5e1; border-radius:8px; padding:10px 12px;">
+            <div style="font-weight:800; font-size:0.86rem; color:${currentColor};">${currentStatusBadge}</div>
+            ${packInfo}
+            ${timeInfo}
+          </div>
+        `;
+      }
+
+      // Show modal immediately
+      modal.classList.add('open');
+
+      if (!storeHistoryCache[storeId]) {
+        if (timelineEl) {
+          timelineEl.innerHTML = `
+            <div style="text-align:center; padding:24px 8px; color:#64748b;">
+              <div style="font-size:1.6rem; animation:pulse 1s infinite;">⏳</div>
+              <div style="margin-top:6px; font-weight:600;">過去の入荷履歴を読込中...</div>
+            </div>
+          `;
+        }
+        if (countEl) countEl.innerText = '';
+      }
+
+      // Fetch history data from backend API
+      try {
+        let history = storeHistoryCache[storeId];
+        if (!history) {
+          const res = await fetch(`/api/store_history/${storeId}`);
+          history = await res.json();
+          storeHistoryCache[storeId] = history;
+        }
+
+        renderStoreTimeline(history, info);
+      } catch (err) {
+        if (timelineEl) {
+          timelineEl.innerHTML = `
+            <div style="color:#ef4444; font-size:0.75rem; padding:12px; text-align:center;">
+              ⚠️ 履歴の取得に失敗しました: ${escapeHtml(err.message)}
+            </div>
+          `;
+        }
+      }
+    }
+    window.openStoreHistoryModal = openStoreHistoryModal;
+
+    function renderStoreTimeline(historyList, currentInfo) {
+      const countEl = document.getElementById('hist-modal-count');
+      const timelineEl = document.getElementById('hist-modal-timeline');
+      if (!timelineEl) return;
+
+      if (!historyList || historyList.length === 0) {
+        if (countEl) countEl.innerText = '0件';
+        timelineEl.innerHTML = `
+          <div style="text-align:center; padding:20px 8px; background:#f8fafc; border-radius:8px; border:1px dashed #cbd5e1; color:#64748b;">
+            <div style="font-size:1.4rem; margin-bottom:4px;">📭</div>
+            <div style="font-weight:700; color:#334155;">過去の報告ログはありません</div>
+            <div style="font-size:0.72rem; margin-top:2px;">今後の新着入荷報告や目撃情報を受信するとここに記録されます。</div>
+          </div>
+        `;
+        return;
+      }
+
+      if (countEl) countEl.innerText = `${historyList.length}件の記録`;
+
+      timelineEl.innerHTML = historyList.map(item => {
+        let badgeBg = '#f1f5f9';
+        let badgeColor = '#475569';
+        let badgeLabel = '⚪ 不明';
+        let borderAccent = '#cbd5e1';
+
+        if (item.status_code === 'i') {
+          badgeBg = '#dcfce7'; badgeColor = '#15803d'; badgeLabel = '🟢 在庫あり'; borderAccent = '#22c55e';
+        } else if (item.status_code === 'o') {
+          badgeBg = '#fee2e2'; badgeColor = '#b91c1c'; badgeLabel = '🔴 売り切れ'; borderAccent = '#ef4444';
+        } else if (item.status_code === 'n') {
+          badgeBg = '#f1f5f9'; badgeColor = '#64748b'; badgeLabel = '⚪ 扱無'; borderAccent = '#94a3b8';
+        }
+
+        const noteHtml = item.note ? `<div style="font-size:0.75rem; color:#1e293b; margin-top:4px; font-weight:700;">📦 ${escapeHtml(item.note)}</div>` : '';
+        const userHtml = item.user ? `<span style="color:#64748b;">👤 ${escapeHtml(item.user)}</span>` : '';
+        const onsiteHtml = item.onsite ? `<span style="color:#16a34a; font-weight:700;"> • 📸 現地確認</span>` : '';
+
+        return `
+          <div style="background:#ffffff; border:1px solid #e2e8f0; border-left:4px solid ${borderAccent}; border-radius:8px; padding:10px 12px; box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+              <span style="font-size:0.76rem; font-weight:800; background:${badgeBg}; color:${badgeColor}; padding:3px 8px; border-radius:6px;">
+                ${badgeLabel}
+              </span>
+              <span style="font-size:0.7rem; color:#64748b; font-weight:600;">
+                🕒 ${escapeHtml(item.formatted_time || '')}
+              </span>
+            </div>
+            ${noteHtml}
+            <div style="font-size:0.7rem; margin-top:5px; color:#94a3b8; display:flex; justify-content:space-between; align-items:center;">
+              <div>${userHtml}${onsiteHtml}</div>
+              ${item.who ? `<span style="font-family:monospace; font-size:0.65rem; color:#94a3b8;">ID: ${escapeHtml(item.who)}</span>` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function closeStoreHistoryModal() {
+      const modal = document.getElementById('store-history-modal');
+      if (modal) modal.classList.remove('open');
+    }
+    window.closeStoreHistoryModal = closeStoreHistoryModal;
 
     // 14. ROBUST GPS USER LOCATION (Smooth, non-jittering, one-time centering)
     function updateUserMarker(lat, lng, accuracy = 30) {
