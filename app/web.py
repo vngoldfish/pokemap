@@ -28,7 +28,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 import uvicorn
 
 from .fetcher import fetch_stores, fetch_firestore_document, DEFAULT_CACHE_DIR, fetch_store_history, fetch_realtime_status
-from .parser import merge_stores_with_status
+from .parser import merge_stores_with_status, parse_store_status
 from .calendar_tracker import fetch_calendar_events
 from .config import CHAIN_NAMES, PACK_CODES, FIREBASE_API_KEY, PROJECT_ID
 
@@ -128,226 +128,6 @@ async def update_settings(request: Request):
         return JSONResponse(status_code=400, content={"error": str(e)})
 
 
-@app.post("/api/notify/webhook")
-async def send_webhook_notification(request: Request):
-    """
-    Dispatch in-stock notifications to Discord Webhook and Telegram Bot.
-    Payload: {
-        "store": { "id", "name", "chain_label", "address", "lat", "lng" },
-        "info": { "label", "packs", "reported_at", "timeAgo", "confirms", "onsite" },
-        "is_test": bool
-    }
-    """
-    import urllib.request
-    import urllib.parse
-    
-    try:
-        body = await request.json()
-        store = body.get("store") or {}
-        info = body.get("info") or {}
-        is_test = bool(body.get("is_test", False))
-        
-        cfg = load_user_settings().get("notifications", {})
-        results = {}
-
-        # Check prefecture filter for notifications
-        store_pref = store.get("pref") or ""
-        allowed_prefs = cfg.get("notifyPrefs")
-        if not is_test and allowed_prefs and store_pref and store_pref not in allowed_prefs:
-            return JSONResponse(content={"status": "filtered", "reason": f"pref '{store_pref}' not in allowed notification prefectures"})
-
-        # Fetch store report history if store_id available
-        store_id = store.get("id") or ""
-        history_list = []
-        if store_id and store_id != "test_store_webhook":
-            try:
-                history_list = fetch_store_history(store_id) or []
-            except Exception as he:
-                print("Could not fetch history for webhook:", he)
-        elif is_test:
-            # Demo history entries for test notification
-            history_list = [
-                {
-                    "status_code": "o",
-                    "status_label": "🔴 Hết hàng",
-                    "note": "Hết đợt Terastal Festival",
-                    "formatted_time": "14:20 24/09",
-                    "timestamp": 1727155200,
-                    "user": "Trainer_A"
-                },
-                {
-                    "status_code": "i",
-                    "status_label": "🟢 Có hàng",
-                    "note": "Về 2 box Terastal",
-                    "formatted_time": "09:15 24/09",
-                    "timestamp": 1727136900,
-                    "user": "Trainer_B"
-                }
-            ]
-
-        # Filter out current report if duplicated in history
-        filtered_hist = []
-        cur_ts = info.get("timestamp") or 0
-        for h in history_list:
-            h_ts = h.get("timestamp") or 0
-            if cur_ts > 0 and abs(h_ts - cur_ts) < 180:
-                continue
-            filtered_hist.append(h)
-            if len(filtered_hist) >= 3:
-                break
-
-        # Calculate distance to JR Imamiya Station (lat=34.6540, lng=135.4925)
-        imamiya_dist_str = ""
-        st_lat = store.get("lat")
-        st_lng = store.get("lng")
-        if st_lat is not None and st_lng is not None:
-            try:
-                import math
-                lat1, lon1 = float(st_lat), float(st_lng)
-                lat2, lon2 = 34.6540, 135.4925
-                dlat = math.radians(lat2 - lat1)
-                dlon = math.radians(lon2 - lon1)
-                a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon/2)**2
-                dist_km = 6371 * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-                if dist_km < 1.0:
-                    imamiya_dist_str = f"{int(round(dist_km * 1000))} m"
-                else:
-                    imamiya_dist_str = f"{dist_km:.1f} km"
-            except Exception:
-                pass
-
-        # Build concise history text for Telegram and Discord
-        hist_text_tg_lines = []
-        hist_fields_discord = []
-        if filtered_hist:
-            for item in filtered_hist:
-                s_icon = "🟢" if item.get("status_code") == "i" else ("🔴" if item.get("status_code") == "o" else "⚪")
-                t_str = item.get("formatted_time") or "Trước đó"
-                note_str = f" ({item.get('note')})" if item.get("note") else ""
-                hist_text_tg_lines.append(f"- {s_icon} {t_str}: {item.get('status_label', '')}{note_str}")
-                hist_fields_discord.append(f"- {s_icon} `{t_str}`: {item.get('status_label', '')}{note_str}")
-
-        packs_text = ", ".join(info.get("packs", [])) if info.get("packs") else "Gói thẻ Pokémon (Xem tại quán)"
-        store_name = store.get('name', 'Cửa hàng')
-        store_chain = store.get('chain_label') or store.get('chain') or 'Tiện lợi'
-        store_addr = store.get('address') or 'Khu vực Osaka'
-        maps_query = urllib.parse.quote_plus(f"{store_name} {store_addr}".strip())
-        maps_url = f"https://www.google.com/maps/search/?api=1&query={maps_query}" if maps_query else ""
-        time_display = info.get('reported_at', 'Vừa xong')
-        if info.get('timeAgo'):
-            time_display += f" ({info.get('timeAgo')})"
-
-        dist_line_tg = f"🚶 <b>Khoảng cách cách ga Imamiya:</b> ~{imamiya_dist_str}" if imamiya_dist_str else ""
-
-        # 1. DISCORD WEBHOOK
-        discord_url = (cfg.get("discordWebhookUrl") or "").strip()
-        discord_enabled = cfg.get("discordEnabled", False) or is_test
-        
-        if discord_url and discord_enabled:
-            try:
-                embed_fields = [
-                    {"name": "📍 Địa chỉ", "value": store_addr, "inline": False}
-                ]
-                if imamiya_dist_str:
-                    embed_fields.append({"name": "🚶 Khoảng cách cách ga Imamiya", "value": f"~{imamiya_dist_str}", "inline": True})
-                embed_fields.extend([
-                    {"name": "📦 Sản phẩm", "value": packs_text, "inline": False},
-                    {"name": "⏱ Báo lúc", "value": time_display, "inline": True}
-                ])
-                if hist_fields_discord:
-                    embed_fields.append({
-                        "name": "📜 Lịch sử các lần báo trước:",
-                        "value": "\n".join(hist_fields_discord),
-                        "inline": False
-                    })
-                if maps_url:
-                    embed_fields.append({
-                        "name": "🗺️ Chỉ đường",
-                        "value": f"[Mở Google Maps dẫn đường chính xác]({maps_url})",
-                        "inline": False
-                    })
-
-                embed = {
-                    "title": f"{'🧪 [TEST] ' if is_test else '🔥 '}{store_name} ({store_chain})",
-                    "description": f"📍 **{store_addr}**\n🚶 **Khoảng cách cách ga Imamiya:** ~{imamiya_dist_str if imamiya_dist_str else 'N/A'}\n\n🟢 **TRẠNG THÁI: CÓ HÀNG (IN STOCK)**",
-                    "color": 0x16a34a,
-                    "fields": embed_fields,
-                    "footer": {
-                        "text": "BAWUI POKE APP • Osaka Stock Radar"
-                    }
-                }
-
-                payload = {
-                    "username": "BAWUI Poke Radar",
-                    "avatar_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png",
-                    "embeds": [embed]
-                }
-                req = urllib.request.Request(
-                    discord_url,
-                    data=json.dumps(payload).encode("utf-8"),
-                    headers={"Content-Type": "application/json", "User-Agent": "BAWUI-PokeApp"}
-                )
-                with urllib.request.urlopen(req, timeout=8) as resp:
-                    results["discord"] = "ok"
-            except Exception as de:
-                results["discord"] = f"error: {str(de)}"
-        elif not discord_url:
-            results["discord"] = "no_url"
-
-        # 2. TELEGRAM BOT
-        tg_token = (cfg.get("telegramBotToken") or "").strip()
-        tg_chat_id = (cfg.get("telegramChatId") or "").strip()
-        tg_enabled = cfg.get("telegramEnabled", False) or is_test
-        
-        if tg_token and tg_chat_id and tg_enabled:
-            try:
-                header_prefix = "🧪 <b>[THÔNG BÁO THỬ NGHIỆM]</b>\n" if is_test else "🔥 <b>CÓ HÀNG MỚI!</b>\n"
-                
-                # Format đúng chuẩn theo yêu cầu:
-                # 1. Tên cửa hàng
-                # 2. Địa chỉ
-                # 3. Khoảng cách cách ga Imamiya
-                # 4. Trạng thái & Sản phẩm
-                # 5. Xuống dòng
-                # 6. - Lịch sử: Xuống dòng từng dòng với dấu gạch ngang (-)
-                # 7. Link mở Google Maps
-                # Format ngắn gọn giống toast trên bản đồ
-                dist_part = f" • 📍 ~{imamiya_dist_str}" if imamiya_dist_str else ""
-                msg_lines = [
-                    f"🔥 <b>{store_name}</b> - CÓ HÀNG!",
-                    f"📦 {packs_text}{dist_part} • ⏱ {time_display}",
-                ]
-                app_url = body.get("app_url") or ""
-                if app_url:
-                    msg_lines.append(f"⚡ <a href=\"{app_url}\">Mở trên PokéMap App ↗</a>")
-                
-                tg_payload = {
-                    "chat_id": tg_chat_id,
-                    "text": "\n".join(msg_lines),
-                    "parse_mode": "HTML",
-                    "disable_web_page_preview": False
-                }
-                tg_api_url = f"https://api.telegram.org/bot{tg_token}/sendMessage"
-                req = urllib.request.Request(
-                    tg_api_url,
-                    data=json.dumps(tg_payload).encode("utf-8"),
-                    headers={"Content-Type": "application/json"}
-                )
-                with urllib.request.urlopen(req, timeout=8) as resp:
-                    results["telegram"] = "ok"
-            except Exception as te:
-                results["telegram"] = f"error: {str(te)}"
-        elif not (tg_token and tg_chat_id):
-            results["telegram"] = "no_credentials"
-
-        return JSONResponse(content={"status": "ok", "results": results})
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "error": str(e)})
-
-
-_stores_cache = None
-_cold_cache = None
-
 from typing import Optional, List, Dict, Any
 from concurrent.futures import ThreadPoolExecutor
 
@@ -363,6 +143,253 @@ REGION_PREFS = {
     "aichi": ["aichi", "gifu", "mie"],
     "all": ["osaka", "aichi", "kanagawa", "gifu", "mie"],
 }
+
+_recent_notified_keys = {}
+
+def send_telegram_alert(store: dict, info: dict, notif_cfg: dict, is_test: bool = False) -> dict:
+    """Send formatted alert to Telegram bot matching configured channel."""
+    import urllib.request
+    import urllib.parse
+    import json
+
+    tg_token = (notif_cfg.get("telegramBotToken") or "").strip()
+    tg_chat_id = (notif_cfg.get("telegramChatId") or "").strip()
+    tg_enabled = notif_cfg.get("telegramEnabled", False) or is_test
+
+    if not (tg_token and tg_chat_id):
+        return {"status": "no_credentials"}
+    if not tg_enabled:
+        return {"status": "disabled"}
+
+    # Calculate distance to JR Imamiya Station (lat=34.6540, lng=135.4925)
+    imamiya_dist_str = ""
+    st_lat = store.get("lat")
+    st_lng = store.get("lng")
+    if st_lat is not None and st_lng is not None:
+        try:
+            import math
+            lat1, lon1 = float(st_lat), float(st_lng)
+            lat2, lon2 = 34.6540, 135.4925
+            dlat = math.radians(lat2 - lat1)
+            dlon = math.radians(lon2 - lon1)
+            a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon/2)**2
+            dist_km = 6371 * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+            if dist_km < 1.0:
+                imamiya_dist_str = f"{int(round(dist_km * 1000))} m"
+            else:
+                imamiya_dist_str = f"{dist_km:.1f} km"
+        except Exception:
+            pass
+
+    store_name = store.get('name', 'Cửa hàng')
+    store_chain = store.get('chain_label') or store.get('chain') or 'Tiện lợi'
+    store_addr = store.get('address') or 'Khu vực đang chọn'
+    maps_query = urllib.parse.quote_plus(f"{store_name} {store_addr}".strip())
+    maps_url = f"https://www.google.com/maps/search/?api=1&query={maps_query}" if maps_query else ""
+    time_display = info.get('reported_at', 'Vừa xong')
+    if info.get('timeAgo'):
+        time_display += f" ({info.get('timeAgo')})"
+
+    packs_text = ", ".join(info.get("packs", [])) if info.get("packs") else "Gói thẻ Pokémon (Xem tại quán)"
+
+    # History
+    store_id = store.get("id") or ""
+    history_list = []
+    if store_id and store_id != "test_store_webhook":
+        try:
+            history_list = fetch_store_history(store_id) or []
+        except Exception:
+            pass
+    elif is_test:
+        history_list = [
+            {"status_code": "o", "status_label": "🔴 Hết hàng", "note": "Hết đợt Terastal Festival", "formatted_time": "14:20 24/09"},
+            {"status_code": "i", "status_label": "🟢 Có hàng", "note": "Về 2 box Terastal", "formatted_time": "09:15 24/09"}
+        ]
+
+    # Filter out current report if duplicated in history
+    filtered_hist = []
+    cur_ts = info.get("timestamp") or 0
+    for h in history_list:
+        h_ts = h.get("timestamp") or 0
+        if cur_ts > 0 and abs(h_ts - cur_ts) < 180:
+            continue
+        filtered_hist.append(h)
+        if len(filtered_hist) >= 3:
+            break
+
+    hist_text_tg_lines = []
+    if filtered_hist:
+        for item in filtered_hist:
+            s_icon = "🟢" if item.get("status_code") == "i" else ("🔴" if item.get("status_code") == "o" else "⚪")
+            t_str = item.get("formatted_time") or "Trước đó"
+            note_str = f" ({item.get('note')})" if item.get("note") else ""
+            hist_text_tg_lines.append(f"- {s_icon} {t_str}: {item.get('status_label', '')}{note_str}")
+
+    dist_part = f" • 📍 ~{imamiya_dist_str}" if imamiya_dist_str else ""
+    title_status = "🟢📸 CÓ HÀNG (XÁC NHẬN TẠI CHỖ)" if info.get("onsite") else "🟢 CÓ HÀNG (IN STOCK)"
+    header = "🧪 <b>[THÔNG BÁO THỬ NGHIỆM]</b>\n" if is_test else f"🔥 <b>{title_status}!</b>\n"
+
+    msg_lines = [
+        f"{header}🏪 <b>{store_name}</b> ({store_chain})",
+        f"📍 {store_addr}{dist_part}",
+        f"📦 <b>Sản phẩm:</b> {packs_text}",
+        f"⏱ <b>Thời gian báo:</b> {time_display}"
+    ]
+    if hist_text_tg_lines:
+        msg_lines.append("\n📜 <b>Lịch sử báo cáo gần đây:</b>")
+        msg_lines.extend(hist_text_tg_lines)
+    if maps_url:
+        msg_lines.append(f"\n🗺️ <a href=\"{maps_url}\">Mở Google Maps dẫn đường chính xác ↗</a>")
+
+    tg_payload = {
+        "chat_id": tg_chat_id,
+        "text": "\n".join(msg_lines),
+        "parse_mode": "HTML",
+        "disable_web_page_preview": False
+    }
+    try:
+        tg_api_url = f"https://api.telegram.org/bot{tg_token}/sendMessage"
+        req = urllib.request.Request(
+            tg_api_url,
+            data=json.dumps(tg_payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            return {"status": "ok"}
+    except Exception as te:
+        return {"status": f"error: {str(te)}"}
+
+
+@app.post("/api/notify/webhook")
+async def send_webhook_notification(request: Request):
+    """
+    Dispatch in-stock notifications to Telegram Bot and Discord Webhook.
+    Strictly applies exact user settings (Region, Status Filter, Time Window, Deduplication).
+    """
+    import urllib.request
+    import urllib.parse
+    import time
+    
+    try:
+        body = await request.json()
+        store = body.get("store") or {}
+        info = body.get("info") or {}
+        is_test = bool(body.get("is_test", False))
+        
+        user_settings = load_user_settings()
+        notif_cfg = user_settings.get("notifications", {})
+        results = {}
+
+        # 1. Telegram Enabled Check
+        tg_enabled = notif_cfg.get("telegramEnabled", False) or is_test
+        if not tg_enabled:
+            return JSONResponse(content={"status": "disabled", "reason": "telegram notifications disabled in settings"})
+
+        # 2. Region Check (must match user's current selected region in settings)
+        current_region = user_settings.get("currentRegion") or "osaka"
+        allowed_prefs = REGION_PREFS.get(current_region, ["osaka"])
+        if current_region == "all":
+            allowed_prefs = ALL_PREFS
+        
+        store_pref = (store.get("pref") or "").lower()
+        if not is_test and store_pref and store_pref not in allowed_prefs:
+            return JSONResponse(content={"status": "filtered", "reason": f"pref '{store_pref}' not in current region '{current_region}'"})
+
+        # 3. Status Filter Check (e.g. only in-stock or onsite)
+        status_code = info.get("status_code") or info.get("code") or "i"
+        active_filter = user_settings.get("activeFilter") or "all"
+        if not is_test:
+            if active_filter == "in" and status_code != "i":
+                return JSONResponse(content={"status": "filtered", "reason": f"status '{status_code}' does not match active filter '{active_filter}'"})
+            if active_filter == "onsite" and (status_code != "i" or not info.get("onsite")):
+                return JSONResponse(content={"status": "filtered", "reason": "not onsite in-stock"})
+
+        # 4. Time Window Check (e.g. within 1 hour, 3 hours...)
+        active_time = user_settings.get("activeTime") or "all"
+        if not is_test and active_time != "all":
+            try:
+                max_seconds = int(active_time) * 3600
+                cur_now = time.time()
+                rep_ts = info.get("timestamp") or 0
+                if rep_ts > 0 and (cur_now - rep_ts > max_seconds):
+                    return JSONResponse(content={"status": "filtered", "reason": f"report age exceeds {active_time}h"})
+            except Exception:
+                pass
+
+        # 5. Deduplication: do not spam the exact same report within 2 hours
+        global _recent_notified_keys
+        now_t = time.time()
+        report_key = f"{store.get('id')}_{info.get('timestamp') or int(now_t // 300)}"
+        if not is_test:
+            if report_key in _recent_notified_keys and (now_t - _recent_notified_keys[report_key] < 7200):
+                return JSONResponse(content={"status": "duplicate", "message": "Already notified recently"})
+            _recent_notified_keys[report_key] = now_t
+            _recent_notified_keys = {k: v for k, v in _recent_notified_keys.items() if now_t - v < 7200}
+
+        # 6. Send notification
+        tg_res = send_telegram_alert(store, info, notif_cfg, is_test=is_test)
+        results["telegram"] = tg_res.get("status", "error")
+
+        return JSONResponse(content={"status": "ok", "results": results})
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"status": "error", "error": str(e)})
+
+
+def telegram_background_watcher():
+    """Background thread to poll Firestore for new in-stock reports matching user settings and send Telegram alerts."""
+    import time
+    time.sleep(8)
+    print("  [TelegramDaemon] Background stock monitor daemon started (polling every 35s)")
+    while True:
+        try:
+            settings = load_user_settings()
+            notif_cfg = settings.get("notifications", {})
+            if not notif_cfg.get("telegramEnabled", False):
+                time.sleep(30)
+                continue
+            
+            tg_token = (notif_cfg.get("telegramBotToken") or "").strip()
+            tg_chat_id = (notif_cfg.get("telegramChatId") or "").strip()
+            if not (tg_token and tg_chat_id):
+                time.sleep(30)
+                continue
+            
+            current_reg = settings.get("currentRegion") or "osaka"
+            target_prefs = REGION_PREFS.get(current_reg, ["osaka"])
+            if current_reg == "all":
+                target_prefs = ALL_PREFS
+            
+            active_filt = settings.get("activeFilter") or "all"
+            active_tm = settings.get("activeTime") or "all"
+            max_age_sec = int(active_tm) * 3600 if active_tm != "all" else 3600 * 24
+
+            now_sec = time.time()
+            for pref in target_prefs:
+                try:
+                    hot_data = fetch_realtime_status(pref, include_cold=False)
+                    pref_stores = get_stores_by_pref(pref)
+                    for sid, raw in hot_data.items():
+                        parsed = parse_store_status(str(raw))
+                        if parsed and parsed.get("status_code") == "i":
+                            ts = parsed.get("timestamp") or 0
+                            if ts > 0 and (now_sec - ts > max_age_sec):
+                                continue
+                            if active_filt == "onsite" and not parsed.get("onsite"):
+                                continue
+
+                            report_key = f"{sid}_{ts}"
+                            if report_key not in _recent_notified_keys:
+                                _recent_notified_keys[report_key] = now_sec
+                                st = pref_stores.get(sid) or {"id": sid, "name": sid, "pref": pref}
+                                st["pref"] = pref
+                                print(f"  [TelegramDaemon] Auto-dispatching Telegram alert for {st.get('name')}")
+                                send_telegram_alert(st, parsed, notif_cfg, is_test=False)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        time.sleep(35)
+
 
 _pref_stores_cache = {}
 _cold_cache = {}
@@ -494,11 +521,20 @@ def get_report_counts(region: Optional[str] = None, pref: Optional[str] = None):
 
 @app.get("/api/config")
 def get_config():
+    user_settings = load_user_settings()
+    notif = user_settings.get("notifications", {})
     return {
         "apiKey": FIREBASE_API_KEY,
         "projectId": PROJECT_ID,
         "chainNames": CHAIN_NAMES,
-        "packCodes": PACK_CODES
+        "packCodes": PACK_CODES,
+        "telegramEnabled": bool(notif.get("telegramEnabled", False)),
+        "soundEnabled": bool(notif.get("soundEnabled", True)),
+        "telegramBotTokenSet": bool(notif.get("telegramBotToken")),
+        "telegramChatIdSet": bool(notif.get("telegramChatId")),
+        "currentRegion": user_settings.get("currentRegion", "osaka"),
+        "activeFilter": user_settings.get("activeFilter", "all"),
+        "activeTime": user_settings.get("activeTime", "all")
     }
 
 
@@ -1818,10 +1854,23 @@ def index():
       </button>
     </div>
 
-    <!-- 4 status tabs matching PokéTan -->
+    <!-- Real-time settings synchronization banner on reports page -->
+    <div id="list-active-settings-banner" style="background:#f8fafc; border-bottom:1px solid #e2e8f0; padding:6px 12px; font-size:0.72rem; color:#334155; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px;">
+      <div style="display:flex; align-items:center; gap:6px;">
+        <span style="font-weight:800; color:#0f172a;">📍 Cài đặt áp dụng:</span>
+        <span id="list-active-settings-text" style="color:#2563eb; font-weight:700;">Osaka • Tất cả • Toàn thời gian</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:6px;">
+        <span id="list-tg-status-tag" style="font-size:0.65rem; background:#dcfce7; color:#15803d; font-weight:800; padding:2px 7px; border-radius:6px;">✈️ Telegram: BẬT</span>
+        <button type="button" onclick="openSettingsModal()" style="background:#e2e8f0; border:none; border-radius:4px; font-size:0.68rem; font-weight:700; color:#1e293b; padding:2px 7px; cursor:pointer;">⚙️ Đổi</button>
+      </div>
+    </div>
+
+    <!-- Status tabs matching PokéTan -->
     <div class="list-tabs-row" style="padding: 8px 12px 4px 12px; display: flex; gap: 6px; overflow-x: auto; background: #ffffff; border-bottom: 1px solid #f1f5f9; scrollbar-width: none;">
       <button class="list-tab-chip active" id="list-tab-all" onclick="setListStatusTab('all')">🌐 すべて</button>
       <button class="list-tab-chip" id="list-tab-in" onclick="setListStatusTab('in')">🟢 在庫あり</button>
+      <button class="list-tab-chip" id="list-tab-onsite" onclick="setListStatusTab('onsite')">📸 現地確認</button>
       <button class="list-tab-chip" id="list-tab-out" onclick="setListStatusTab('out')">🔴 在庫なし</button>
       <button class="list-tab-chip" id="list-tab-recent" onclick="setListStatusTab('recent')">★ 実績あり</button>
       <button class="list-tab-chip" id="list-tab-unknown" onclick="setListStatusTab('unknown')">⚪ 不明</button>
@@ -2174,6 +2223,14 @@ def index():
         <button class="modal-close-btn" onclick="closeSettingsModal()">✕</button>
       </div>
       <div class="modal-body" style="font-size:0.82rem; max-height:75vh; overflow-y:auto;">
+        <!-- Real-time Synchronization Notice -->
+        <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:9px 12px; margin-bottom:14px; font-size:0.73rem; color:#1e40af; line-height:1.45;">
+          <div style="font-weight:800; display:flex; align-items:center; gap:6px; margin-bottom:2px;">
+            <span>⚡ Đồng bộ hóa tự động:</span>
+          </div>
+          <span>Mọi cài đặt ở đây (Vùng, Trạng thái, Thời gian) sẽ áp dụng ngay cho cả <b>Trang Báo Cáo (📋 一覧)</b> và <b>Thông báo gửi tới Telegram (✈️)</b>.</span>
+        </div>
+
         <!-- Store Display Filter Section -->
         <div style="margin-bottom:14px;">
           <div style="font-weight:800; font-size:0.85rem; color:#1e293b; margin-bottom:6px;">🗺️ Cài đặt hiển thị bản đồ / 表示設定</div>
@@ -2263,22 +2320,30 @@ def index():
         </div>
 
         <!-- Telegram & Notifications -->
-        <div style="margin-bottom:14px;">
-          <div style="font-weight:800; font-size:0.85rem; color:#1e293b; margin-bottom:4px;">🔔 Thông báo / 通知連携</div>
-          <div style="font-size:0.73rem;color:#64748b;margin-bottom:8px;">Tự động thông báo khi có báo cáo có hàng.</div>
+        <div style="margin-bottom:16px;">
+          <div style="font-weight:800; font-size:0.85rem; color:#1e293b; margin-bottom:4px; display:flex; align-items:center; justify-content:space-between;">
+            <span>🔔 Thông báo Telegram &amp; Âm thanh</span>
+            <span id="set-tg-status-pill" style="font-size:0.65rem; background:#dcfce7; color:#15803d; font-weight:800; padding:2px 7px; border-radius:6px;">✈️ Đang bật</span>
+          </div>
+          <div style="font-size:0.72rem; color:#64748b; margin-bottom:8px;">Báo cáo gửi tới Telegram sẽ tuân thủ đúng Vùng dữ liệu, Trạng thái và Thời gian bạn chọn ở trên.</div>
 
-          <div style="background:#f8fafc;padding:10px;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:8px;">
-            <label style="display:flex;align-items:center;gap:8px;font-weight:700;cursor:pointer;">
-              <input type="checkbox" id="set-tg-check" onchange="updateSettings('telegramEnabled', this.checked)">
-              <span>✈️ Bật thông báo Telegram (Telegram通知)</span>
+          <div style="background:#f8fafc; padding:10px; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:8px;">
+            <label style="display:flex; align-items:center; gap:8px; font-weight:700; cursor:pointer;">
+              <input type="checkbox" id="set-tg-check" onchange="toggleTelegramNotification(this.checked)">
+              <span>✈️ Bật gửi báo cáo tới Telegram (Telegram通知)</span>
             </label>
           </div>
-          <div style="background:#f8fafc;padding:10px;border-radius:8px;border:1px solid #e2e8f0;">
-            <label style="display:flex;align-items:center;gap:8px;font-weight:700;cursor:pointer;">
+          <div style="background:#f8fafc; padding:10px; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:8px;">
+            <label style="display:flex; align-items:center; gap:8px; font-weight:700; cursor:pointer;">
               <input type="checkbox" id="set-sound-check" onchange="updateSettings('soundEnabled', this.checked)" checked>
               <span>🔊 Âm thanh thông báo (音声アラート)</span>
             </label>
           </div>
+
+          <button type="button" id="btn-test-tg" onclick="sendTestTelegramNotification()" style="width:100%; padding:9px 12px; background:#0284c7; color:white; border:none; border-radius:8px; font-weight:800; font-size:0.78rem; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; box-shadow:0 2px 6px rgba(2,132,199,0.25);">
+            <span>🧪 Gửi thông báo thử nghiệm tới Telegram</span>
+          </button>
+          <div id="test-tg-result" style="display:none; font-size:0.72rem; margin-top:6px; padding:7px 10px; border-radius:6px;"></div>
         </div>
 
         <!-- Refresh Button -->
@@ -3170,10 +3235,10 @@ def index():
       if (qConbini) qConbini.classList.toggle('active', activeChain === 'conbini');
 
       // Update list tabs
-      const tabs = ['all', 'in', 'out', 'recent', 'unknown'];
+      const tabs = ['all', 'in', 'onsite', 'out', 'recent', 'unknown'];
       tabs.forEach(t => {
         const btn = document.getElementById(`list-tab-${t}`);
-        if (btn) btn.classList.toggle('active', listStatusFilter === t);
+        if (btn) btn.classList.toggle('active', listStatusFilter === t || (t === 'all' && listStatusFilter === 'hidenone'));
       });
     }
     window.updateActiveFilterBadges = updateActiveFilterBadges;
@@ -3181,7 +3246,7 @@ def index():
     // Quick shortcuts on the slim single-row floating bar
     function quickSelectStatus(st) {
       activeFilter = st;
-      listStatusFilter = (st === 'onsite' || st === 'hidenone') ? 'all' : st;
+      listStatusFilter = st;
       updateActiveFilterBadges();
       renderMapMarkers();
       renderStoreList(document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '');
@@ -3253,9 +3318,14 @@ def index():
         activeTime = (activeTime === num) ? 'all' : num;
       }
       listTimeFilter = String(activeTime);
+      const settingsTimeSelect = document.getElementById('settings-time-select');
+      if (settingsTimeSelect && settingsTimeSelect.value !== String(activeTime)) {
+        settingsTimeSelect.value = String(activeTime);
+      }
       updateActiveFilterBadges();
       renderMapMarkers();
       renderStoreList(document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '');
+      updateSettings('activeTime', activeTime);
     }
     window.setTimeFilter = setTimeFilter;
 
@@ -3347,7 +3417,7 @@ def index():
 
     function setListStatusTab(tab) {
       listStatusFilter = tab;
-      const tabs = ['all', 'in', 'out', 'recent', 'unknown'];
+      const tabs = ['all', 'in', 'onsite', 'out', 'recent', 'unknown'];
       tabs.forEach(t => {
         const btn = document.getElementById(`list-tab-${t}`);
         if (btn) {
@@ -3355,7 +3425,9 @@ def index():
           else btn.classList.remove('active');
         }
       });
+      activeFilter = tab;
       updateActiveFilterBadges();
+      updateSettings('activeFilter', activeFilter);
       const q = document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '';
       renderStoreList(q);
     }
@@ -3387,14 +3459,43 @@ def index():
       const now = Math.floor(Date.now() / 1000);
       const q = query.toLowerCase().trim();
 
+      // Update real-time synchronization banner text matching Settings
+      const bannerTextEl = document.getElementById('list-active-settings-text');
+      if (bannerTextEl) {
+        const regName = REGIONS[currentRegion] ? REGIONS[currentRegion].name : 'Osaka';
+        let statusName = 'Tất cả';
+        if (listStatusFilter === 'in') statusName = '🟢 Có hàng';
+        else if (listStatusFilter === 'onsite') statusName = '📸 Tại chỗ';
+        else if (listStatusFilter === 'hidenone') statusName = '⚪ Ẩn quán ko bán';
+        else if (listStatusFilter === 'out') statusName = '🔴 Hết hàng';
+        else if (listStatusFilter === 'recent') statusName = '★ Đã có';
+        else if (listStatusFilter === 'unknown') statusName = 'Chưa rõ';
+
+        let timeName = 'Toàn thời gian';
+        if (listTimeFilter && listTimeFilter !== 'all') {
+          timeName = `Trong ${listTimeFilter}h`;
+        }
+        bannerTextEl.innerText = `${regName} • ${statusName} • ${timeName}`;
+      }
+
+      const tgTag = document.getElementById('list-tg-status-tag');
+      if (tgTag) {
+        const isTgOn = !!configData.telegramEnabled;
+        tgTag.innerText = isTgOn ? '✈️ Telegram: BẬT' : '✈️ Telegram: TẮT';
+        tgTag.style.background = isTgOn ? '#dcfce7' : '#fee2e2';
+        tgTag.style.color = isTgOn ? '#15803d' : '#b91c1c';
+      }
+
       let matched = [];
       const listTargetPrefs = REGIONS[currentRegion] ? REGIONS[currentRegion].prefs : ['osaka'];
       for (const store of allStores) {
         if (currentRegion !== 'all' && !listTargetPrefs.includes(store.pref) && store.pref !== currentPref) continue;
         const info = decodeStatus(effectiveStatus[store.id] || effectiveStatus[store.id + '_c']);
 
-        // List Status Tab Filter
+        // List Status Tab Filter (Synchronized with Settings modal)
         if (listStatusFilter === 'in' && info.code !== 'i') continue;
+        if (listStatusFilter === 'onsite' && (!info.onsite || info.code !== 'i')) continue;
+        if (listStatusFilter === 'hidenone' && info.code === 'n') continue;
         if (listStatusFilter === 'out' && info.code !== 'o') continue;
         if (listStatusFilter === 'recent' && (info.code !== 'i' && !(info.timestamp > 0 && (now - info.timestamp <= 86400 * 7) && info.code !== 'n'))) continue;
         if (listStatusFilter === 'unknown' && info.code !== 'u' && info.code) continue;
@@ -3451,7 +3552,7 @@ def index():
           <div style="text-align:center; padding:36px 12px; color:#64748b;">
             <div style="font-size:2rem; margin-bottom:8px;">📭</div>
             <div style="font-weight:700; color:#334155; font-size:0.88rem;">Không tìm thấy báo cáo cửa hàng phù hợp</div>
-            <div style="font-size:0.75rem; margin-top:4px;">Thử đổi từ khóa hoặc điều chỉnh bộ lọc thời gian / chuỗi.</div>
+            <div style="font-size:0.75rem; margin-top:4px;">Thử đổi từ khóa hoặc điều chỉnh bộ lọc thời gian / chuỗi trong Cài đặt.</div>
           </div>
         `;
         return;
@@ -3468,6 +3569,10 @@ def index():
         else if (info.code === 'o') { badgeClass = 'badge-out'; badgeText = '🔴 Hết hàng'; }
         else if (info.code === 'n') { badgeClass = 'badge-none'; badgeText = '⚪ Không bán'; }
 
+        const onsiteBadge = (info.onsite && info.code === 'i')
+          ? `<span class="card-badge" style="background:#dcfce7; color:#15803d; border:1px solid #bbf7d0; padding:2px 6px; font-size:0.68rem; margin-left:0;">📸 Tại chỗ</span>`
+          : '';
+
         const counts = getStoreCounts(store.id, info.code);
 
         const chain = (configData.chainNames && configData.chainNames[store.chain]) || store.chain || 'Cửa hàng';
@@ -3482,6 +3587,7 @@ def index():
             <div class="card-left-info">
               <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                 <span class="card-badge ${badgeClass}" style="margin-left:0; padding:2px 6px; font-size:0.68rem;">${badgeText}</span>
+                ${onsiteBadge}
                 <div class="card-store-name">${escapeHtml(store.name || '')}</div>
               </div>
               <div class="card-chain-time">${escapeHtml(chain)}${distStr}${timeStr}</div>
@@ -3579,6 +3685,7 @@ def index():
       currentRegion = regionId;
       window.currentRegion = currentRegion;
       localStorage.setItem('poketan_selected_region', regionId);
+      updateSettings('currentRegion', regionId);
 
       // Sync radio in Settings Modal
       const radios = document.querySelectorAll('input[name="set-region-radio"]');
@@ -3858,17 +3965,56 @@ def index():
 
     // 14. SETTINGS MODAL (⚙️ 設定 & カスタマイズ)
     function openSettingsModal() {
+      // 1. Sync filter radio
       const radios = document.getElementsByName('set-filter-radio');
       if (radios) {
         radios.forEach(r => {
           r.checked = (r.value === activeFilter || (r.value === 'none' && activeFilter === 'all'));
         });
       }
+
+      // 2. Sync time select
+      const timeSelect = document.getElementById('settings-time-select');
+      if (timeSelect) {
+        timeSelect.value = String(activeTime);
+      }
+
+      // 3. Sync region radios
+      const regionRadios = document.getElementsByName('set-region-radio');
+      if (regionRadios) {
+        regionRadios.forEach(r => {
+          r.checked = (r.value === currentRegion);
+        });
+      }
+
+      // 4. Sync Telegram checkbox & status pill
+      const tgCheck = document.getElementById('set-tg-check');
+      const tgPill = document.getElementById('set-tg-status-pill');
+      const isTg = !!configData.telegramEnabled;
+      if (tgCheck) tgCheck.checked = isTg;
+      if (tgPill) {
+        tgPill.innerText = isTg ? '✈️ Đang bật' : '✈️ Đang tắt';
+        tgPill.style.background = isTg ? '#dcfce7' : '#fee2e2';
+        tgPill.style.color = isTg ? '#15803d' : '#b91c1c';
+      }
+
+      // 5. Sync Sound checkbox
+      const soundCheck = document.getElementById('set-sound-check');
+      if (soundCheck) {
+        soundCheck.checked = configData.soundEnabled !== false;
+      }
+
+      // 6. Sync location name
       const prefLabelEl = document.getElementById('header-loc-name');
       const setPrefEl = document.getElementById('settings-current-pref');
       if (prefLabelEl && setPrefEl) {
         setPrefEl.innerText = prefLabelEl.innerText;
       }
+
+      // Reset test result if previously open
+      const resEl = document.getElementById('test-tg-result');
+      if (resEl) resEl.style.display = 'none';
+
       document.getElementById('settings-modal').classList.add('open');
     }
     window.openSettingsModal = openSettingsModal;
@@ -3878,8 +4024,90 @@ def index():
     }
     window.closeSettingsModal = closeSettingsModal;
 
+    function toggleTelegramNotification(enabled) {
+      configData.telegramEnabled = enabled;
+      const tgPill = document.getElementById('set-tg-status-pill');
+      if (tgPill) {
+        tgPill.innerText = enabled ? '✈️ Đang bật' : '✈️ Đang tắt';
+        tgPill.style.background = enabled ? '#dcfce7' : '#fee2e2';
+        tgPill.style.color = enabled ? '#15803d' : '#b91c1c';
+      }
+      updateSettings('telegramEnabled', enabled);
+      renderStoreList();
+    }
+    window.toggleTelegramNotification = toggleTelegramNotification;
+
+    async function sendTestTelegramNotification() {
+      const btn = document.getElementById('btn-test-tg');
+      const resEl = document.getElementById('test-tg-result');
+      if (!btn || !resEl) return;
+
+      btn.disabled = true;
+      btn.innerHTML = '<span>⏳ Đang gửi thông báo thử nghiệm...</span>';
+      resEl.style.display = 'block';
+      resEl.style.background = '#f1f5f9';
+      resEl.style.color = '#475569';
+      resEl.innerText = 'Đang kết nối tới Telegram bot...';
+
+      try {
+        const res = await fetch('/api/notify/webhook', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            is_test: true,
+            store: {
+              id: 'test_store_webhook',
+              name: 'Pokémon Center Osaka DX (Thông báo thử nghiệm)',
+              chain: 'specialty',
+              chain_label: 'Pokémon Center',
+              address: 'Osaka, Chuo Ward, Shinsaibashisuji 1-7-1',
+              lat: 34.6732,
+              lng: 135.5008,
+              pref: currentPref || 'osaka'
+            },
+            info: {
+              status_code: 'i',
+              code: 'i',
+              onsite: true,
+              reported_at: 'Vừa xong',
+              timeAgo: 'Vừa cập nhật',
+              packs: ['Terastal Festival ex (High Class Pack)', 'Battle Partners']
+            }
+          })
+        });
+        const data = await res.json();
+        if (data.status === 'ok') {
+          resEl.style.background = '#dcfce7';
+          resEl.style.color = '#15803d';
+          resEl.innerHTML = '✅ <b>Thành công!</b> Đã gửi tin nhắn test tới Telegram. Vui lòng kiểm tra app Telegram của bạn.';
+        } else if (data.status === 'disabled') {
+          resEl.style.background = '#fef3c7';
+          resEl.style.color = '#92400e';
+          resEl.innerHTML = '⚠️ Telegram đang bị TẮT trong cài đặt. Vui lòng tick chọn "Bật gửi báo cáo tới Telegram" ở trên.';
+        } else {
+          resEl.style.background = '#fee2e2';
+          resEl.style.color = '#b91c1c';
+          resEl.innerHTML = `❌ <b>Lỗi:</b> ${data.error || data.reason || JSON.stringify(data)}`;
+        }
+      } catch (err) {
+        resEl.style.background = '#fee2e2';
+        resEl.style.color = '#b91c1c';
+        resEl.innerHTML = `❌ <b>Không thể kết nối máy chủ:</b> ${err.message}`;
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span>🧪 Gửi thông báo thử nghiệm tới Telegram</span>';
+      }
+    }
+    window.sendTestTelegramNotification = sendTestTelegramNotification;
+
     function setSettingsFilter(filterName) {
-      setStatusFilter(filterName === 'none' ? 'all' : filterName);
+      const actual = (filterName === 'none') ? 'all' : filterName;
+      activeFilter = actual;
+      listStatusFilter = actual;
+      updateActiveFilterBadges();
+      renderMapMarkers();
+      renderStoreList(document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '');
+      updateSettings('activeFilter', actual);
     }
     window.setSettingsFilter = setSettingsFilter;
 
@@ -3889,10 +4117,16 @@ def index():
     window.openSearchModal = openSearchModal;
 
     function updateSettings(key, val) {
+      const payload = {};
+      if (key === 'telegramEnabled' || key === 'soundEnabled' || key === 'telegramBotToken' || key === 'telegramChatId') {
+        payload.notifications = { [key]: val };
+      } else {
+        payload[key] = val;
+      }
       fetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ notifications: { [key]: val } })
+        body: JSON.stringify(payload)
       }).catch(e => console.warn(e));
     }
     window.updateSettings = updateSettings;
@@ -4413,6 +4647,17 @@ def index():
         storesDict = await storesRes.json();
         window.storesDict = storesDict;
 
+        // Apply synchronized server settings if available
+        if (configData.activeFilter && configData.activeFilter !== 'all') {
+          activeFilter = configData.activeFilter;
+          listStatusFilter = configData.activeFilter;
+        }
+        if (configData.activeTime && configData.activeTime !== 'all') {
+          activeTime = configData.activeTime;
+          listTimeFilter = String(configData.activeTime);
+        }
+        updateActiveFilterBadges();
+
         if (hotRes && hotRes.ok) {
           try { hotStatus = await hotRes.json(); } catch(e) {}
         }
@@ -4489,6 +4734,56 @@ def index():
       });
     }
 
+    const notifiedRealtimeKeys = new Set();
+    function processRealtimeTelegramAlerts(newData, pref) {
+      if (!configData.telegramEnabled) return;
+      if (!newData || typeof newData !== 'object') return;
+
+      const nowSec = Math.floor(Date.now() / 1000);
+      const maxAgeSec = (activeTime && activeTime !== 'all') ? parseInt(activeTime, 10) * 3600 : 86400;
+
+      for (const [sid, raw] of Object.entries(newData)) {
+        const info = decodeStatus(raw);
+        if (!info || info.code !== 'i') continue;
+
+        // Status filter check (Settings sync)
+        if (activeFilter === 'onsite' && !info.onsite) continue;
+
+        // Time window check (Settings sync)
+        if (info.timestamp && (nowSec - info.timestamp > maxAgeSec)) continue;
+
+        const notifKey = `${sid}_${info.timestamp || ''}`;
+        if (notifiedRealtimeKeys.has(notifKey)) continue;
+        notifiedRealtimeKeys.add(notifKey);
+
+        const store = storesDict[sid] || { id: sid, name: sid, pref: pref };
+        fetch('/api/notify/webhook', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            store: {
+              id: store.id,
+              name: store.name,
+              chain: store.chain,
+              address: store.address,
+              lat: store.lat,
+              lng: store.lng,
+              pref: store.pref || pref
+            },
+            info: {
+              status_code: info.code,
+              code: info.code,
+              onsite: !!info.onsite,
+              reported_at: info.reported_at || 'Vừa xong',
+              timeAgo: info.timeAgo || 'Vừa xong',
+              timestamp: info.timestamp,
+              packs: info.packs || []
+            }
+          })
+        }).catch(err => console.warn('Telegram webhook push failed:', err));
+      }
+    }
+
     let realtimeDb = null;
     let realtimeUnsubscribes = [];
 
@@ -4511,8 +4806,14 @@ def index():
         targetPrefs.forEach(p => {
           const unsub = onSnapshot(doc(realtimeDb, 'status', p), (snap) => {
             if (snap.exists()) {
-              Object.assign(hotStatus, snap.data());
+              const data = snap.data();
+              processRealtimeTelegramAlerts(data, p);
+              Object.assign(hotStatus, data);
               requestRenderMarkers();
+              const listContainer = document.getElementById('view-list-container');
+              if (listContainer && listContainer.classList.contains('open')) {
+                renderStoreList();
+              }
             }
           });
           realtimeUnsubscribes.push(unsub);
@@ -4556,6 +4857,12 @@ def main():
     print("🚀 BAWUI POKE APP - Instant Real-Time Push Dashboard")
     print(f"👉 Mở trình duyệt tại: http://localhost:{port}")
     print("=================================================================")
+
+    # Start 24/7 background Telegram stock watcher daemon
+    import threading
+    watcher_thread = threading.Thread(target=telegram_background_watcher, daemon=True)
+    watcher_thread.start()
+
     uvicorn.run("app.web:app", host="0.0.0.0", port=port, reload=False)
 
 

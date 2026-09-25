@@ -48,5 +48,8 @@
   "feedSortMode": "newest",
   "allStatusFilter": "all",
   "allChain": "",
-  "allSortMode": "newest"
+  "allSortMode": "newest",
+  "currentRegion": "osaka",
+  "activeFilter": "onsite",
+  "activeTime": 3
 }
