@@ -1398,7 +1398,7 @@ def index():
     .floating-btn {
       background: white;
       border: 1px solid #cbd5e1;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.15);
       padding: 8px 14px;
       border-radius: 8px;
       font-size: 0.82rem;
@@ -1414,6 +1414,19 @@ def index():
       background: #f8fafc;
       border-color: #2563eb;
       color: #2563eb;
+    }
+    .gps-locate-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      padding: 0;
+      justify-content: center;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.2);
+    }
+    .gps-locate-btn.active {
+      background: #2563eb;
+      border-color: #2563eb;
+      color: white;
     }
     
     /* 3. DEDICATED CALENDAR VIEW & HEADER */
@@ -2835,8 +2848,8 @@ def index():
 
       <div id="map">
         <div class="map-controls-box">
-          <button class="floating-btn" onclick="requestUserLocation(true)" title="Định vị vị trí GPS hiện tại của tôi">
-            <span>📍 Vị trí của tôi</span>
+          <button class="floating-btn gps-locate-btn" onclick="flyToMyLocation()" title="Quay về vị trí của tôi" id="gps-locate-btn">
+            <span style="font-size:1.2rem;">📍</span>
           </button>
         </div>
       </div>
@@ -4310,6 +4323,19 @@ def index():
     }
     window.requestUserLocation = requestUserLocation;
 
+    function flyToMyLocation() {
+      if (userLat !== null && userLng !== null) {
+        // Already have GPS — just fly to it
+        map.flyTo([userLat, userLng], 15, { duration: 0.8 });
+        const btn = document.getElementById('gps-locate-btn');
+        if (btn) { btn.classList.add('active'); setTimeout(() => btn.classList.remove('active'), 1500); }
+      } else {
+        // No GPS yet — request it (will auto-fly)
+        requestUserLocation(true);
+      }
+    }
+    window.flyToMyLocation = flyToMyLocation;
+
     // 6. TOAST NOTIFICATIONS & ALERT DISPATCH
     function showToast(store, info, force = false) {
       if (!force) {
@@ -5759,7 +5785,7 @@ def index():
         }
       } catch(e) {}
 
-      requestUserLocation(false);
+      requestUserLocation(true);
       loadCalendar();
 
       // Immediately apply saved settings from localStorage (if any) to prevent layout shift
