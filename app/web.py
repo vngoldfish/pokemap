@@ -443,6 +443,7 @@ def get_calendar(include_expired: bool = False):
 @app.get("/", response_class=HTMLResponse)
 @app.get("/map", response_class=HTMLResponse)
 @app.get("/stores", response_class=HTMLResponse)
+@app.get("/thongbao", response_class=HTMLResponse)
 @app.get("/calendar", response_class=HTMLResponse)
 @app.get("/events", response_class=HTMLResponse)
 def index():
@@ -1309,15 +1310,24 @@ def index():
     </button>
   </main>
 
-  <!-- 4. LIST VIEW SHEET -->
+  <!-- 4. LIST VIEW SHEET (一覧 / Thông báo cập nhật báo cáo) -->
   <div id="view-list-container">
     <div class="list-header-bar">
-      <div class="list-search-box">
-        <span class="icon">🔍</span>
-        <input type="text" id="list-search-input" placeholder="店舗名・駅名で検索..." oninput="onListSearch(this.value)" />
+      <div style="font-weight:800; font-size:0.92rem; color:#0f172a; display:flex; align-items:center; gap:6px;">
+        <span>📋</span>
+        <span>一覧 • Cập nhật báo cáo</span>
       </div>
       <button style="background:none;border:none;font-weight:700;color:#4f46e5;font-size:0.85rem;cursor:pointer;" onclick="switchFooterTab('map')">
-        ✕ 閉じる
+        ✕ Đóng
+      </button>
+    </div>
+    <div style="padding:8px 12px; border-bottom:1px solid #f1f5f9; display:flex; gap:8px; align-items:center; background:#fafafa;">
+      <div class="list-search-box" style="flex:1;">
+        <span class="icon">🔍</span>
+        <input type="text" id="list-search-input" placeholder="Tìm tên quán, địa chỉ..." oninput="onListSearch(this.value)" />
+      </div>
+      <button id="list-filter-in-btn" onclick="toggleListInStockFilter()" style="background:#f1f5f9; border:1px solid #cbd5e1; border-radius:8px; padding:7px 10px; font-size:0.72rem; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px; color:#334155;">
+        🟢 Chỉ có hàng
       </button>
     </div>
     <div class="list-cards-scroll" id="store-cards-list"></div>
@@ -1896,9 +1906,31 @@ def index():
     }
     window.switchFooterTab = switchFooterTab;
 
-    // 11. STORE LIST VIEW
+    let listOnlyInStock = false;
+
+    function toggleListInStockFilter() {
+      listOnlyInStock = !listOnlyInStock;
+      const btn = document.getElementById('list-filter-in-btn');
+      if (btn) {
+        if (listOnlyInStock) {
+          btn.style.background = '#dcfce7';
+          btn.style.borderColor = '#86efac';
+          btn.style.color = '#15803d';
+        } else {
+          btn.style.background = '#f1f5f9';
+          btn.style.borderColor = '#cbd5e1';
+          btn.style.color = '#334155';
+        }
+      }
+      const q = document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '';
+      renderStoreList(q);
+    }
+    window.toggleListInStockFilter = toggleListInStockFilter;
+
+    // 11. STORE LIST VIEW (一覧 • Cập nhật thông tin báo cáo)
     function renderStoreList(query = '') {
       const listContainer = document.getElementById('store-cards-list');
+      if (!listContainer) return;
       const allStores = Object.values(storesDict);
       const effectiveStatus = { ...coldStatus, ...hotStatus };
       const q = query.toLowerCase().trim();
@@ -1907,6 +1939,8 @@ def index():
       for (const store of allStores) {
         if (currentPref !== 'all' && store.pref !== currentPref) continue;
         const info = decodeStatus(effectiveStatus[store.id]);
+
+        if (listOnlyInStock && info.code !== 'i') continue;
 
         if (q) {
           const mName = (store.name || '').toLowerCase().includes(q);
@@ -1929,32 +1963,53 @@ def index():
         return (b.info.timestamp || 0) - (a.info.timestamp || 0);
       });
 
+      if (matched.length === 0) {
+        listContainer.innerHTML = `
+          <div style="text-align:center; padding:36px 12px; color:#64748b;">
+            <div style="font-size:2rem; margin-bottom:8px;">📭</div>
+            <div style="font-weight:700; color:#334155; font-size:0.88rem;">Không tìm thấy báo cáo cửa hàng phù hợp</div>
+            <div style="font-size:0.75rem; margin-top:4px;">Thử đổi từ khóa hoặc tắt lọc "Chỉ có hàng".</div>
+          </div>
+        `;
+        return;
+      }
+
       // Limit 120 for instant performance
       const renderSlice = matched.slice(0, 120);
 
       listContainer.innerHTML = renderSlice.map(item => {
         const { store, info, dist } = item;
         let badgeClass = 'badge-none';
-        let badgeText = '不明';
-        if (info.code === 'i') { badgeClass = 'badge-in'; badgeText = '🟢 在庫あり'; }
-        else if (info.code === 'o') { badgeClass = 'badge-out'; badgeText = '🔴 在庫なし'; }
-        else if (info.code === 'n') { badgeClass = 'badge-none'; badgeText = '⚪ 扱無'; }
+        let badgeText = '⚪ Chưa rõ';
+        if (info.code === 'i') { badgeClass = 'badge-in'; badgeText = '🟢 Có hàng'; }
+        else if (info.code === 'o') { badgeClass = 'badge-out'; badgeText = '🔴 Hết hàng'; }
+        else if (info.code === 'n') { badgeClass = 'badge-none'; badgeText = '⚪ Không bán'; }
 
-        const chain = (configData.chainNames && configData.chainNames[store.chain]) || store.chain || 'コンビニ';
-        const distStr = dist !== null ? ` • 📍 ${formatDist(dist)}` : '';
-        const timeStr = info.timeAgo ? ` • 🕒 ${info.timeAgo}` : '';
+        const chain = (configData.chainNames && configData.chainNames[store.chain]) || store.chain || 'Cửa hàng';
+        const distStr = dist !== null ? ` • 📍 Cách ${formatDist(dist)}` : '';
+        const timeStr = info.timeAgo ? ` • 🕒 ${escapeHtml(info.timeAgo)}${info.reported_at ? ` (${escapeHtml(info.reported_at)})` : ''}` : '';
+        const packHtml = (info.packs && info.packs.length > 0)
+          ? `<div style="font-size:0.72rem; color:#2563eb; font-weight:700; margin-top:3px;">📦 ${escapeHtml(info.packs.join(', '))}</div>`
+          : '';
 
         return `
           <div class="store-list-card" onclick="focusStoreFromList('${store.id}')">
             <div class="card-left-info">
-              <div class="card-store-name">${store.name}</div>
-              <div class="card-chain-time">${chain}${distStr}${timeStr}</div>
+              <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                <span class="card-badge ${badgeClass}" style="margin-left:0; padding:2px 6px; font-size:0.68rem;">${badgeText}</span>
+                <div class="card-store-name">${escapeHtml(store.name || '')}</div>
+              </div>
+              <div class="card-chain-time">${escapeHtml(chain)}${distStr}${timeStr}</div>
+              ${packHtml}
             </div>
-            <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px; flex-shrink:0;">
-              <div class="card-badge ${badgeClass}">${badgeText}</div>
+            <div style="display:flex; flex-direction:column; align-items:flex-end; gap:5px; flex-shrink:0;">
+              <button type="button" onclick="event.stopPropagation(); focusStoreFromList('${store.id}')"
+                      style="background:#4f46e5; color:white; border:none; border-radius:6px; padding:4px 8px; font-size:0.68rem; font-weight:700; cursor:pointer;">
+                🗺️ Bản đồ
+              </button>
               <button type="button" onclick="event.stopPropagation(); openStoreHistoryModal('${store.id}')"
-                      style="background:#f1f5f9; border:1px solid #cbd5e1; border-radius:4px; padding:2px 6px; font-size:0.62rem; font-weight:700; color:#334155; cursor:pointer;">
-                📜 履歴
+                      style="background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; padding:3px 8px; font-size:0.65rem; font-weight:700; color:#334155; cursor:pointer;">
+                📜 Lịch sử
               </button>
             </div>
           </div>
@@ -2604,6 +2659,11 @@ def index():
 
         // Render ALL markers once - smooth, instant, zero redundant cluster re-builds!
         renderMapMarkers();
+
+        // Direct URL routing for /thongbao and /stores
+        if (window.location.pathname === '/thongbao' || window.location.pathname === '/stores') {
+          switchFooterTab('list');
+        }
 
         // Dismiss loading screen right away
         clearTimeout(safetyTimer);
