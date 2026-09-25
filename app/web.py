@@ -1341,27 +1341,31 @@ def index():
       white-space: nowrap;
     }
 
-    /* 6. LIST VIEW (Sliding Sheet / Tab) */
+    /* 3.0 MAIN MAP CONTAINER (Tách biệt trang Bản đồ) */
+    #view-map-container {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      width: 100%;
+      height: 100%;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* 6. LIST VIEW (Dedicated Full-Page View - Tách biệt độc lập khỏi Bản đồ) */
     #view-list-container {
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: calc(56px + env(safe-area-inset-bottom, 0px));
-      background: #ffffff;
-      z-index: 1200;
       display: none;
+      flex: 1;
+      min-height: 0;
+      width: 100%;
+      height: 100%;
+      position: relative;
+      background: #ffffff;
       flex-direction: column;
+      overflow: hidden;
     }
     #view-list-container.open {
       display: flex;
-    }
-
-    body.tab-list-active #filter-bar-container,
-    body.tab-list-active #gps-btn {
-      display: none !important;
-      visibility: hidden !important;
-      pointer-events: none !important;
     }
 
     .list-header-bar {
@@ -1901,70 +1905,77 @@ def index():
     </div>
   </header>
 
-  <!-- 2. FLOATING SUB-HEADER FILTER BAR (Bản đồ: Bộ lọc & Phím tắt nhanh) -->
-  <div id="filter-bar-container">
-    <div class="filter-chips-scroll">
-      <!-- Nút mở Modal Bộ lọc Bản đồ -->
-      <button class="poketan-chip chip-main-filter" id="btn-map-filter" onclick="openMapFilterModal()" title="Mở bộ lọc bản đồ">
-        <span>⚙️ Bộ lọc</span>
-        <span id="map-filter-badge" class="filter-count-pill" style="display:none; background:#38bdf8; color:#0f172a;">0</span>
-      </button>
+  <!-- ======================================================= -->
+  <!-- TRANG 1: BẢN ĐỒ TƯƠNG TÁC (MAP VIEW - ĐỘC LẬP HOÀN TOÀN) -->
+  <!-- ======================================================= -->
+  <div id="view-map-container">
+    <!-- 2. FLOATING SUB-HEADER FILTER BAR (Bản đồ: Bộ lọc & Phím tắt nhanh) -->
+    <div id="filter-bar-container">
+      <div class="filter-chips-scroll">
+        <!-- Nút mở Modal Bộ lọc Bản đồ -->
+        <button class="poketan-chip chip-main-filter" id="btn-map-filter" onclick="openMapFilterModal()" title="Mở bộ lọc bản đồ">
+          <span>⚙️ Bộ lọc</span>
+          <span id="map-filter-badge" class="filter-count-pill" style="display:none; background:#38bdf8; color:#0f172a;">0</span>
+        </button>
 
-      <!-- Trạng thái hàng hóa trên bản đồ -->
-      <button class="poketan-chip active" id="map-chip-all" onclick="setMapStatusFilter('all')">
-        🌐 Tất cả
-      </button>
-      <button class="poketan-chip" id="map-chip-in" onclick="setMapStatusFilter('in')">
-        <span class="chip-dot dot-green"></span> 🟢 Có hàng
-      </button>
-      <button class="poketan-chip" id="map-chip-recent" onclick="setMapStatusFilter('recent')">
-        <span style="color:#eab308;font-size:0.75rem;">★</span> Từng có hàng
-      </button>
-      <button class="poketan-chip" id="map-chip-out" onclick="setMapStatusFilter('out')">
-        <span class="chip-dot dot-red"></span> 🔴 Hết hàng
-      </button>
+        <!-- Trạng thái hàng hóa trên bản đồ -->
+        <button class="poketan-chip active" id="map-chip-all" onclick="setMapStatusFilter('all')">
+          🌐 Tất cả
+        </button>
+        <button class="poketan-chip" id="map-chip-in" onclick="setMapStatusFilter('in')">
+          <span class="chip-dot dot-green"></span> 🟢 Có hàng
+        </button>
+        <button class="poketan-chip" id="map-chip-recent" onclick="setMapStatusFilter('recent')">
+          <span style="color:#eab308;font-size:0.75rem;">★</span> Từng có hàng
+        </button>
+        <button class="poketan-chip" id="map-chip-out" onclick="setMapStatusFilter('out')">
+          <span class="chip-dot dot-red"></span> 🔴 Hết hàng
+        </button>
 
-      <!-- Chuỗi cửa hàng & Thương hiệu trên bản đồ -->
-      <select class="poketan-chip select-chip" id="map-chain-select" onchange="setMapChainFilter(this.value)" title="Chuỗi cửa hàng & Thương hiệu">
-        <option value="all">🏢 Tất cả chuỗi</option>
-        <option value="conbini">🏪 Tất cả Conbini</option>
-        <option value="seven">🏪 7-Eleven</option>
-        <option value="lawson">🏪 Lawson</option>
-        <option value="familymart">🏪 FamilyMart</option>
-        <option value="ministop">🏪 Ministop</option>
-        <option value="specialty">🃏 Card Shop chuyên biệt</option>
-        <option value="electronics">🎮 Điện máy, GEO, Tsutaya</option>
-      </select>
-    </div>
-
-    <!-- Real-time stock alert toast -->
-    <div id="live-stock-toast" style="display:none;" onclick="focusStockStore()">
-      <div class="toast-info">
-        <span class="chip-dot dot-green"></span>
-        <span id="toast-store-title" style="font-weight:700;">セブン-イレブン...</span>
-        <span>で <b style="color:#16a34a;">在庫あり</b> の報告 <span id="toast-time">1分前</span></span>
+        <!-- Chuỗi cửa hàng & Thương hiệu trên bản đồ -->
+        <select class="poketan-chip select-chip" id="map-chain-select" onchange="setMapChainFilter(this.value)" title="Chuỗi cửa hàng & Thương hiệu">
+          <option value="all">🏢 Tất cả chuỗi</option>
+          <option value="conbini">🏪 Tất cả Conbini</option>
+          <option value="seven">🏪 7-Eleven</option>
+          <option value="lawson">🏪 Lawson</option>
+          <option value="familymart">🏪 FamilyMart</option>
+          <option value="ministop">🏪 Ministop</option>
+          <option value="specialty">🃏 Card Shop chuyên biệt</option>
+          <option value="electronics">🎮 Điện máy, GEO, Tsutaya</option>
+        </select>
       </div>
-      <button class="toast-close-btn" onclick="event.stopPropagation(); hideToast()">✕</button>
+
+      <!-- Real-time stock alert toast -->
+      <div id="live-stock-toast" style="display:none;" onclick="focusStockStore()">
+        <div class="toast-info">
+          <span class="chip-dot dot-green"></span>
+          <span id="toast-store-title" style="font-weight:700;">セブン-イレブン...</span>
+          <span>で <b style="color:#16a34a;">在庫あり</b> の報告 <span id="toast-time">1分前</span></span>
+        </div>
+        <button class="toast-close-btn" onclick="event.stopPropagation(); hideToast()">✕</button>
+      </div>
+
+      <!-- Region loading & switch toast -->
+      <div id="region-load-toast" style="display:none;">
+        <span id="region-load-icon">⚡</span>
+        <span id="region-load-text">Đang chuyển vùng...</span>
+      </div>
     </div>
 
-    <!-- Region loading & switch toast -->
-    <div id="region-load-toast" style="display:none;">
-      <span id="region-load-icon">⚡</span>
-      <span id="region-load-text">Đang chuyển vùng...</span>
-    </div>
+    <!-- 3. MAIN MAP AREA -->
+    <main id="app-main">
+      <div id="map"></div>
+
+      <!-- Floating GPS Locate Button -->
+      <button id="gps-btn" onclick="locateUser(true)" title="現在地を表示">
+        📍
+      </button>
+    </main>
   </div>
 
-  <!-- 3. MAIN MAP AREA -->
-  <main id="app-main">
-    <div id="map"></div>
-
-    <!-- Floating GPS Locate Button -->
-    <button id="gps-btn" onclick="locateUser(true)" title="現在地を表示">
-      📍
-    </button>
-  </main>
-
-  <!-- 4. LIST VIEW SHEET (一覧 / Thông báo cập nhật báo cáo) -->
+  <!-- ======================================================= -->
+  <!-- TRANG 2: BÁO CÁO & THÔNG BÁO (NOTIFICATION - ĐỘC LẬP)    -->
+  <!-- ======================================================= -->
   <div id="view-list-container">
     <div class="list-header-bar">
       <div style="font-weight:800; font-size:0.92rem; color:#0f172a; display:flex; align-items:center; gap:6px;">
@@ -3945,33 +3956,67 @@ def index():
     }
     window.triggerGachiMeguri = triggerGachiMeguri;
 
-    // 10. FOOTER NAVIGATION TABS
-    function switchFooterTab(tab) {
+    // 10. FOOTER NAVIGATION TABS (Tách biệt hai trang Bản đồ và Báo cáo riêng biệt, không chạy ẩn đè nhau)
+    function switchFooterTab(tab, updateHistory = true) {
       try {
         localStorage.setItem('poketan_active_tab', tab);
       } catch(e) {}
       document.querySelectorAll('.footer-tab-btn').forEach(b => b.classList.remove('active'));
 
-      const filterBar = document.getElementById('filter-bar-container');
-      const gpsBtn = document.getElementById('gps-btn');
+      const mapContainer = document.getElementById('view-map-container');
+      const listContainer = document.getElementById('view-list-container');
 
       if (tab === 'map') {
-        document.body.classList.remove('tab-list-active');
-        document.getElementById('f-tab-map').classList.add('active');
-        document.getElementById('view-list-container').classList.remove('open');
-        if (filterBar) filterBar.style.display = 'flex';
-        if (gpsBtn) gpsBtn.style.display = 'flex';
-        setTimeout(() => map.invalidateSize(), 50);
+        const btn = document.getElementById('f-tab-map');
+        if (btn) btn.classList.add('active');
+
+        // Hiện trang Bản đồ, Ẩn hoàn toàn trang Thông báo
+        if (listContainer) {
+          listContainer.classList.remove('open');
+          listContainer.style.display = 'none';
+        }
+        if (mapContainer) {
+          mapContainer.style.display = 'flex';
+        }
+
+        if (updateHistory && window.location.pathname !== '/map' && window.location.pathname !== '/') {
+          try { history.pushState({ tab: 'map' }, '', '/map'); } catch(e) {}
+        }
+
+        setTimeout(() => {
+          if (map) map.invalidateSize();
+        }, 50);
       } else if (tab === 'list') {
-        document.body.classList.add('tab-list-active');
-        document.getElementById('f-tab-list').classList.add('active');
-        if (filterBar) filterBar.style.display = 'none';
-        if (gpsBtn) gpsBtn.style.display = 'none';
+        const btn = document.getElementById('f-tab-list');
+        if (btn) btn.classList.add('active');
+
+        // Ẩn hoàn toàn trang Bản đồ (không chạy ẩn ở dưới), Hiện trang Thông báo
+        if (mapContainer) {
+          mapContainer.style.display = 'none';
+        }
+        if (listContainer) {
+          listContainer.classList.add('open');
+          listContainer.style.display = 'flex';
+        }
+
+        if (updateHistory && window.location.pathname !== '/thongbao') {
+          try { history.pushState({ tab: 'list' }, '', '/thongbao'); } catch(e) {}
+        }
+
         renderStoreList();
-        document.getElementById('view-list-container').classList.add('open');
       }
     }
     window.switchFooterTab = switchFooterTab;
+
+    // Lắng nghe nút Back / Forward trên điện thoại và trình duyệt
+    window.addEventListener('popstate', () => {
+      const path = window.location.pathname;
+      if (path === '/thongbao' || path === '/stores') {
+        switchFooterTab('list', false);
+      } else if (path === '/map' || path === '/') {
+        switchFooterTab('map', false);
+      }
+    });
 
     let listOnlyInStock = false;
 
@@ -5477,14 +5522,18 @@ def index():
 
         // Direct URL routing for /thongbao and /stores, or restore saved active tab
         if (window.location.pathname === '/thongbao' || window.location.pathname === '/stores') {
-          switchFooterTab('list');
+          switchFooterTab('list', false);
         } else {
           try {
             const savedTab = localStorage.getItem('poketan_active_tab');
             if (savedTab === 'list' && window.location.pathname !== '/calendar') {
-              switchFooterTab('list');
+              switchFooterTab('list', false);
+            } else {
+              switchFooterTab('map', false);
             }
-          } catch(e) {}
+          } catch(e) {
+            switchFooterTab('map', false);
+          }
         }
 
         // Dismiss loading screen right away
