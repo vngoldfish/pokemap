@@ -273,6 +273,7 @@ SHARED_BASE_CSS = """
     }
     .badge-in { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
     .badge-out { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
+    .badge-not { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
     .badge-recent { background: #fef9c3; color: #854d0e; border: 1px solid #fef08a; }
     .badge-none { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
 
@@ -565,37 +566,7 @@ SHARED_BASE_CSS = """
 
 
 def render_shared_header() -> str:
-    return """
-  <!-- 1. TOP HEADER -->
-  <header id="poketan-header">
-    <div class="header-brand-group">
-      <a href="/map" class="brand-logo-area">
-        <div class="brand-pin-icon"></div>
-        <span class="brand-title-text">ポケ探</span>
-      </a>
-
-      <!-- Location Area Selector Pill -->
-      <div class="location-pill" onclick="openPrefModal()">
-        <div class="loc-main-title">
-          <span>📍</span>
-          <span id="header-loc-name">なんば周辺</span>
-          <span style="font-size:0.6rem; color:#64748b;">▼</span>
-        </div>
-        <div class="loc-sub-title">エリアを変える</div>
-      </div>
-    </div>
-
-    <!-- Right Button Group -->
-    <div style="display:flex; align-items:center; gap:6px;">
-      <button class="header-menu-btn" onclick="openTelegramModal()" title="Cấu hình Telegram & Bộ lọc cảnh báo" style="background:#0284c7; color:#ffffff; font-size:0.95rem; border:none; display:flex; align-items:center; justify-content:center; box-shadow:0 1px 3px rgba(2,132,199,0.3); border-radius:8px; width:34px; height:34px; cursor:pointer;">
-        ✈️
-      </button>
-      <button class="header-menu-btn" onclick="openSettingsModal()" title="Cài đặt hệ thống">
-        ☰
-      </button>
-    </div>
-  </header>
-"""
+    return ""
 
 
 def render_shared_footer(active_page: str) -> str:
@@ -604,164 +575,25 @@ def render_shared_footer(active_page: str) -> str:
     return f"""
   <!-- 5. FOOTER BOTTOM NAVIGATION -->
   <footer id="poketan-footer">
-    <a href="/map" class="footer-tab-btn{map_active}" id="f-tab-map" title="地図 / Bản đồ">
+    <a href="/map" class="footer-tab-btn{map_active}" id="f-tab-map" title="Bản đồ (地図)">
       <span class="tab-icon">🗺️</span>
-      <span class="tab-label">地図</span>
+      <span class="tab-label">Bản đồ</span>
     </a>
 
-    <a href="/thongbao" class="footer-tab-btn{list_active}" id="f-tab-list" title="一覧 / Danh sách thông báo">
+    <a href="/thongbao" class="footer-tab-btn{list_active}" id="f-tab-list" title="Thông báo &amp; Danh sách (一覧)">
       <span class="tab-icon">📋</span>
-      <span class="tab-label">一覧</span>
+      <span class="tab-label">Thông báo</span>
     </a>
 
-    <!-- Center Elevated Button: Gachi Meguri (⚡) -->
-    <a href="/map?hunt=1" class="gachi-meguri-wrap" title="ガチ巡り (在庫あり店舗へ直行)">
-      <div class="gachi-meguri-btn">
-        <span class="btn-icon">⚡</span>
-      </div>
-      <span class="gachi-meguri-label">ガチ巡り</span>
-    </a>
-
-    <button type="button" class="footer-tab-btn" id="f-tab-search" onclick="openSearchModal()" title="さがす / Tìm kiếm">
-      <span class="tab-icon">🔍</span>
-      <span class="tab-label">さがす</span>
-    </button>
-
-    <button type="button" class="footer-tab-btn" id="f-tab-bulletin" onclick="openBulletinModal()" title="掲示板 / Bảng tin">
-      <span class="tab-icon">💬</span>
-      <span class="tab-label">掲示板</span>
-    </button>
-
-    <button type="button" class="footer-tab-btn" id="f-tab-settings" onclick="openSettingsModal()" title="設定 / Cài đặt">
+    <button type="button" class="footer-tab-btn" id="f-tab-settings" onclick="openSettingsModal()" title="Cài đặt hệ thống &amp; Telegram">
       <span class="tab-icon">⚙️</span>
-      <span class="tab-label">設定</span>
+      <span class="tab-label">Cài đặt</span>
     </button>
   </footer>
 """
 
 
 SHARED_MODALS_HTML = """
-  <!-- 5.6 TELEGRAM NOTIFICATION & ALERT CONFIGURATION MODAL -->
-  <div id="telegram-modal" class="modal-overlay" onclick="if(event.target===this) closeTelegramModal()">
-    <div class="modal-card" style="max-height:88vh; max-height:88dvh; max-width:480px;">
-      <div class="modal-header" style="background:#0284c7; color:#ffffff;">
-        <div style="display:flex; align-items:center; gap:8px;">
-          <span style="font-size:1.25rem;">✈️</span>
-          <h3 style="font-weight:800; font-size:1.02rem; color:#ffffff; margin:0;">Cấu hình Telegram & Bộ lọc cảnh báo</h3>
-        </div>
-        <button class="modal-close-btn" style="color:#ffffff;" onclick="closeTelegramModal()">✕</button>
-      </div>
-      <div class="modal-body" style="font-size:0.82rem; padding:16px; overflow-y:auto;">
-        
-        <div style="margin-bottom:14px; background:#f0f9ff; border:1px solid #bae6fd; border-radius:10px; padding:10px 12px; font-size:0.75rem; color:#0369a1;">
-          💡 <b>Hướng dẫn nhận thông báo Telegram 24/7:</b>
-          <ol style="margin-top:4px; padding-left:16px; line-height:1.5;">
-            <li>Mở Telegram tìm bot <b>@BotFather</b> để tạo bot mới và lấy <code>Bot Token</code>.</li>
-            <li>Tạo một nhóm chat, thêm bot vừa tạo vào nhóm và lấy <code>Chat ID</code> (hoặc ID tài khoản cá nhân).</li>
-            <li>Bật công tắc bên dưới và bấm <b>Lưu cấu hình</b> để hệ thống tự động bắn tin có hàng.</li>
-          </ol>
-        </div>
-
-        <!-- Công tắc bật/tắt gửi Telegram -->
-        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:12px 14px; margin-bottom:14px; display:flex; align-items:center; justify-content:space-between;">
-          <div>
-            <div style="font-weight:800; color:#0f172a; font-size:0.88rem;">Bật đẩy thông báo qua Telegram</div>
-            <div style="font-size:0.72rem; color:#64748b; margin-top:2px;">Tự động gửi tin nhắn báo quán có hàng vào chat/nhóm Telegram</div>
-          </div>
-          <label style="position:relative; display:inline-block; width:44px; height:24px; margin:0; flex-shrink:0;">
-            <input type="checkbox" id="tg-cfg-enabled" onchange="onTelegramToggleChange(this.checked)" style="opacity:0; width:0; height:0;">
-            <span style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background:#cbd5e1; transition:.3s; border-radius:24px;" id="tg-cfg-slider"></span>
-          </label>
-        </div>
-
-        <!-- Token & Chat ID -->
-        <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:16px;">
-          <div>
-            <label style="font-weight:800; font-size:0.75rem; color:#334155; display:block; margin-bottom:4px;">Telegram Bot Token:</label>
-            <input type="text" id="tg-cfg-token" placeholder="Ví dụ: 123456789:ABCdefGhIJKlmNoPQRstuVWXyz..." style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:8px 10px; font-size:0.8rem; outline:none;" />
-          </div>
-          <div>
-            <label style="font-weight:800; font-size:0.75rem; color:#334155; display:block; margin-bottom:4px;">Telegram Chat ID (Nhóm hoặc Cá nhân):</label>
-            <input type="text" id="tg-cfg-chatid" placeholder="Ví dụ: -1001234567890 hoặc 987654321" style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:8px 10px; font-size:0.8rem; outline:none;" />
-          </div>
-        </div>
-
-        <!-- Bộ lọc cảnh báo gửi tin -->
-        <div style="border-top:1px dashed #cbd5e1; padding-top:14px; margin-bottom:14px;">
-          <div style="font-weight:800; color:#0f172a; font-size:0.82rem; margin-bottom:8px; display:flex; align-items:center; gap:5px;">
-            <span>🎯</span> <span>Bộ lọc cảnh báo tin nhắn gửi Telegram:</span>
-          </div>
-
-          <!-- Khu vực nhận tin -->
-          <div style="margin-bottom:10px;">
-            <label style="font-size:0.73rem; font-weight:700; color:#475569; display:block; margin-bottom:3px;">📍 Khu vực nhận tin:</label>
-            <select id="tg-cfg-region" style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:6px 8px; font-size:0.78rem; font-weight:700; color:#1e293b; background:#ffffff;">
-              <option value="osaka">📍 Osaka & Kansai (大阪府周辺)</option>
-              <option value="tokyo">📍 Tokyo & Kanto (東京都・神奈川)</option>
-              <option value="nagoya">📍 Nagoya & Tokai (愛知県・岐阜・三重)</option>
-              <option value="all">🗾 Toàn quốc (全国エリア)</option>
-            </select>
-          </div>
-
-          <!-- Trạng thái nhận tin -->
-          <div style="margin-bottom:10px;">
-            <label style="font-size:0.73rem; font-weight:700; color:#475569; display:block; margin-bottom:3px;">📊 Trạng thái nhận tin:</label>
-            <select id="tg-cfg-status" style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:6px 8px; font-size:0.78rem; font-weight:700; color:#1e293b; background:#ffffff;">
-              <option value="in">🟢 Chỉ gửi khi có hàng (Khuyên dùng)</option>
-              <option value="onsite">📸 Chỉ gửi tin báo tại quán (GPS)</option>
-              <option value="recent">★ Gửi cả tin có hàng & từng có hàng</option>
-              <option value="all">🌐 Nhận tất cả thông báo (Bao gồm hết hàng)</option>
-            </select>
-          </div>
-
-          <!-- Lọc chuỗi -->
-          <div style="margin-bottom:10px;">
-            <label style="font-size:0.73rem; font-weight:700; color:#475569; display:block; margin-bottom:3px;">🏢 Chuỗi cửa hàng:</label>
-            <select id="tg-cfg-chain" style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:6px 8px; font-size:0.78rem; font-weight:700; color:#1e293b; background:#ffffff;">
-              <option value="all">🏢 Tất cả các chuỗi</option>
-              <option value="conbini">🏪 Tất cả Conbini</option>
-              <option value="seven">🏪 7-Eleven</option>
-              <option value="lawson">🏪 Lawson</option>
-              <option value="familymart">🏪 FamilyMart</option>
-              <option value="ministop">🏪 Ministop</option>
-              <option value="specialty">🃏 Card Shop chuyên biệt</option>
-              <option value="electronics">🎮 Điện máy, GEO, Tsutaya</option>
-            </select>
-          </div>
-
-          <!-- Độ mới tin báo -->
-          <div>
-            <label style="font-size:0.73rem; font-weight:700; color:#475569; display:block; margin-bottom:3px;">⏱️ Độ tươi mới của tin báo:</label>
-            <select id="tg-cfg-time" style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:6px 8px; font-size:0.78rem; font-weight:700; color:#1e293b; background:#ffffff;">
-              <option value="1">⚡ Siêu mới: Trong vòng 1 giờ</option>
-              <option value="3">⏱ Trong vòng 3 giờ</option>
-              <option value="6">⏱ Trong vòng 6 giờ</option>
-              <option value="24" selected>📅 Trong vòng 24 giờ</option>
-              <option value="all">⏳ Toàn bộ thời gian</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- Nút test webhook & kết quả -->
-        <div style="margin-top:10px; display:flex; flex-direction:column; gap:6px;">
-          <button type="button" onclick="testTelegramWebhook()" id="btn-test-tg" style="width:100%; padding:8px 12px; background:#f0fdf4; border:1px solid #86efac; border-radius:8px; font-weight:800; font-size:0.78rem; color:#166534; cursor:pointer;">
-            🔔 Gửi thử tin nhắn test tới Telegram ngay
-          </button>
-          <div id="tg-test-result" style="display:none; font-size:0.72rem; padding:6px 10px; border-radius:6px; margin-top:4px;"></div>
-        </div>
-
-      </div>
-      <div style="padding:12px 16px; border-top:1px solid #e2e8f0; background:#f8fafc; display:flex; gap:8px;">
-        <button type="button" class="btn-reset-filter" onclick="closeTelegramModal()">
-          Đóng
-        </button>
-        <button type="button" class="btn-apply-filter" onclick="saveTelegramConfig()" id="btn-save-tg" style="background:#0284c7;">
-          💾 Lưu cấu hình Telegram
-        </button>
-      </div>
-    </div>
-  </div>
-
   <!-- 6. PREFECTURE & CITY AREA SELECTOR MODAL (なんば周辺 / エリア変更) -->
   <div id="pref-modal" class="modal-overlay" onclick="if(event.target===this) closePrefModal()">
     <div class="modal-card">
@@ -836,16 +668,129 @@ SHARED_MODALS_HTML = """
     </div>
   </div>
 
-  <!-- 8. SETTINGS MODAL (⚙️ 設定 &amp; カスタマイズ) -->
+  <!-- 8. SETTINGS & TELEGRAM MODAL (⚙️ Cài đặt hệ thống & Telegram 24/7) -->
   <div id="settings-modal" class="modal-overlay" onclick="if(event.target===this) closeSettingsModal()">
-    <div class="modal-card" style="max-width:440px;">
-      <div class="modal-header">
-        <h3>⚙️ 設定 / Cài đặt tùy chỉnh</h3>
-        <button class="modal-close-btn" onclick="closeSettingsModal()">✕</button>
+    <div class="modal-card" style="max-width:480px; max-height:88vh; max-height:88dvh; display:flex; flex-direction:column;">
+      <div class="modal-header" style="background:#0f172a; color:#ffffff;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:1.15rem;">⚙️</span>
+          <div>
+            <h3 style="font-weight:800; font-size:1.02rem; color:#ffffff; margin:0;">Cài đặt hệ thống &amp; Telegram</h3>
+            <div style="font-size:0.7rem; color:#94a3b8; font-weight:600; margin-top:1px;">Cấu hình báo tin Telegram 24/7 &amp; tùy chọn hiển thị</div>
+          </div>
+        </div>
+        <button class="modal-close-btn" style="color:#ffffff;" onclick="closeSettingsModal()">✕</button>
       </div>
-      <div class="modal-body" style="font-size:0.82rem; max-height:75vh; overflow-y:auto; display:flex; flex-direction:column; gap:16px;">
+      <div class="modal-body" style="font-size:0.82rem; max-height:75vh; overflow-y:auto; display:flex; flex-direction:column; gap:16px; padding:16px;">
         
-        <!-- Vùng dữ liệu hiển thị -->
+        <!-- SECTION 1: CẤU HÌNH THÔNG BÁO TELEGRAM 24/7 -->
+        <div style="border:1px solid #bae6fd; background:#f0f9ff; border-radius:12px; padding:14px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span style="font-size:1.15rem;">✈️</span>
+              <span style="font-weight:800; font-size:0.92rem; color:#0369a1;">Thông báo Telegram 24/7</span>
+            </div>
+            <!-- Switch toggle -->
+            <label style="position:relative; display:inline-block; width:44px; height:24px; margin:0; flex-shrink:0;">
+              <input type="checkbox" id="tg-cfg-enabled" onchange="onTelegramToggleChange(this.checked)" style="opacity:0; width:0; height:0;">
+              <span style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background:#cbd5e1; transition:.3s; border-radius:24px;" id="tg-cfg-slider"></span>
+            </label>
+          </div>
+
+          <div style="font-size:0.72rem; color:#0369a1; margin-bottom:12px; line-height:1.4;">
+            Tự động gửi tin nhắn báo quán có hàng vào chat hoặc nhóm Telegram ngay khi phát hiện.
+          </div>
+
+          <!-- Token & Chat ID -->
+          <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:12px;">
+            <div>
+              <label style="font-weight:800; font-size:0.75rem; color:#334155; display:block; margin-bottom:4px;">Telegram Bot Token:</label>
+              <input type="text" id="tg-cfg-token" placeholder="Ví dụ: 123456789:ABCdefGhIJKlmNoPQRstuVWXyz..." style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:8px 10px; font-size:0.8rem; outline:none; background:#ffffff;" />
+            </div>
+            <div>
+              <label style="font-weight:800; font-size:0.75rem; color:#334155; display:block; margin-bottom:4px;">Telegram Chat ID (Nhóm hoặc Cá nhân):</label>
+              <input type="text" id="tg-cfg-chatid" placeholder="Ví dụ: -1001234567890 hoặc 987654321" style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:8px 10px; font-size:0.8rem; outline:none; background:#ffffff;" />
+            </div>
+          </div>
+
+          <!-- Bộ lọc tin nhắn gửi Telegram -->
+          <div style="border-top:1px dashed #bae6fd; padding-top:10px; margin-bottom:10px;">
+            <div style="font-weight:800; color:#0f172a; font-size:0.78rem; margin-bottom:8px; display:flex; align-items:center; gap:5px;">
+              <span>🎯</span> <span>Bộ lọc cảnh báo gửi Telegram:</span>
+            </div>
+
+            <!-- Grid 2 cột -->
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+              <div>
+                <label style="font-size:0.7rem; font-weight:700; color:#475569; display:block; margin-bottom:3px;">📍 Khu vực:</label>
+                <select id="tg-cfg-region" style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:6px 8px; font-size:0.75rem; font-weight:700; color:#1e293b; background:#ffffff;">
+                  <option value="osaka">📍 Osaka &amp; Kansai</option>
+                  <option value="tokyo">📍 Tokyo &amp; Kanto</option>
+                  <option value="nagoya">📍 Nagoya &amp; Tokai</option>
+                  <option value="all">🗾 Toàn quốc</option>
+                </select>
+              </div>
+
+              <div>
+                <label style="font-size:0.7rem; font-weight:700; color:#475569; display:block; margin-bottom:3px;">📊 Trạng thái:</label>
+                <select id="tg-cfg-status" style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:6px 8px; font-size:0.75rem; font-weight:700; color:#1e293b; background:#ffffff;">
+                  <option value="in">🟢 Chỉ khi có hàng</option>
+                  <option value="onsite">📸 Chỉ tin tại quán (GPS)</option>
+                  <option value="recent">★ Có hàng &amp; Từng có</option>
+                  <option value="all">🌐 Nhận tất cả tin</option>
+                </select>
+              </div>
+
+              <div>
+                <label style="font-size:0.7rem; font-weight:700; color:#475569; display:block; margin-bottom:3px;">🏢 Chuỗi:</label>
+                <select id="tg-cfg-chain" style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:6px 8px; font-size:0.75rem; font-weight:700; color:#1e293b; background:#ffffff;">
+                  <option value="all">🏢 Tất cả các chuỗi</option>
+                  <option value="conbini">🏪 Tất cả Conbini</option>
+                  <option value="seven">🏪 7-Eleven</option>
+                  <option value="lawson">🏪 Lawson</option>
+                  <option value="familymart">🏪 FamilyMart</option>
+                  <option value="ministop">🏪 Ministop</option>
+                  <option value="specialty">🃏 Card Shop chuyên</option>
+                  <option value="electronics">🎮 Điện máy, GEO</option>
+                </select>
+              </div>
+
+              <div>
+                <label style="font-size:0.7rem; font-weight:700; color:#475569; display:block; margin-bottom:3px;">⏱️ Độ mới:</label>
+                <select id="tg-cfg-time" style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:6px 8px; font-size:0.75rem; font-weight:700; color:#1e293b; background:#ffffff;">
+                  <option value="1">⚡ Trong vòng 1 giờ</option>
+                  <option value="3">⏱ Trong vòng 3 giờ</option>
+                  <option value="6">⏱ Trong vòng 6 giờ</option>
+                  <option value="24" selected>📅 Trong vòng 24 giờ</option>
+                  <option value="all">⏳ Toàn bộ thời gian</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div id="tg-test-result" style="display:none; padding:8px 10px; border-radius:8px; font-size:0.75rem; font-weight:700; margin-top:8px;"></div>
+
+          <!-- Buttons test & save -->
+          <div style="display:flex; gap:8px; margin-top:10px;">
+            <button type="button" onclick="testTelegramWebhook()" style="flex:1; padding:9px 10px; background:#ffffff; color:#0369a1; border:1px solid #bae6fd; border-radius:8px; font-weight:800; font-size:0.78rem; cursor:pointer;">
+              🔔 Gửi test
+            </button>
+            <button type="button" onclick="saveTelegramConfig()" style="flex:2; padding:9px 10px; background:#0284c7; color:#ffffff; border:none; border-radius:8px; font-weight:800; font-size:0.78rem; cursor:pointer;">
+              💾 Lưu cấu hình Telegram
+            </button>
+          </div>
+        </div>
+
+        <!-- SECTION 2: ÂM THANH TRÊN WEB -->
+        <div>
+          <div class="filter-group-title">🔔 Thông báo âm thanh trên Web</div>
+          <label style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; font-weight:700; background:#f8fafc; padding:10px 12px; border-radius:8px; border:1px solid #e2e8f0;">
+            <span>🔊 Âm thanh khi phát hiện có hàng</span>
+            <input type="checkbox" id="set-sound-check" onchange="updateSettings('soundEnabled', this.checked)">
+          </label>
+        </div>
+
+        <!-- SECTION 3: VÙNG DỮ LIỆU HIỂN THỊ -->
         <div>
           <div class="filter-group-title">📍 Vùng dữ liệu hiển thị (地域・エリア)</div>
           <div style="display:flex; flex-direction:column; gap:8px;">
@@ -868,21 +813,7 @@ SHARED_MODALS_HTML = """
           </div>
         </div>
 
-        <!-- Cấu hình Telegram & Âm thanh -->
-        <div>
-          <div class="filter-group-title">🔔 Thông báo & Cảnh báo</div>
-          <div style="display:flex; flex-direction:column; gap:10px;">
-            <button type="button" onclick="closeSettingsModal(); openTelegramModal();" style="width:100%; padding:10px 14px; background:#0284c7; color:#ffffff; border:none; border-radius:10px; font-weight:800; font-size:0.82rem; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;">
-              <span>✈️ Cấu hình Telegram & Bộ lọc cảnh báo 24/7</span>
-            </button>
-            <label style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; font-weight:700; background:#f8fafc; padding:10px 12px; border-radius:8px; border:1px solid #e2e8f0;">
-              <span>🔊 Âm thanh thông báo trên web</span>
-              <input type="checkbox" id="set-sound-check" onchange="updateSettings('soundEnabled', this.checked)">
-            </label>
-          </div>
-        </div>
-
-        <!-- Cập nhật dữ liệu -->
+        <!-- SECTION 4: CẬP NHẬT DỮ LIỆU -->
         <div>
           <button type="button" onclick="refreshData(); closeSettingsModal();" style="width:100%; padding:10px 14px; background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; border-radius:10px; font-weight:800; font-size:0.82rem; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;">
             <span>🔄 Cập nhật dữ liệu mới nhất</span>
@@ -1039,6 +970,12 @@ MAP_PAGE_CSS = """
       background: #eff6ff;
       transform: scale(1.08);
     }
+    #gps-btn.tracking {
+      background: #2563eb;
+      color: #ffffff;
+      border-color: #ffffff;
+      box-shadow: 0 0 16px rgba(37, 99, 235, 0.85), 0 4px 18px rgba(0, 0, 0, 0.28);
+    }
     #gps-btn.locating {
       border-color: #3b82f6;
       animation: gpsPulseAnim 0.8s infinite alternate;
@@ -1048,119 +985,196 @@ MAP_PAGE_CSS = """
       to { transform: scale(1.1); box-shadow: 0 0 18px rgba(59, 130, 246, 0.9); }
     }
 
-    /* USER LOCATION MARKER */
+    /* USER LOCATION MARKER WITH LIVE PULSE */
     .user-location-marker {
       width: 18px;
       height: 18px;
       border-radius: 50%;
       background: #2563eb;
       border: 3px solid #ffffff;
-      box-shadow: 0 0 10px rgba(37, 99, 235, 0.8);
+      box-shadow: 0 0 10px rgba(37, 99, 235, 0.85);
       position: relative;
+    }
+    .user-location-marker::after {
+      content: '';
+      position: absolute;
+      top: -8px;
+      left: -8px;
+      right: -8px;
+      bottom: -8px;
+      border-radius: 50%;
+      background: rgba(37, 99, 235, 0.4);
+      animation: userPulse 2s ease-out infinite;
+      pointer-events: none;
+    }
+    @keyframes userPulse {
+      0% { transform: scale(0.6); opacity: 0.9; }
+      100% { transform: scale(2.6); opacity: 0; }
     }
 
     /* MARKER CLUSTERS & IN-STOCK PIN */
     .poketan-cluster-wrap { background: transparent; border: none; }
     .poketan-cluster {
-      width: 34px;
-      height: 34px;
+      width: 32px;
+      height: 32px;
       border-radius: 50%;
       background: #ffffff;
-      border: 2px solid #2563eb;
-      color: #0f172a;
+      border: 2px solid #4338ca;
+      color: #1e1b4b;
       font-weight: 800;
       font-size: 0.78rem;
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+      transition: all 0.15s ease;
     }
     .poketan-cluster.has-stock {
       border-color: #16a34a;
-      box-shadow: 0 0 12px rgba(22, 163, 74, 0.7);
-      background: #f0fdf4;
-      color: #15803d;
+      box-shadow: 0 0 14px rgba(22, 163, 74, 0.85), 0 2px 6px rgba(0,0,0,0.25);
+      background: #16a34a;
+      color: #ffffff;
     }
 
-    .poketan-pin-wrapper {
+    /* POKETAN STOCK PIN (CONCENTRIC CIRCLE TARGET + TIME PILL) */
+    .poketan-pin-wrap {
+      background: transparent;
+      border: none;
+    }
+    .poketan-stock-pin-v2 {
       display: inline-flex;
       align-items: center;
       gap: 5px;
-      pointer-events: auto;
+      cursor: pointer;
+      white-space: nowrap;
+      z-index: 3000 !important;
     }
-    .poketan-stock-pin {
-      height: 28px;
-      padding: 0 8px;
-      border-radius: 14px;
-      background: #16a34a;
-      border: 2px solid #ffffff;
-      box-shadow: 0 0 10px rgba(22, 163, 74, 0.8), 0 3px 6px rgba(0,0,0,0.25);
+    .stock-circle-target {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: rgba(34, 197, 94, 0.28);
+      border: 2.5px solid #16a34a;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 3px;
-      font-size: 0.74rem;
-      font-weight: 800;
-      color: #ffffff;
-      cursor: pointer;
-      animation: bouncePin 1.6s infinite;
-      flex-shrink: 0;
-      white-space: nowrap;
+      box-shadow: 0 0 12px rgba(34, 197, 94, 0.85), 0 2px 5px rgba(0,0,0,0.3);
+      position: relative;
     }
-    .poketan-pin-time-pill {
+    .stock-circle-target::after {
+      content: '';
+      position: absolute;
+      top: -5px;
+      left: -5px;
+      right: -5px;
+      bottom: -5px;
+      border-radius: 50%;
+      border: 2px solid #22c55e;
+      animation: stockRipple 1.6s ease-out infinite;
+      pointer-events: none;
+    }
+    @keyframes stockRipple {
+      0% { transform: scale(0.7); opacity: 1; }
+      100% { transform: scale(2.2); opacity: 0; }
+    }
+    .stock-circle-inner {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #16a34a;
+      box-shadow: 0 0 6px #16a34a;
+    }
+    .stock-time-badge {
       background: rgba(15, 23, 42, 0.92);
       color: #4ade80;
-      font-size: 0.68rem;
+      border: 1px solid rgba(74, 222, 128, 0.4);
+      font-size: 0.72rem;
       font-weight: 800;
-      padding: 2px 8px;
-      border-radius: 99px;
-      border: 1px solid rgba(74, 222, 128, 0.45);
-      white-space: nowrap;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-      backdrop-filter: blur(4px);
-    }
-    @keyframes bouncePin {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-4px); }
+      padding: 2px 7px;
+      border-radius: 9999px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+      letter-spacing: -0.2px;
     }
 
-    /* BRANDED STORE PINS */
+    /* CONBINI CIRCULAR DOT PINS - 100% CLEAN CIRCLES, NO LETTERS */
     .chain-pin-wrap {
       background: transparent;
       border: none;
     }
     .chain-pin {
-      width: 22px;
-      height: 22px;
-      border-radius: 6px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.62rem;
-      font-weight: 800;
-      box-shadow: 0 1.5px 5px rgba(0,0,0,0.28);
-      border: 1.5px solid #ffffff;
+      border-radius: 50%;
+      border: 2px solid #ffffff;
       cursor: pointer;
       position: relative;
       transition: transform 0.15s ease;
       user-select: none;
     }
-    .chain-pin:hover {
-      transform: scale(1.25);
+    .chain-pin:hover, .chain-pin-mini:hover {
+      transform: scale(1.6);
       z-index: 1000 !important;
     }
-    .chain-pin-text {
-      line-height: 1;
-      letter-spacing: -0.5px;
+
+    /* STATUS COLORS FOR CIRCULAR PINS (ZOOM >= 16) */
+    .chain-pin.status-in {
+      width: 14px;
+      height: 14px;
+      background: #16a34a !important;
+      border-color: #ffffff;
+      box-shadow: 0 0 10px rgba(22, 163, 74, 0.85);
     }
-    .chain-pin-status-dot {
-      position: absolute;
-      top: -3px;
-      right: -3px;
+    .chain-pin.status-out {
+      width: 11px;
+      height: 11px;
+      background: #ef4444 !important;
+      border-color: #ffffff;
+      box-shadow: 0 1px 4px rgba(239, 68, 68, 0.5);
+    }
+    .chain-pin.status-not {
+      width: 10px;
+      height: 10px;
+      background: #f59e0b !important;
+      border-color: #ffffff;
+      box-shadow: 0 1px 4px rgba(245, 158, 11, 0.5);
+    }
+    .chain-pin.status-unk {
+      width: 9px;
+      height: 9px;
+      background: #94a3b8 !important;
+      border-color: #ffffff;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+    }
+
+    /* CIRCULAR MINI DOT PINS (ZOOM 14 - 15) */
+    .chain-pin-mini {
+      border-radius: 50%;
+      border: 1.5px solid #ffffff;
+      cursor: pointer;
+      transition: transform 0.15s ease;
+    }
+    .chain-pin-mini.status-in {
+      width: 12px;
+      height: 12px;
+      background: #16a34a !important;
+      box-shadow: 0 0 8px rgba(22, 163, 74, 0.8);
+    }
+    .chain-pin-mini.status-out {
+      width: 10px;
+      height: 10px;
+      background: #ef4444 !important;
+      box-shadow: 0 1px 3px rgba(239, 68, 68, 0.45);
+    }
+    .chain-pin-mini.status-not {
+      width: 9px;
+      height: 9px;
+      background: #f59e0b !important;
+      box-shadow: 0 1px 3px rgba(245, 158, 11, 0.45);
+    }
+    .chain-pin-mini.status-unk {
       width: 7px;
       height: 7px;
-      border-radius: 50%;
-      border: 1px solid #ffffff;
+      background: #94a3b8 !important;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+      opacity: 0.85;
     }
 
     /* MAP COUNTER PILL */
@@ -1323,25 +1337,25 @@ def render_map_page() -> str:
           <div class="filter-group-title">📊 Trạng thái hàng hóa (在庫状況)</div>
           <div class="filter-options-grid" id="map-modal-status-group">
             <button class="filter-option-btn active" data-val="all" onclick="selectMapModalStatus('all')">
-              🌐 Tất cả cửa hàng
+              🌐 Tất cả quán
             </button>
             <button class="filter-option-btn" data-val="in" onclick="selectMapModalStatus('in')">
-              <span class="chip-dot dot-green"></span> 🟢 Đang có hàng
-            </button>
-            <button class="filter-option-btn" data-val="recent" onclick="selectMapModalStatus('recent')">
-              <span style="color:#eab308;font-size:0.75rem;">★</span> Từng có hàng gần đây
+              <span class="chip-dot dot-green"></span> 🟢 Có hàng (あった)
             </button>
             <button class="filter-option-btn" data-val="out" onclick="selectMapModalStatus('out')">
-              <span class="chip-dot dot-red"></span> 🔴 Hết hàng
+              <span class="chip-dot dot-red"></span> 🔴 Không có (なかった)
+            </button>
+            <button class="filter-option-btn" data-val="n" onclick="selectMapModalStatus('n')">
+              <span class="chip-dot" style="background:#f59e0b;"></span> 🟡 Không bán thẻ (扱ってない)
+            </button>
+            <button class="filter-option-btn" data-val="unknown" onclick="selectMapModalStatus('unknown')">
+              <span class="chip-dot dot-gray"></span> ⚪ Chưa có báo cáo (未確認)
             </button>
             <button class="filter-option-btn" data-val="onsite" onclick="selectMapModalStatus('onsite')">
               📍 Báo cáo tại quán (GPS)
             </button>
-            <button class="filter-option-btn" data-val="n" onclick="selectMapModalStatus('n')">
-              <span class="chip-dot dot-gray"></span> ⚪ Quán không bán thẻ (扱無)
-            </button>
-            <button class="filter-option-btn" data-val="unknown" onclick="selectMapModalStatus('unknown')">
-              🔘 Chưa có tin báo nào
+            <button class="filter-option-btn" data-val="recent" onclick="selectMapModalStatus('recent')">
+              ⚡ Có tin báo gần đây (7 ngày)
             </button>
           </div>
         </div>
@@ -1435,50 +1449,10 @@ def render_map_page() -> str:
         <span id="map-filter-badge" class="filter-count-pill" style="display:none;">0</span>
       </button>
 
-      <!-- Trạng thái hàng hóa trên bản đồ (7 trạng thái) -->
-      <button class="poketan-chip active" id="map-chip-all" onclick="setMapStatusFilter('all')">
-        🌐 Tất cả
+      <!-- Nút xóa nhanh bộ lọc khi đang áp dụng -->
+      <button class="poketan-chip" id="btn-map-filter-clear" onclick="resetAndClearMapFilters()" style="display:none; color:#ef4444; border-color:#fca5a5;" title="Xóa bộ lọc">
+        ✕ Xóa lọc
       </button>
-      <button class="poketan-chip" id="map-chip-in" onclick="setMapStatusFilter('in')">
-        <span class="chip-dot dot-green"></span> 🟢 Có hàng
-      </button>
-      <button class="poketan-chip" id="map-chip-recent" onclick="setMapStatusFilter('recent')">
-        <span style="color:#eab308;font-size:0.75rem;">★</span> Từng có
-      </button>
-      <button class="poketan-chip" id="map-chip-onsite" onclick="setMapStatusFilter('onsite')">
-        📍 Tại quán (GPS)
-      </button>
-      <button class="poketan-chip" id="map-chip-out" onclick="setMapStatusFilter('out')">
-        <span class="chip-dot dot-red"></span> 🔴 Hết hàng
-      </button>
-      <button class="poketan-chip" id="map-chip-n" onclick="setMapStatusFilter('n')">
-        <span class="chip-dot dot-gray"></span> ⚪ Không bán
-      </button>
-      <button class="poketan-chip" id="map-chip-unknown" onclick="setMapStatusFilter('unknown')">
-        🔘 Chưa có tin
-      </button>
-
-      <!-- Chuỗi cửa hàng & Thương hiệu trên bản đồ -->
-      <select class="poketan-chip" id="map-chain-select" onchange="setMapChainFilter(this.value)" title="Chuỗi cửa hàng & Thương hiệu">
-        <option value="all">🏢 Tất cả chuỗi</option>
-        <option value="conbini">🏪 Tất cả Conbini</option>
-        <option value="seven">🏪 7-Eleven</option>
-        <option value="lawson">🏪 Lawson</option>
-        <option value="familymart">🏪 FamilyMart</option>
-        <option value="ministop">🏪 Ministop</option>
-        <option value="specialty">🃏 Card Shop chuyên</option>
-        <option value="electronics">🎮 Điện máy, GEO</option>
-      </select>
-
-      <!-- Thời gian có sản phẩm -->
-      <select class="poketan-chip" id="map-time-select" onchange="setMapTimeFilter(this.value)" title="Thời gian có hàng">
-        <option value="all">⏳ Có hàng: Mọi lúc</option>
-        <option value="1">⚡ Có hàng: 1h qua</option>
-        <option value="3">⏱ Có hàng: 3h qua</option>
-        <option value="6">⏱ Có hàng: 6h qua</option>
-        <option value="12">⏱ Có hàng: 12h qua</option>
-        <option value="24">📅 Có hàng: 24h qua</option>
-      </select>
     </div>
 
     <!-- Real-time stock alert toast -->
@@ -1503,7 +1477,7 @@ def render_map_page() -> str:
     <div id="map-counter-pill" class="map-counter-pill">
       Đang tải dữ liệu...
     </div>
-    <button id="gps-btn" onclick="locateUser(true)" title="現在地を表示">
+    <button id="gps-btn" class="tracking" onclick="locateUser(true)" title="現在地を表示">
       📍
     </button>
   </main>
@@ -1540,6 +1514,8 @@ def render_map_page() -> str:
     }
 
     let userLat = null, userLng = null, userMarker = null, userCircle = null, hasCenteredOnUser = false;
+    let gpsWatchId = null;
+    let isFollowingUser = true;
     try {
       const savedLat = parseFloat(localStorage.getItem('poketan_user_lat'));
       const savedLng = parseFloat(localStorage.getItem('poketan_user_lng'));
@@ -1552,7 +1528,7 @@ def render_map_page() -> str:
     let initialZoom = REGIONS[currentRegion].zoom;
     if (userLat !== null && userLng !== null) {
       initialCenter = [userLat, userLng];
-      initialZoom = 14;
+      initialZoom = 15;
       hasCenteredOnUser = true;
     }
 
@@ -1574,8 +1550,15 @@ def render_map_page() -> str:
       attribution: '&copy; Google Maps'
     }).addTo(map);
 
+    // Map drag listener: pause auto-following so user can explore freely
+    map.on('dragstart', () => {
+      isFollowingUser = false;
+      updateGpsBtnState();
+    });
+
     let clusterGroup = L.markerClusterGroup({
-      maxClusterRadius: 46,
+      maxClusterRadius: 52,
+      disableClusteringAtZoom: 17,
       spiderfyOnMaxZoom: true,
       showCoverageOnHover: false,
       zoomToBoundsOnClick: true,
@@ -1585,7 +1568,7 @@ def render_map_page() -> str:
         return L.divIcon({
           html: `<div class="poketan-cluster ${hasStock ? 'has-stock' : ''}">${count}</div>`,
           className: 'poketan-cluster-wrap',
-          iconSize: L.point(32, 32)
+          iconSize: L.point(30, 30)
         });
       }
     });
@@ -1662,42 +1645,65 @@ def render_map_page() -> str:
       'other': { label: 'Store', short: '🏪', icon: '🏪', bg: '#475569', border: '#94a3b8', color: '#fff' }
     };
 
-    function createStockPinIcon(timeAgo, meta) {
-      const tag = meta ? meta.short : '🟢';
-      const bg = meta ? meta.bg : '#16a34a';
+    // UNIFORM STATUS THEMES (Same for ALL conbinis)
+    // 🟢 Green = Có hàng | 🔴 Red = Không có | 🟡 Yellow = Không bán | ⚪ Gray = Chưa có báo cáo
+    function getStatusTheme(code, isFresh = true) {
+      if (code === 'i') {
+        return { bg: '#16a34a', cls: 'status-in', label: 'Có hàng' };
+      } else if (code === 'o') {
+        return { bg: '#ef4444', cls: 'status-out', label: 'Không có' };
+      } else if (code === 'n') {
+        return { bg: '#f59e0b', cls: 'status-not', label: 'Không bán thẻ' };
+      } else {
+        return { bg: '#94a3b8', cls: 'status-unk', label: 'Chưa có báo cáo' };
+      }
+    }
+
+    function createStockPinIcon(timeAgo) {
       return L.divIcon({
         html: `<div class="poketan-pin-wrapper">
-                 <div class="poketan-stock-pin" style="background:${bg};" title="在庫あり">
-                   <span>🟢 ${escapeHtml(tag)}</span>
+                 <div class="poketan-stock-pin-v2" title="Có hàng">
+                   <div class="stock-circle-target">
+                     <div class="stock-circle-inner"></div>
+                   </div>
+                   <div class="stock-time-badge">${escapeHtml(timeAgo || 'たった今')}</div>
                  </div>
-                 <div class="poketan-pin-time-pill">${escapeHtml(timeAgo || 'たった今')}</div>
                </div>`,
         className: 'poketan-pin-wrap',
-        iconSize: [110, 28],
-        iconAnchor: [18, 14]
+        iconSize: [85, 24],
+        iconAnchor: [11, 12]
       });
     }
 
-    function createChainPinIcon(store, info, meta) {
-      let statusColor = '#cbd5e1';
-      let statusCls = 'status-u';
-      if (info.code === 'o') { statusColor = '#ef4444'; statusCls = 'status-o'; }
-      else if (info.code === 'n') { statusColor = '#94a3b8'; statusCls = 'status-n'; }
+    function createMiniChainPinIcon(store, info, isFresh = true) {
+      const theme = getStatusTheme(info.code, isFresh);
+      const size = (info.code === 'i' && isFresh) ? 12 : (info.code === 'o' ? 10 : (info.code === 'n' ? 9 : 7));
+      const half = size / 2;
+      return L.divIcon({
+        html: `<div class="chain-pin-mini ${theme.cls}" title="${escapeHtml(store.name)} (${theme.label})"></div>`,
+        className: 'chain-pin-wrap',
+        iconSize: [size, size],
+        iconAnchor: [half, half]
+      });
+    }
+
+    function createChainPinIcon(store, info, isFresh = true) {
+      const theme = getStatusTheme(info.code, isFresh);
+      const size = (info.code === 'i' && isFresh) ? 14 : (info.code === 'o' ? 11 : (info.code === 'n' ? 10 : 9));
+      const half = size / 2;
 
       return L.divIcon({
-        html: `<div class="chain-pin ${statusCls}" style="background:${meta.bg}; color:${meta.color}; border-color:${meta.border};" title="${escapeHtml(store.name)}">
-                 <span class="chain-pin-text">${escapeHtml(meta.short)}</span>
-                 <span class="chain-pin-status-dot" style="background:${statusColor};"></span>
-               </div>`,
+        html: `<div class="chain-pin ${theme.cls}" title="${escapeHtml(store.name)} (${theme.label})"></div>`,
         className: 'chain-pin-wrap',
-        iconSize: [22, 22],
-        iconAnchor: [11, 11]
+        iconSize: [size, size],
+        iconAnchor: [half, half]
       });
     }
 
-    const redDotIcon = L.divIcon({ html: '<div style="width:10px;height:10px;border-radius:50%;background:#ef4444;border:1.5px solid #fff;"></div>', className: 'd-wrap', iconSize: [10, 10], iconAnchor: [5, 5] });
-    const yellowDotIcon = L.divIcon({ html: '<div style="width:8px;height:8px;border-radius:50%;background:#eab308;border:1px solid #fff;"></div>', className: 'd-wrap', iconSize: [8, 8], iconAnchor: [4, 4] });
-    const grayDotIcon = L.divIcon({ html: '<div style="width:8px;height:8px;border-radius:50%;background:#94a3b8;border:1px solid #fff;"></div>', className: 'd-wrap', iconSize: [8, 8], iconAnchor: [4, 4] });
+    const greenDotIcon = L.divIcon({ html: '<div style="width:9px;height:9px;border-radius:50%;background:#16a34a;border:1.5px solid #fff;box-shadow:0 0 8px rgba(22,163,74,0.85);"></div>', className: 'd-wrap', iconSize: [9, 9], iconAnchor: [4.5, 4.5] });
+    const redDotIcon = L.divIcon({ html: '<div style="width:8px;height:8px;border-radius:50%;background:#ef4444;border:1.5px solid #fff;box-shadow:0 1px 3px rgba(239,68,68,0.5);"></div>', className: 'd-wrap', iconSize: [8, 8], iconAnchor: [4, 4] });
+    const yellowDotIcon = L.divIcon({ html: '<div style="width:8px;height:8px;border-radius:50%;background:#f59e0b;border:1.5px solid #fff;box-shadow:0 1px 3px rgba(245,158,11,0.5);"></div>', className: 'd-wrap', iconSize: [8, 8], iconAnchor: [4, 4] });
+    const grayDotIcon = L.divIcon({ html: '<div style="width:6px;height:6px;border-radius:50%;background:#94a3b8;border:1px solid #fff;opacity:0.85;"></div>', className: 'd-wrap', iconSize: [6, 6], iconAnchor: [3, 3] });
 
     function matchesChainFilter(chain, filter) {
       if (!filter || filter === 'all') return true;
@@ -1726,6 +1732,7 @@ def render_map_page() -> str:
       const clusterBatch = [];
       let newestInStore = null, maxTimestamp = 0;
       let visibleCount = 0, inStockVisibleCount = 0;
+      let outCount = 0, notCount = 0, unkCount = 0;
 
       const targetRegion = mapRegionFilter || currentRegion || 'osaka';
       const allowedPrefs = (REGIONS[targetRegion] ? REGIONS[targetRegion].prefs : [targetRegion]) || ['osaka'];
@@ -1741,9 +1748,11 @@ def render_map_page() -> str:
 
         const raw = effectiveStatus[store.id] || effectiveStatus[store.id + '_c'];
         const info = decodeStatus(raw);
+        const reportAge = (info.timestamp > 0) ? (now - info.timestamp) : Infinity;
 
-        // Check if in-stock report is still fresh within time window
-        const isFreshStock = (info.code === 'i') && (maxSec === null || (info.timestamp > 0 && (now - info.timestamp <= maxSec)));
+        // Fresh stock filter if time filter applied
+        // ONLY in-stock stores reported within maxSec get the pulsing green pin + time badge!
+        const isFreshStock = (info.code === 'i') && (maxSec === null || (info.timestamp > 0 && reportAge <= maxSec));
 
         // Status filter
         if (mapStatusFilter === 'in') {
@@ -1755,19 +1764,22 @@ def render_map_page() -> str:
         } else if (mapStatusFilter === 'n') {
           if (info.code !== 'n') continue;
         } else if (mapStatusFilter === 'recent') {
-          const isRecentIn = isFreshStock;
-          const isRecentReport = info.timestamp > 0 && (now - info.timestamp <= 86400 * 7) && info.code !== 'n';
-          if (!isRecentIn && !isRecentReport) continue;
+          const isRecentReport = info.timestamp > 0 && reportAge <= 86400 * 7;
+          if (!isRecentReport) continue;
         } else if (mapStatusFilter === 'unknown') {
           if (info.code !== 'u' && info.timestamp > 0) continue;
         }
-        // If mapStatusFilter === 'all', keep store!
+        // If mapStatusFilter === 'all', all stores remain on map!
 
         // Chain filter
         if (!matchesChainFilter(store.chain, mapChainFilter)) continue;
 
         visibleCount++;
         if (isFreshStock) inStockVisibleCount++;
+        else if (info.code === 'i') inStockVisibleCount++;
+        else if (info.code === 'o') outCount++;
+        else if (info.code === 'n') notCount++;
+        else unkCount++;
 
         if (isFreshStock && info.timestamp > maxTimestamp) {
           maxTimestamp = info.timestamp;
@@ -1779,25 +1791,29 @@ def render_map_page() -> str:
         const meta = CHAIN_META[chainKey] || CHAIN_META['other'];
 
         if (isFreshStock) {
-          const pinIcon = createStockPinIcon(info.timeAgo, meta);
+          // 🟢 MÀU XANH LÁ: CÓ HÀNG (あった) - Concentric target circle chớp chớp + time pill
+          const pinIcon = createStockPinIcon(info.timeAgo);
           if (currentZoom >= 12 || mapStatusFilter === 'in') {
-            const m = L.marker([store.lat, store.lng], { icon: pinIcon, zIndexOffset: 2000 });
+            const m = L.marker([store.lat, store.lng], { icon: pinIcon, zIndexOffset: 3000 });
             m.bindPopup(() => createPopupHtml(store, info), { maxWidth: 300 });
             stockLayer.addLayer(m);
           } else {
-            const cm = L.marker([store.lat, store.lng], { icon: pinIcon, hasStock: true });
+            const cm = L.marker([store.lat, store.lng], { icon: pinIcon, hasStock: true, zIndexOffset: 3000 });
             cm.bindPopup(() => createPopupHtml(store, info), { maxWidth: 300 });
             clusterBatch.push(cm);
           }
         } else {
+          // 🔴 ĐỎ: KHÔNG CÓ | 🟡 VÀNG: KHÔNG BÁN | ⚪ XÁM: CHƯA CÓ BÁO CÁO (Chấm tròn 100%)
           let pin;
-          if (mapChainFilter !== 'all' || currentZoom >= 14) {
-            pin = createChainPinIcon(store, info, meta);
+          if (currentZoom >= 16 || mapChainFilter !== 'all') {
+            pin = createChainPinIcon(store, info, isFreshStock);
+          } else if (currentZoom >= 14) {
+            pin = createMiniChainPinIcon(store, info, isFreshStock);
           } else {
-            let dotIcon = grayDotIcon;
-            if (info.code === 'o') dotIcon = redDotIcon;
-            else if (info.code === 'n') dotIcon = yellowDotIcon;
-            pin = dotIcon;
+            if (info.code === 'i') pin = greenDotIcon;
+            else if (info.code === 'o') pin = redDotIcon;
+            else if (info.code === 'n') pin = yellowDotIcon;
+            else pin = grayDotIcon;
           }
           const cm = L.marker([store.lat, store.lng], { icon: pin, hasStock: false });
           cm.bindPopup(() => createPopupHtml(store, info), { maxWidth: 300 });
@@ -1807,12 +1823,21 @@ def render_map_page() -> str:
 
       if (clusterBatch.length > 0) clusterGroup.addLayers(clusterBatch);
 
-      // Update counter pill
+      // Update counter pill with clear breakdown
       const counterEl = document.getElementById('map-counter-pill');
       if (counterEl) {
-        let label = `Hiển thị <b>${visibleCount.toLocaleString()}</b> quán`;
+        let label = `<b>${visibleCount.toLocaleString()}</b> quán`;
         if (inStockVisibleCount > 0) {
-          label += ` • <span style="color:#4ade80;">🟢 <b>${inStockVisibleCount}</b> có hàng</span>`;
+          label += ` • <span style="color:#4ade80;">🟢 <b>${inStockVisibleCount}</b> có</span>`;
+        }
+        if (outCount > 0) {
+          label += ` • <span style="color:#f87171;">🔴 <b>${outCount}</b> hết</span>`;
+        }
+        if (notCount > 0) {
+          label += ` • <span style="color:#fbbf24;">🟡 <b>${notCount}</b> ko bán</span>`;
+        }
+        if (unkCount > 0) {
+          label += ` • <span style="color:#cbd5e1;">⚪ <b>${unkCount}</b> chưa tin</span>`;
         }
         counterEl.innerHTML = label;
       }
@@ -1842,10 +1867,14 @@ def render_map_page() -> str:
         const d = calcDistanceKm(userLat, userLng, store.lat, store.lng);
         distHtml = `<div style="font-size:0.75rem; color:#2563eb; font-weight:700; margin-top:2px;">📍 Cách vị trí bạn: ${formatDist(d)}</div>`;
       }
-      let statusBg = '#f1f5f9', statusColor = '#64748b', statusText = '🔘 Chưa có tin (未確認)';
-      if (info.code === 'i') { statusBg = '#dcfce7'; statusColor = '#15803d'; statusText = '🟢 Có hàng (In Stock)'; }
-      else if (info.code === 'o') { statusBg = '#fee2e2'; statusColor = '#b91c1c'; statusText = '🔴 Hết hàng (Out of Stock)'; }
-      else if (info.code === 'n') { statusBg = '#f1f5f9'; statusColor = '#475569'; statusText = '⚪ Không bán thẻ (扱ってない)'; }
+      let statusBg = '#f1f5f9', statusColor = '#64748b', statusText = '⚪ Chưa có báo cáo (未確認)';
+      if (info.code === 'i') {
+        statusBg = '#dcfce7'; statusColor = '#15803d'; statusText = '🟢 Có hàng (あった)';
+      } else if (info.code === 'o') {
+        statusBg = '#fee2e2'; statusColor = '#b91c1c'; statusText = '🔴 Không có / Hết (なかった)';
+      } else if (info.code === 'n') {
+        statusBg = '#fef3c7'; statusColor = '#b45309'; statusText = '🟡 Không bán thẻ (扱ってない)';
+      }
 
       const packs = info.packs.length ? `<div style="font-size:0.74rem; margin-top:4px;"><b>📦 Gói:</b> ${escapeHtml(info.packs.join(', '))}</div>` : '';
       const time = (info.timestamp > 0 && info.timeAgo) ? `<div style="font-size:0.72rem; color:#64748b; margin-top:3px;">🕒 Báo: <b>${escapeHtml(info.timeAgo)}</b> (${escapeHtml(info.reported_at)})</div>` : '';
@@ -1876,6 +1905,8 @@ def render_map_page() -> str:
 
     function focusStockStore() {
       if (!latestStockStoreId || !storesDict[latestStockStoreId]) return;
+      isFollowingUser = false;
+      updateGpsBtnState();
       const s = storesDict[latestStockStoreId];
       map.flyTo([s.lat, s.lng], 16, { duration: 0.8 });
       setTimeout(() => {
@@ -1934,12 +1965,27 @@ def render_map_page() -> str:
         badge.innerText = count;
         badge.style.display = count > 0 ? 'inline-flex' : 'none';
       }
+      const clearBtn = document.getElementById('btn-map-filter-clear');
+      if (clearBtn) {
+        clearBtn.style.display = count > 0 ? 'inline-flex' : 'none';
+      }
+    }
+
+    function resetAndClearMapFilters() {
+      mapStatusFilter = 'all';
+      mapChainFilter = 'all';
+      mapTimeFilter = 'all';
+      saveMapFiltersToStorage();
+      updateMapFilterUI();
+      renderMapMarkers();
     }
 
     let lastRenderZoom = map.getZoom();
     map.on('zoomend', () => {
       const z = map.getZoom();
-      if ((lastRenderZoom < 14 && z >= 14) || (lastRenderZoom >= 14 && z < 14)) {
+      const oldTier = lastRenderZoom < 14 ? 0 : (lastRenderZoom < 16 ? 1 : 2);
+      const newTier = z < 14 ? 0 : (z < 16 ? 1 : 2);
+      if (oldTier !== newTier) {
         lastRenderZoom = z;
         renderMapMarkers();
       }
@@ -2000,29 +2046,43 @@ def render_map_page() -> str:
           inStockStores.sort((a,b) => calcDistanceKm(userLat, userLng, a.lat, a.lng) - calcDistanceKm(userLat, userLng, b.lat, b.lng));
           target = inStockStores[0];
         }
+        isFollowingUser = false;
+        updateGpsBtnState();
         map.flyTo([target.lat, target.lng], 16, { duration: 1.0 });
       } else {
         alert('現在、在庫あり店舗は見つかりませんでした。');
       }
     }
 
-    // 8. GPS USER LOCATION
-    function updateUserMarker(lat, lng, accuracy = 30) {
+    // 8. GPS USER LOCATION & REAL-TIME TRACKING
+    function updateUserMarker(lat, lng, accuracy = 25) {
       if (!userMarker) {
         const icon = L.divIcon({ className: 'user-location-marker', iconSize: [18, 18], iconAnchor: [9, 9] });
         userMarker = L.marker([lat, lng], { icon, zIndexOffset: 2000 }).addTo(map);
-        userCircle = L.circle([lat, lng], { radius: Math.max(accuracy, 25), color: '#2563eb', fillColor: '#3b82f6', fillOpacity: 0.15, weight: 1 }).addTo(map);
+        userCircle = L.circle([lat, lng], { radius: Math.max(accuracy, 20), color: '#2563eb', fillColor: '#3b82f6', fillOpacity: 0.15, weight: 1 }).addTo(map);
       } else {
         userMarker.setLatLng([lat, lng]);
-        if (userCircle) userCircle.setLatLng([lat, lng]);
+        if (userCircle) {
+          userCircle.setLatLng([lat, lng]);
+          userCircle.setRadius(Math.max(accuracy, 20));
+        }
       }
     }
 
-    function locateUser(userInitiated = true) {
+    function updateGpsBtnState() {
       const btn = document.getElementById('gps-btn');
-      if (btn && userInitiated) btn.classList.add('locating');
-      if (!navigator.geolocation) return;
+      if (btn) btn.classList.toggle('tracking', !!isFollowingUser);
+    }
 
+    function startGpsTracking(autoFly = true) {
+      if (!navigator.geolocation) return;
+      const btn = document.getElementById('gps-btn');
+      if (btn) {
+        btn.classList.add('locating');
+        updateGpsBtnState();
+      }
+
+      // 1. Initial immediate location fix
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           userLat = pos.coords.latitude;
@@ -2031,15 +2091,58 @@ def render_map_page() -> str:
             localStorage.setItem('poketan_user_lat', String(userLat));
             localStorage.setItem('poketan_user_lng', String(userLng));
           } catch(e) {}
-          updateUserMarker(userLat, userLng, pos.coords.accuracy || 30);
-          if (btn) btn.classList.remove('locating');
-          if (userInitiated) map.flyTo([userLat, userLng], 15, { duration: 0.8 });
+          updateUserMarker(userLat, userLng, pos.coords.accuracy || 25);
+          if (btn) {
+            btn.classList.remove('locating');
+            updateGpsBtnState();
+          }
+          const urlParams = new URLSearchParams(window.location.search);
+          if (autoFly && !urlParams.get('focus') && urlParams.get('hunt') !== '1') {
+            map.flyTo([userLat, userLng], 15, { duration: 1.0 });
+          }
         },
         (err) => {
-          if (btn) btn.classList.remove('locating');
+          if (btn) {
+            btn.classList.remove('locating');
+            updateGpsBtnState();
+          }
+          console.warn('GPS initial fix warning:', err);
         },
-        { enableHighAccuracy: true, timeout: 6000 }
+        { enableHighAccuracy: true, timeout: 8000 }
       );
+
+      // 2. Real-time continuous tracking as device moves
+      if (gpsWatchId !== null) {
+        navigator.geolocation.clearWatch(gpsWatchId);
+      }
+      gpsWatchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          userLat = pos.coords.latitude;
+          userLng = pos.coords.longitude;
+          try {
+            localStorage.setItem('poketan_user_lat', String(userLat));
+            localStorage.setItem('poketan_user_lng', String(userLng));
+          } catch(e) {}
+          updateUserMarker(userLat, userLng, pos.coords.accuracy || 25);
+          if (isFollowingUser) {
+            map.panTo([userLat, userLng], { animate: true, duration: 0.5 });
+          }
+        },
+        (err) => {
+          console.warn('GPS watch error:', err);
+        },
+        { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }
+      );
+    }
+
+    function locateUser(userInitiated = true) {
+      isFollowingUser = true;
+      updateGpsBtnState();
+      if (userLat !== null && userLng !== null) {
+        map.flyTo([userLat, userLng], 15, { duration: 0.8 });
+        updateUserMarker(userLat, userLng);
+      }
+      startGpsTracking(userInitiated);
     }
 
     // 9. AREA & REGION SELECTION
@@ -2048,6 +2151,8 @@ def render_map_page() -> str:
     function selectCityArea(pref, cityName, lat, lng, zoom) {
       currentRegion = pref;
       mapRegionFilter = pref;
+      isFollowingUser = false;
+      updateGpsBtnState();
       try { localStorage.setItem('poketan_selected_region', pref); } catch(e) {}
       const headerLoc = document.getElementById('header-loc-name');
       if (headerLoc) headerLoc.innerText = `${cityName}周辺`;
@@ -2068,8 +2173,20 @@ def render_map_page() -> str:
       });
     }
 
-    // 10. MODALS: TELEGRAM, SETTINGS, HISTORY, BULLETIN
+    // 10. MODALS: TELEGRAM & SETTINGS, HISTORY, BULLETIN
+    function onTelegramToggleChange(checked) {
+      const slider = document.getElementById('tg-cfg-slider');
+      if (slider) slider.style.background = checked ? '#0284c7' : '#cbd5e1';
+    }
+
     function openTelegramModal() {
+      openSettingsModal();
+    }
+    function closeTelegramModal() {
+      closeSettingsModal();
+    }
+
+    function openSettingsModal() {
       const tokenEl = document.getElementById('tg-cfg-token');
       const chatIdEl = document.getElementById('tg-cfg-chatid');
       const enabledEl = document.getElementById('tg-cfg-enabled');
@@ -2080,15 +2197,26 @@ def render_map_page() -> str:
 
       if (tokenEl) tokenEl.value = configData.telegramBotToken || '';
       if (chatIdEl) chatIdEl.value = configData.telegramChatId || '';
-      if (enabledEl) enabledEl.checked = !!configData.telegramEnabled;
+      if (enabledEl) {
+        enabledEl.checked = !!configData.telegramEnabled;
+        onTelegramToggleChange(!!configData.telegramEnabled);
+      }
       if (statusEl) statusEl.value = configData.telegramStatus || 'in';
       if (chainEl) chainEl.value = configData.telegramChain || 'all';
       if (timeEl) timeEl.value = String(configData.telegramTime || '24');
       if (regionEl) regionEl.value = configData.telegramRegion || 'osaka';
 
-      document.getElementById('telegram-modal').classList.add('open');
+      const rad = document.querySelector(`input[name="set-region-radio"][value="${currentRegion}"]`);
+      if (rad) rad.checked = true;
+
+      const soundCheck = document.getElementById('set-sound-check');
+      if (soundCheck && configData.notifications) {
+        soundCheck.checked = !!configData.notifications.soundEnabled;
+      }
+
+      document.getElementById('settings-modal').classList.add('open');
     }
-    function closeTelegramModal() { document.getElementById('telegram-modal').classList.remove('open'); }
+    function closeSettingsModal() { document.getElementById('settings-modal').classList.remove('open'); }
 
     async function saveTelegramConfig() {
       const token = (document.getElementById('tg-cfg-token') ? document.getElementById('tg-cfg-token').value : '').trim();
@@ -2118,7 +2246,6 @@ def render_map_page() -> str:
         })
       });
       alert('Đã lưu cấu hình Telegram thành công! ✅');
-      closeTelegramModal();
     }
 
     async function testTelegramWebhook() {
@@ -2151,8 +2278,6 @@ def render_map_page() -> str:
       }
     }
 
-    function openSettingsModal() { document.getElementById('settings-modal').classList.add('open'); }
-    function closeSettingsModal() { document.getElementById('settings-modal').classList.remove('open'); }
     function openBulletinModal() { document.getElementById('bulletin-modal').classList.add('open'); }
     function closeBulletinModal() { document.getElementById('bulletin-modal').classList.remove('open'); }
     function openSearchModal() { openPrefModal(); }
@@ -2212,6 +2337,8 @@ def render_map_page() -> str:
         const isHunt = urlParams.get('hunt');
 
         if (focusId && storesDict[focusId]) {
+          isFollowingUser = false;
+          updateGpsBtnState();
           const s = storesDict[focusId];
           map.flyTo([s.lat, s.lng], 16, { duration: 0.8 });
           setTimeout(() => {
@@ -2221,6 +2348,8 @@ def render_map_page() -> str:
             });
           }, 850);
         } else if (isHunt === '1') {
+          isFollowingUser = false;
+          updateGpsBtnState();
           triggerGachiMeguri();
         }
 
@@ -2253,7 +2382,15 @@ def render_map_page() -> str:
       } catch(e) {}
     }
 
-    window.addEventListener('DOMContentLoaded', initData);
+    window.addEventListener('DOMContentLoaded', () => {
+      initData();
+      if (userLat !== null && userLng !== null) {
+        updateUserMarker(userLat, userLng, 25);
+      }
+      const urlParams = new URLSearchParams(window.location.search);
+      const shouldAutoFly = !urlParams.get('focus') && urlParams.get('hunt') !== '1';
+      startGpsTracking(shouldAutoFly);
+    });
   </script>
 </body>
 </html>"""
@@ -2506,6 +2643,108 @@ THONGBAO_PAGE_CSS = """
       color: #334155;
       cursor: pointer;
     }
+
+    /* REPORT TIME PILL */
+    .card-time-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: #f0f7ff;
+      color: #1e3a8a;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+      border: 1px solid #bfdbfe;
+      margin-top: 3px;
+    }
+    .card-time-pill b {
+      color: #1d4ed8;
+      font-weight: 800;
+    }
+    .card-time-pill .time-ago-highlight {
+      color: #1e40af;
+      font-weight: 800;
+      background: #dbeafe;
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+
+    /* PAGINATION STYLES */
+    .pagination-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      padding: 18px 12px 28px 12px;
+      background: #ffffff;
+      border-top: 1px solid #e2e8f0;
+      margin-top: 8px;
+      border-radius: 12px;
+    }
+    .pagination-info {
+      font-size: 0.75rem;
+      color: #475569;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .pagination-buttons {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .page-btn {
+      min-width: 36px;
+      height: 36px;
+      padding: 0 10px;
+      border-radius: 8px;
+      border: 1px solid #cbd5e1;
+      background: #ffffff;
+      color: #334155;
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+    .page-btn:hover:not(:disabled) {
+      background: #eff6ff;
+      border-color: #3b82f6;
+      color: #1d4ed8;
+    }
+    .page-btn.active {
+      background: #2563eb;
+      border-color: #2563eb;
+      color: #ffffff;
+      font-weight: 800;
+      box-shadow: 0 2px 6px rgba(37, 99, 235, 0.35);
+    }
+    .page-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+      background: #f8fafc;
+      border-color: #e2e8f0;
+    }
+    .page-size-select {
+      padding: 3px 8px;
+      border-radius: 6px;
+      border: 1px solid #cbd5e1;
+      font-size: 0.72rem;
+      font-weight: 800;
+      color: #1e293b;
+      background: #ffffff;
+      outline: none;
+      cursor: pointer;
+    }
   </style>
 """
 
@@ -2558,22 +2797,22 @@ def render_thongbao_page() -> str:
               🌐 Tất cả trạng thái
             </button>
             <button class="filter-option-btn" data-val="in" onclick="selectModalStatus('in')">
-              <span class="chip-dot dot-green"></span> 🟢 Chỉ điểm có hàng
+              <span class="chip-dot dot-green"></span> 🟢 Có hàng (あった)
+            </button>
+            <button class="filter-option-btn" data-val="out" onclick="selectModalStatus('out')">
+              <span class="chip-dot dot-red"></span> 🔴 Không có (なかった)
+            </button>
+            <button class="filter-option-btn" data-val="n" onclick="selectModalStatus('n')">
+              <span class="chip-dot" style="background:#f59e0b;"></span> 🟡 Không bán thẻ (扱ってない)
+            </button>
+            <button class="filter-option-btn" data-val="unknown" onclick="selectModalStatus('unknown')">
+              <span class="chip-dot dot-gray"></span> ⚪ Chưa có báo cáo (未確認)
             </button>
             <button class="filter-option-btn" data-val="onsite" onclick="selectModalStatus('onsite')">
               📍 Báo cáo tại quán (GPS)
             </button>
             <button class="filter-option-btn" data-val="recent" onclick="selectModalStatus('recent')">
-              <span style="color:#eab308;font-size:0.75rem;">★</span> Từng có gần đây
-            </button>
-            <button class="filter-option-btn" data-val="out" onclick="selectModalStatus('out')">
-              <span class="chip-dot dot-red"></span> 🔴 Báo hết hàng
-            </button>
-            <button class="filter-option-btn" data-val="n" onclick="selectModalStatus('n')">
-              <span class="chip-dot dot-gray"></span> ⚪ Quán không bán thẻ (扱無)
-            </button>
-            <button class="filter-option-btn" data-val="unknown" onclick="selectModalStatus('unknown')">
-              🔘 Chưa có tin báo nào
+              ⚡ Có tin báo gần đây (7 ngày)
             </button>
           </div>
         </div>
@@ -2717,38 +2956,18 @@ def render_thongbao_page() -> str:
       </div>
     </div>
 
-    <!-- Status tabs -->
-    <div class="list-tabs-row">
-      <button class="list-tab-chip active" id="list-tab-all" onclick="setListStatusTab('all')">🌐 Tất cả</button>
-      <button class="list-tab-chip" id="list-tab-in" onclick="setListStatusTab('in')">🟢 Có hàng</button>
-      <button class="list-tab-chip" id="list-tab-onsite" onclick="setListStatusTab('onsite')">📍 Tại quán (GPS)</button>
-      <button class="list-tab-chip" id="list-tab-out" onclick="setListStatusTab('out')">🔴 Hết hàng</button>
-      <button class="list-tab-chip" id="list-tab-n" onclick="setListStatusTab('n')">⚪ Không bán thẻ</button>
-      <button class="list-tab-chip" id="list-tab-recent" onclick="setListStatusTab('recent')">★ Từng có</button>
-      <button class="list-tab-chip" id="list-tab-unknown" onclick="setListStatusTab('unknown')">🔘 Chưa có tin</button>
-    </div>
-
-    <!-- Radius filter row -->
-    <div class="list-radius-row">
-      <span style="font-size: 0.72rem; font-weight: 800; color: #334155; white-space: nowrap; display: flex; align-items: center; gap: 3px;">
-        <span>📍 Khoảng cách:</span>
-      </span>
-      <button class="list-radius-chip active" id="list-radius-chip-all" onclick="setListRadiusFilter('all')">🌐 Tất cả</button>
-      <button class="list-radius-chip" id="list-radius-chip-1" onclick="setListRadiusFilter('1')">📍 1 km</button>
-      <button class="list-radius-chip" id="list-radius-chip-3" onclick="setListRadiusFilter('3')">📍 3 km</button>
-      <button class="list-radius-chip" id="list-radius-chip-5" onclick="setListRadiusFilter('5')">📍 5 km</button>
-      <button class="list-radius-chip" id="list-radius-chip-10" onclick="setListRadiusFilter('10')">📍 10 km</button>
-    </div>
-
     <!-- Search row -->
     <div class="list-search-row">
       <div class="list-search-box">
         <span class="icon">🔍</span>
         <input type="text" id="list-search-input" placeholder="Tìm tên quán, địa chỉ..." oninput="onListSearch(this.value)" />
       </div>
-      <button onclick="openFilterModal()" class="list-sort-btn" style="background:#0f172a; color:#ffffff; padding:7px 11px; border-radius:8px; cursor:pointer;">
+      <button onclick="openFilterModal()" class="list-sort-btn" style="background:#0f172a; color:#ffffff; padding:7px 11px; border-radius:8px; cursor:pointer; display:inline-flex; align-items:center; gap:5px;">
         <span>⚙️ Lọc</span>
         <span id="list-filter-active-badge-2" class="filter-count-pill" style="display:none;">0</span>
+      </button>
+      <button id="list-filter-clear-btn" onclick="resetAllFiltersAndApply()" style="display:none; color:#ef4444; border:1px solid #fca5a5; background:#ffffff; font-size:0.75rem; font-weight:700; border-radius:8px; padding:6px 10px; cursor:pointer;">
+        ✕ Xóa lọc
       </button>
     </div>
 
@@ -2789,15 +3008,22 @@ def render_thongbao_page() -> str:
     const storeCountsCache = {};
 
     let listRegionFilter = currentRegion;
-    let listStatusFilter = localStorage.getItem('poketan_list_status') || 'all';
+    let listStatusFilter = 'all';
+    try {
+      localStorage.removeItem('poketan_list_status'); // Clear legacy lock
+      const savedSt = localStorage.getItem('poketan_list_status_v3');
+      if (savedSt) listStatusFilter = savedSt;
+    } catch(e) {}
     let listChainFilter = localStorage.getItem('poketan_list_chain') || 'all';
     let listTimeFilter = localStorage.getItem('poketan_list_time') || 'all';
     let listRadiusFilter = localStorage.getItem('poketan_list_radius') || 'all';
     let listSortMode = localStorage.getItem('poketan_list_sort') || 'newest';
+    let listCurrentPage = 1;
+    let listPageSize = 20;
 
     function saveListFiltersToStorage() {
       try {
-        localStorage.setItem('poketan_list_status', listStatusFilter);
+        localStorage.setItem('poketan_list_status_v3', listStatusFilter);
         localStorage.setItem('poketan_list_chain', listChainFilter);
         localStorage.setItem('poketan_list_time', String(listTimeFilter));
         localStorage.setItem('poketan_list_radius', String(listRadiusFilter));
@@ -2815,35 +3041,46 @@ def render_thongbao_page() -> str:
     } catch(e) {}
 
     // 2. HELPERS
-    function decodeStatus(rawVal) {
+    function decodeStatus(rawVal, confVal = '') {
       if (!rawVal || typeof rawVal !== 'string') {
-        return { code: 'u', label: '不明', packs: [], reported_at: '', timeAgo: '', onsite: false, timestamp: 0 };
+        return { code: 'u', label: 'Chưa có tin', packs: [], reported_at: '', timeOnly: '', dateOnly: '', timeAgo: '', onsite: false, timestamp: 0 };
       }
       const code = rawVal[0].toLowerCase();
       let rest = rawVal.substring(1);
       let onsite = false;
-      if (rest.endsWith('g')) { onsite = true; rest = rest.slice(0, -1); }
+      const confCombined = (confVal || '') + rest;
+      if (confCombined.includes('g')) { onsite = true; }
+
       let packs = [];
       const packCodes = configData.packCodes || {};
       for (const [pCode, pName] of Object.entries(packCodes)) {
-        if (rest.endsWith(pCode)) { packs.push(pName); rest = rest.slice(0, -pCode.length); }
+        if (confCombined.includes(pCode)) { packs.push(pName); }
       }
-      let dtStr = '', timeAgo = '', timestamp = 0;
+
+      let dtStr = '', timeAgo = '', timeOnly = '', dateOnly = '', timestamp = 0;
       if (rest.length >= 10) {
         const parsed = parseInt(rest.substring(0, 10), 10);
         if (!isNaN(parsed) && parsed > 0) {
           timestamp = parsed;
           const d = new Date(parsed * 1000);
-          dtStr = `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')} (${d.getMonth()+1}/${d.getDate()})`;
+          const hours = String(d.getHours()).padStart(2, '0');
+          const minutes = String(d.getMinutes()).padStart(2, '0');
+          const seconds = String(d.getSeconds()).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          timeOnly = `${hours}:${minutes}:${seconds}`;
+          dateOnly = `${day}/${month}`;
+          dtStr = `${hours}:${minutes} (${day}/${month})`;
+
           const diffSec = Math.floor(Date.now() / 1000 - parsed);
-          if (diffSec < 60) timeAgo = 'たった今';
-          else if (diffSec < 3600) timeAgo = `${Math.floor(diffSec / 60)}分前`;
-          else if (diffSec < 86400) timeAgo = `${Math.floor(diffSec / 3600)}時間前`;
-          else timeAgo = `${Math.floor(diffSec / 86400)}日前`;
+          if (diffSec < 60) timeAgo = 'Vừa xong';
+          else if (diffSec < 3600) timeAgo = `${Math.floor(diffSec / 60)} phút trước`;
+          else if (diffSec < 86400) timeAgo = `${Math.floor(diffSec / 3600)} giờ trước`;
+          else timeAgo = `${Math.floor(diffSec / 86400)} ngày trước`;
         }
       }
-      const labelMap = { 'i': '在庫あり', 'o': '在庫なし', 'n': '扱ってない', 'u': '未確認' };
-      return { code, label: labelMap[code] || '未確認', packs, reported_at: dtStr, timeAgo, onsite, timestamp };
+      const labelMap = { 'i': 'Có hàng', 'o': 'Không có', 'n': 'Không bán thẻ', 'u': 'Chưa có tin' };
+      return { code, label: labelMap[code] || 'Chưa có tin', packs, reported_at: dtStr, timeOnly, dateOnly, timeAgo, onsite, timestamp };
     }
 
     function calcDistanceKm(lat1, lon1, lat2, lon2) {
@@ -2935,24 +3172,27 @@ def render_thongbao_page() -> str:
           if (!allowedPrefs.includes(storePref)) continue;
         }
 
-        const info = decodeStatus(effectiveStatus[store.id] || effectiveStatus[store.id + '_c']);
+        const rawVal = effectiveStatus[store.id];
+        const confVal = effectiveStatus[store.id + '_c'] || '';
+        const info = decodeStatus(rawVal, confVal);
 
-        // Check if in-stock report is still fresh within time window
-        const isFreshStock = (info.code === 'i') && (maxSec === null || (info.timestamp > 0 && (now - info.timestamp <= maxSec)));
+        // Check time filter if specified (e.g. 1h, 3h, 6h, 24h)
+        if (maxSec !== null) {
+          if (!info.timestamp || (now - info.timestamp > maxSec)) continue;
+        }
 
-        // Status
+        // Status filter
         if (listStatusFilter === 'in') {
-          if (!isFreshStock) continue;
+          if (info.code !== 'i') continue;
         } else if (listStatusFilter === 'onsite') {
-          if (!info.onsite || !isFreshStock) continue;
+          if (!info.onsite || info.code !== 'i') continue;
         } else if (listStatusFilter === 'out') {
           if (info.code !== 'o') continue;
         } else if (listStatusFilter === 'n') {
           if (info.code !== 'n') continue;
         } else if (listStatusFilter === 'recent') {
-          const isRecentIn = isFreshStock;
-          const isRecentReport = info.timestamp > 0 && (now - info.timestamp <= 86400 * 7) && info.code !== 'n';
-          if (!isRecentIn && !isRecentReport) continue;
+          const isRecentReport = info.timestamp > 0 && (now - info.timestamp <= 86400 * 7);
+          if (!isRecentReport) continue;
         } else if (listStatusFilter === 'unknown') {
           if (info.code !== 'u' && info.timestamp > 0) continue;
         }
@@ -2980,22 +3220,23 @@ def render_thongbao_page() -> str:
         matched.push({ store, info, dist });
       }
 
-      // Update count badge
-      const countBadge = document.getElementById('list-count-badge');
-      if (countBadge) countBadge.innerText = `${matched.length.toLocaleString()} quán`;
-
       // Sort
       matched.sort((a,b) => {
-        if (a.info.code === 'i' && b.info.code !== 'i') return -1;
-        if (b.info.code === 'i' && a.info.code !== 'i') return 1;
         if (listSortMode === 'nearest') {
-          if (a.dist !== null && b.dist !== null) return a.dist - b.dist;
-          if (a.dist !== null) return -1;
-          if (b.dist !== null) return 1;
+          if (a.dist !== null && b.dist !== null) {
+            const dDiff = a.dist - b.dist;
+            if (Math.abs(dDiff) > 0.05) return dDiff;
+          }
+          if (a.dist !== null && b.dist === null) return -1;
+          if (b.dist !== null && a.dist === null) return 1;
           return (b.info.timestamp || 0) - (a.info.timestamp || 0);
         } else {
-          const diffTs = (b.info.timestamp || 0) - (a.info.timestamp || 0);
-          if (diffTs !== 0) return diffTs;
+          // Newest first (Báo cáo mới nhất trước)
+          const tsA = a.info.timestamp || 0;
+          const tsB = b.info.timestamp || 0;
+          if (tsA > 0 && tsB > 0) return tsB - tsA;
+          if (tsA > 0) return -1;
+          if (tsB > 0) return 1;
           if (a.dist !== null && b.dist !== null) return a.dist - b.dist;
           return 0;
         }
@@ -3012,14 +3253,29 @@ def render_thongbao_page() -> str:
         return;
       }
 
-      const renderSlice = matched.slice(0, 120);
+      const totalItems = matched.length;
+      const totalPages = Math.max(1, Math.ceil(totalItems / listPageSize));
+      if (listCurrentPage > totalPages) listCurrentPage = totalPages;
+      if (listCurrentPage < 1) listCurrentPage = 1;
 
-      listContainer.innerHTML = renderSlice.map(item => {
+      const startIndex = (listCurrentPage - 1) * listPageSize;
+      const endIndex = Math.min(startIndex + listPageSize, totalItems);
+      const pageSlice = matched.slice(startIndex, endIndex);
+
+      // Update count badge in sort bar
+      const countBadge = document.getElementById('list-count-badge');
+      if (countBadge) {
+        countBadge.innerText = totalItems > 0
+          ? `Trang ${listCurrentPage}/${totalPages} (${totalItems.toLocaleString()} quán)`
+          : '0 quán';
+      }
+
+      const cardsHtml = pageSlice.map((item, idx) => {
         const { store, info, dist } = item;
         let badgeClass = 'badge-none', badgeText = '🔘 Chưa có tin';
         if (info.code === 'i') { badgeClass = 'badge-in'; badgeText = '🟢 Có hàng'; }
-        else if (info.code === 'o') { badgeClass = 'badge-out'; badgeText = '🔴 Hết hàng'; }
-        else if (info.code === 'n') { badgeClass = 'badge-none'; badgeText = '⚪ Không bán thẻ'; }
+        else if (info.code === 'o') { badgeClass = 'badge-out'; badgeText = '🔴 Không có'; }
+        else if (info.code === 'n') { badgeClass = 'badge-not'; badgeText = '🟡 Không bán thẻ'; }
 
         const onsiteBadge = (info.onsite && info.code === 'i')
           ? `<span class="card-badge" style="background:#dcfce7; color:#15803d; border:1px solid #bbf7d0; padding:2px 6px; font-size:0.68rem;">📸 Tại chỗ</span>`
@@ -3028,22 +3284,48 @@ def render_thongbao_page() -> str:
         const counts = storeCountsCache[store.id] || { in: info.code === 'i' ? 1 : 0, out: info.code === 'o' ? 1 : 0 };
         const chain = (configData.chainNames && configData.chainNames[store.chain]) || store.chain || 'Cửa hàng';
         const distStr = dist !== null ? ` • 📍 Cách ${formatDist(dist)}` : '';
-        const timeStr = (info.timestamp > 0 && info.timeAgo) ? ` • 🕒 ${escapeHtml(info.timeAgo)}` : '';
+        
+        let timeReportHtml = '';
+        if (info.timestamp > 0) {
+          timeReportHtml = `
+            <div style="margin:4px 0 2px 0;">
+              <span class="card-time-pill" title="Thời gian người dùng gửi báo cáo">
+                <span>🕒 Báo lúc:</span>
+                <b>${escapeHtml(info.timeOnly || info.reported_at)}</b>
+                ${info.dateOnly ? `<span style="color:#64748b; font-size:0.68rem;">(${escapeHtml(info.dateOnly)})</span>` : ''}
+                <span>•</span>
+                <span class="time-ago-highlight">${escapeHtml(info.timeAgo)}</span>
+              </span>
+            </div>
+          `;
+        }
+
         const packHtml = info.packs.length ? `<div style="font-size:0.72rem; color:#2563eb; font-weight:700; margin-top:3px;">📦 ${escapeHtml(info.packs.join(', '))}</div>` : '';
+
+        let countsHtml = '';
+        if (counts.in > 0 || counts.out > 0) {
+          countsHtml = `
+            <div class="popup-report-counts-bar" style="margin:4px 0 2px 0;">
+              <span class="report-count-tag tag-green" style="font-size:0.67rem; padding:1px 6px;">🟢 Có: <b>${counts.in}</b> lần</span>
+              <span class="report-count-tag tag-red" style="font-size:0.67rem; padding:1px 6px;">🔴 Hết: <b>${counts.out}</b> lần</span>
+            </div>
+          `;
+        }
+
+        const itemNum = startIndex + idx + 1;
 
         return `
           <div class="store-list-card">
             <div class="card-left-info">
               <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                <span style="font-size:0.68rem; color:#94a3b8; font-weight:700;">#${itemNum}</span>
                 <span class="card-badge ${badgeClass}">${badgeText}</span>
                 ${onsiteBadge}
                 <div class="card-store-name">${escapeHtml(store.name || '')}</div>
               </div>
-              <div class="card-chain-time">${escapeHtml(chain)}${distStr}${timeStr}</div>
-              <div class="popup-report-counts-bar" style="margin:4px 0 2px 0;">
-                <span class="report-count-tag tag-green" style="font-size:0.67rem; padding:1px 6px;">🟢 Có: <b>${counts.in}</b> lần</span>
-                <span class="report-count-tag tag-red" style="font-size:0.67rem; padding:1px 6px;">🔴 Hết: <b>${counts.out}</b> lần</span>
-              </div>
+              <div class="card-chain-time">${escapeHtml(chain)}${distStr}</div>
+              ${timeReportHtml}
+              ${countsHtml}
               ${packHtml}
             </div>
             <div class="card-actions-col">
@@ -3057,11 +3339,94 @@ def render_thongbao_page() -> str:
           </div>
         `;
       }).join('');
+
+      const paginationHtml = renderPaginationHtml(totalItems, listCurrentPage, listPageSize);
+
+      listContainer.innerHTML = cardsHtml + paginationHtml;
+    }
+
+    function renderPaginationHtml(totalItems, currentPage, pageSize) {
+      if (totalItems <= 0) return '';
+      const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+      const startItem = (currentPage - 1) * pageSize + 1;
+      const endItem = Math.min(currentPage * pageSize, totalItems);
+
+      let buttonsHtml = '';
+
+      buttonsHtml += `
+        <button type="button" class="page-btn" onclick="setListPage(1)" ${currentPage === 1 ? 'disabled' : ''} title="Trang đầu">⏮</button>
+        <button type="button" class="page-btn" onclick="setListPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''} title="Trang trước">◀</button>
+      `;
+
+      let pageNumbers = [];
+      if (totalPages <= 7) {
+        for (let i = 1; i <= totalPages; i++) pageNumbers.push(i);
+      } else {
+        if (currentPage <= 4) {
+          pageNumbers = [1, 2, 3, 4, 5, '...', totalPages];
+        } else if (currentPage >= totalPages - 3) {
+          pageNumbers = [1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+        } else {
+          pageNumbers = [1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages];
+        }
+      }
+
+      for (const p of pageNumbers) {
+        if (p === '...') {
+          buttonsHtml += `<span style="padding:0 4px; color:#94a3b8; font-weight:700;">...</span>`;
+        } else {
+          const isActive = p === currentPage ? 'active' : '';
+          buttonsHtml += `<button type="button" class="page-btn ${isActive}" onclick="setListPage(${p})">${p}</button>`;
+        }
+      }
+
+      buttonsHtml += `
+        <button type="button" class="page-btn" onclick="setListPage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''} title="Trang sau">▶</button>
+        <button type="button" class="page-btn" onclick="setListPage(${totalPages})" ${currentPage === totalPages ? 'disabled' : ''} title="Trang cuối">⏭</button>
+      `;
+
+      return `
+        <div class="pagination-container">
+          <div class="pagination-info">
+            <span>Hiển thị <b>${startItem.toLocaleString()} - ${endItem.toLocaleString()}</b> / <b>${totalItems.toLocaleString()}</b> quán</span>
+            <span>•</span>
+            <span>Trang <b>${currentPage}</b> / <b>${totalPages}</b></span>
+            <span>•</span>
+            <label style="display:inline-flex; align-items:center; gap:4px; font-size:0.72rem;">
+              <span>Mỗi trang:</span>
+              <select class="page-size-select" onchange="setListPageSize(this.value)">
+                <option value="20" ${pageSize === 20 ? 'selected' : ''}>20 quán</option>
+                <option value="50" ${pageSize === 50 ? 'selected' : ''}>50 quán</option>
+                <option value="100" ${pageSize === 100 ? 'selected' : ''}>100 quán</option>
+              </select>
+            </label>
+          </div>
+          <div class="pagination-buttons">
+            ${buttonsHtml}
+          </div>
+        </div>
+      `;
+    }
+
+    function setListPage(page) {
+      listCurrentPage = Math.max(1, parseInt(page, 10) || 1);
+      renderStoreList(document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '');
+      const scrollEl = document.getElementById('store-cards-list');
+      if (scrollEl) scrollEl.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function setListPageSize(size) {
+      listPageSize = parseInt(size, 10) || 20;
+      listCurrentPage = 1;
+      renderStoreList(document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '');
+      const scrollEl = document.getElementById('store-cards-list');
+      if (scrollEl) scrollEl.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     // 4. FILTER CONTROLS & HANDLERS
     function setListStatusTab(tab) {
       listStatusFilter = tab;
+      listCurrentPage = 1;
       saveListFiltersToStorage();
       document.querySelectorAll('.list-tab-chip').forEach(b => b.classList.remove('active'));
       const activeBtn = document.getElementById(`list-tab-${tab}`);
@@ -3071,6 +3436,7 @@ def render_thongbao_page() -> str:
 
     function setListRadiusFilter(val) {
       listRadiusFilter = String(val);
+      listCurrentPage = 1;
       saveListFiltersToStorage();
       document.querySelectorAll('.list-radius-chip').forEach(b => b.classList.remove('active'));
       const activeBtn = document.getElementById(`list-radius-chip-${val}`);
@@ -3080,6 +3446,7 @@ def render_thongbao_page() -> str:
 
     function setListSortMode(mode) {
       listSortMode = mode;
+      listCurrentPage = 1;
       saveListFiltersToStorage();
       document.querySelectorAll('.list-sort-btn').forEach(b => b.classList.remove('active'));
       const activeBtn = document.getElementById(`sort-btn-${mode}`);
@@ -3088,6 +3455,7 @@ def render_thongbao_page() -> str:
     }
 
     function onListSearch(val) {
+      listCurrentPage = 1;
       renderStoreList(val);
     }
 
@@ -3123,6 +3491,25 @@ def render_thongbao_page() -> str:
       modalTempFilter = 'all'; modalTempChain = 'all'; modalTempTime = 'all'; modalTempRadius = 'all'; modalTempSort = 'newest';
       syncFilterModalUI();
     }
+    function resetAllFiltersAndApply() {
+      resetAllFilters();
+      applyAndCloseFilterModal();
+    }
+    function updateListFilterBadgeUI() {
+      let count = 0;
+      if (listStatusFilter !== 'all') count++;
+      if (listChainFilter !== 'all') count++;
+      if (listTimeFilter !== 'all') count++;
+      if (listRadiusFilter !== 'all') count++;
+      if (listRegionFilter !== currentRegion) count++;
+
+      ['list-filter-active-badge', 'list-filter-active-badge-2'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) { el.innerText = count; el.style.display = count > 0 ? 'inline-flex' : 'none'; }
+      });
+      const clearBtn = document.getElementById('list-filter-clear-btn');
+      if (clearBtn) clearBtn.style.display = count > 0 ? 'inline-flex' : 'none';
+    }
     function applyAndCloseFilterModal() {
       listRegionFilter = modalTempRegion;
       listStatusFilter = modalTempFilter;
@@ -3132,12 +3519,13 @@ def render_thongbao_page() -> str:
       listSortMode = modalTempSort;
       saveListFiltersToStorage();
 
-      document.querySelectorAll('.list-tab-chip').forEach(b => b.classList.toggle('active', b.id === `list-tab-${listStatusFilter}`));
-      document.querySelectorAll('.list-radius-chip').forEach(b => b.classList.toggle('active', b.id === `list-radius-chip-${listRadiusFilter}`));
       document.querySelectorAll('.list-sort-btn').forEach(b => b.classList.toggle('active', b.id === `sort-btn-${listSortMode}`));
+      updateListFilterBadgeUI();
 
       closeFilterModal();
-      renderStoreList(document.getElementById('list-search-input').value);
+      listCurrentPage = 1;
+      const searchVal = document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '';
+      renderStoreList(searchVal);
     }
 
     // 5. AREA & MODALS
@@ -3146,6 +3534,7 @@ def render_thongbao_page() -> str:
     function selectCityArea(pref, cityName, lat, lng, zoom) {
       currentRegion = pref;
       listRegionFilter = pref;
+      listCurrentPage = 1;
       try { localStorage.setItem('poketan_selected_region', pref); } catch(e) {}
       const headerLoc = document.getElementById('header-loc-name');
       if (headerLoc) headerLoc.innerText = `${cityName}周辺`;
@@ -3165,7 +3554,19 @@ def render_thongbao_page() -> str:
       });
     }
 
+    function onTelegramToggleChange(checked) {
+      const slider = document.getElementById('tg-cfg-slider');
+      if (slider) slider.style.background = checked ? '#0284c7' : '#cbd5e1';
+    }
+
     function openTelegramModal() {
+      openSettingsModal();
+    }
+    function closeTelegramModal() {
+      closeSettingsModal();
+    }
+
+    function openSettingsModal() {
       const tokenEl = document.getElementById('tg-cfg-token');
       const chatIdEl = document.getElementById('tg-cfg-chatid');
       const enabledEl = document.getElementById('tg-cfg-enabled');
@@ -3176,15 +3577,26 @@ def render_thongbao_page() -> str:
 
       if (tokenEl) tokenEl.value = configData.telegramBotToken || '';
       if (chatIdEl) chatIdEl.value = configData.telegramChatId || '';
-      if (enabledEl) enabledEl.checked = !!configData.telegramEnabled;
+      if (enabledEl) {
+        enabledEl.checked = !!configData.telegramEnabled;
+        onTelegramToggleChange(!!configData.telegramEnabled);
+      }
       if (statusEl) statusEl.value = configData.telegramStatus || 'in';
       if (chainEl) chainEl.value = configData.telegramChain || 'all';
       if (timeEl) timeEl.value = String(configData.telegramTime || '24');
       if (regionEl) regionEl.value = configData.telegramRegion || 'osaka';
 
-      document.getElementById('telegram-modal').classList.add('open');
+      const rad = document.querySelector(`input[name="set-region-radio"][value="${currentRegion}"]`);
+      if (rad) rad.checked = true;
+
+      const soundCheck = document.getElementById('set-sound-check');
+      if (soundCheck && configData.notifications) {
+        soundCheck.checked = !!configData.notifications.soundEnabled;
+      }
+
+      document.getElementById('settings-modal').classList.add('open');
     }
-    function closeTelegramModal() { document.getElementById('telegram-modal').classList.remove('open'); }
+    function closeSettingsModal() { document.getElementById('settings-modal').classList.remove('open'); }
 
     async function saveTelegramConfig() {
       const token = (document.getElementById('tg-cfg-token') ? document.getElementById('tg-cfg-token').value : '').trim();
@@ -3214,7 +3626,6 @@ def render_thongbao_page() -> str:
         })
       });
       alert('Đã lưu cấu hình Telegram thành công! ✅');
-      closeTelegramModal();
       renderStoreList();
     }
 
@@ -3247,9 +3658,6 @@ def render_thongbao_page() -> str:
         resEl.innerText = '❌ Không thể kết nối máy chủ';
       }
     }
-
-    function openSettingsModal() { document.getElementById('settings-modal').classList.add('open'); }
-    function closeSettingsModal() { document.getElementById('settings-modal').classList.remove('open'); }
     function openBulletinModal() { document.getElementById('bulletin-modal').classList.add('open'); }
     function closeBulletinModal() { document.getElementById('bulletin-modal').classList.remove('open'); }
     function openSearchModal() { openPrefModal(); }
@@ -3270,16 +3678,22 @@ def render_thongbao_page() -> str:
           bodyEl.innerHTML = '<div style="text-align:center; padding:20px; color:#64748b;">Chưa có lịch sử báo cáo nào.</div>';
           return;
         }
-        bodyEl.innerHTML = history.map(item => `
+        bodyEl.innerHTML = history.map(item => {
+          let histColor = '#64748b', histText = '⚪ Chưa rõ';
+          if (item.status_code === 'i') { histColor = '#15803d'; histText = '🟢 Có hàng'; }
+          else if (item.status_code === 'o') { histColor = '#b91c1c'; histText = '🔴 Không có'; }
+          else if (item.status_code === 'n') { histColor = '#b45309'; histText = '🟡 Không bán thẻ'; }
+          return `
           <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px 10px; margin-bottom:8px;">
             <div style="display:flex; justify-content:space-between; font-weight:800; font-size:0.78rem;">
-              <span style="color:${item.status_code === 'i' ? '#15803d' : '#b91c1c'};">${item.status_code === 'i' ? '🟢 Có hàng' : '🔴 Hết hàng'}</span>
+              <span style="color:${histColor};">${histText}</span>
               <span style="color:#64748b; font-size:0.7rem;">🕒 ${escapeHtml(item.formatted_time || '')}</span>
             </div>
             ${item.note ? `<div style="font-size:0.74rem; color:#1e293b; margin-top:3px;">📦 ${escapeHtml(item.note)}</div>` : ''}
             <div style="font-size:0.68rem; color:#94a3b8; margin-top:3px;">👤 Người báo: <b>${escapeHtml(item.user || 'Ẩn danh')}</b></div>
           </div>
-        `).join('');
+        `;
+        }).join('');
       } catch(e) {
         bodyEl.innerHTML = '<div style="color:#ef4444; padding:20px; text-align:center;">Lỗi tải dữ liệu.</div>';
       }
@@ -3300,7 +3714,7 @@ def render_thongbao_page() -> str:
           renderStoreList(document.getElementById('list-search-input').value);
         },
         (err) => {},
-        { enableHighAccuracy: false, timeout: 5000 }
+        { enableHighAccuracy: true, timeout: 6000 }
       );
     }
 
@@ -3319,9 +3733,8 @@ def render_thongbao_page() -> str:
         if (coldRes && coldRes.ok) coldStatus = await coldRes.json();
 
         // Sync initial UI badges
-        document.querySelectorAll('.list-tab-chip').forEach(b => b.classList.toggle('active', b.id === `list-tab-${listStatusFilter}`));
-        document.querySelectorAll('.list-radius-chip').forEach(b => b.classList.toggle('active', b.id === `list-radius-chip-${listRadiusFilter}`));
         document.querySelectorAll('.list-sort-btn').forEach(b => b.classList.toggle('active', b.id === `sort-btn-${listSortMode}`));
+        updateListFilterBadgeUI();
 
         renderStoreList();
         setupRealtime();

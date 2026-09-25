@@ -1,10 +1,61 @@
+# ==========================================
+# Byte-compiled / optimized / DLL files
+# ==========================================
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-env/
-venv/
+*.py[cod]
+*$py.class
+*.so
+
+# ==========================================
+# Virtual environments
+# ==========================================
 .venv/
-*.log
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/
+
+# ==========================================
+# IDEs and Editors
+# ==========================================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+
+# ==========================================
+# Operating System files
+# ==========================================
 .DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ==========================================
+# HAR network capture dumps (Large & sensitive)
+# ==========================================
+*.har
+
+# ==========================================
+# Data cache & generated export files
+# ==========================================
+app/data/stores_*.json
+app/data/*_in_stock.json
+app/data/*_in_stock.csv
+app/data/*.csv
+!app/data/.gitkeep
+!app/data/settings.json
+
+# ==========================================
+# Logs & temporary files
+# ==========================================
+*.log
+*.tmp
+temp/
+tmp/

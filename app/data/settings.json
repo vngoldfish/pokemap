@@ -19,17 +19,21 @@
     "maxReportAgeHours": 1,
     "onlyOnsiteGps": false,
     "discordWebhookUrl": "",
-    "discordEnabled": false,
     "telegramBotToken": "8888535478:AAFtlcFhwjhlAvLZ4lPf7tGQtnZ8XIoKvSE",
     "telegramChatId": "5572197416",
-    "telegramEnabled": true,
+    "telegramEnabled": false,
+    "telegramStatus": "in",
+    "telegramChain": "conbini",
+    "telegramTime": "24",
+    "telegramRegion": "osaka",
     "notifyPrefs": [
       "osaka",
       "aichi",
       "kanagawa",
       "gifu",
       "mie"
-    ]
+    ],
+    "discordEnabled": false
   },
   "sidebarTab": "feed",
   "statusFilter": {
