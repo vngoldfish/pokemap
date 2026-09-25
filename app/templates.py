@@ -1270,8 +1270,11 @@ def render_map_page() -> str:
             <button class="filter-option-btn" data-val="onsite" onclick="selectMapModalStatus('onsite')">
               📍 Báo cáo tại quán (GPS)
             </button>
+            <button class="filter-option-btn" data-val="n" onclick="selectMapModalStatus('n')">
+              <span class="chip-dot dot-gray"></span> ⚪ Quán không bán thẻ (扱無)
+            </button>
             <button class="filter-option-btn" data-val="unknown" onclick="selectMapModalStatus('unknown')">
-              ⚪ Chưa rõ trạng thái
+              🔘 Chưa có tin báo nào
             </button>
           </div>
         </div>
@@ -1525,7 +1528,8 @@ def render_map_page() -> str:
           else timeAgo = `${Math.floor(diffSec / 86400)}日前`;
         }
       }
-      return { code, label: code === 'i' ? '在庫あり' : (code === 'o' ? '在庫なし' : '不明'), packs, reported_at: dtStr, timeAgo, onsite, timestamp };
+      const labelMap = { 'i': '在庫あり', 'o': '在庫なし', 'n': '扱ってない', 'u': '未確認' };
+      return { code, label: labelMap[code] || '未確認', packs, reported_at: dtStr, timeAgo, onsite, timestamp };
     }
 
     function calcDistanceKm(lat1, lon1, lat2, lon2) {
@@ -1606,8 +1610,9 @@ def render_map_page() -> str:
         if (mapStatusFilter === 'in' && info.code !== 'i') continue;
         if (mapStatusFilter === 'onsite' && (!info.onsite || info.code !== 'i')) continue;
         if (mapStatusFilter === 'out' && info.code !== 'o') continue;
+        if (mapStatusFilter === 'n' && info.code !== 'n') continue;
         if (mapStatusFilter === 'recent' && (info.code !== 'i' && !(info.timestamp > 0 && (now - info.timestamp <= 86400 * 7) && info.code !== 'n'))) continue;
-        if (mapStatusFilter === 'unknown' && info.code !== 'u' && info.code) continue;
+        if (mapStatusFilter === 'unknown' && info.timestamp > 0) continue;
 
         // Chain filter
         if (!matchesChainFilter(store.chain, mapChainFilter)) continue;
@@ -1667,12 +1672,13 @@ def render_map_page() -> str:
         const d = calcDistanceKm(userLat, userLng, store.lat, store.lng);
         distHtml = `<div style="font-size:0.75rem; color:#2563eb; font-weight:700; margin-top:2px;">📍 Cách vị trí bạn: ${formatDist(d)}</div>`;
       }
-      let statusBg = '#f1f5f9', statusColor = '#64748b', statusText = '⚪ Chưa rõ';
+      let statusBg = '#f1f5f9', statusColor = '#64748b', statusText = '🔘 Chưa có tin (未確認)';
       if (info.code === 'i') { statusBg = '#dcfce7'; statusColor = '#15803d'; statusText = '🟢 Có hàng (In Stock)'; }
       else if (info.code === 'o') { statusBg = '#fee2e2'; statusColor = '#b91c1c'; statusText = '🔴 Hết hàng (Out of Stock)'; }
+      else if (info.code === 'n') { statusBg = '#f1f5f9'; statusColor = '#475569'; statusText = '⚪ Không bán thẻ (扱ってない)'; }
 
       const packs = info.packs.length ? `<div style="font-size:0.74rem; margin-top:4px;"><b>📦 Gói:</b> ${escapeHtml(info.packs.join(', '))}</div>` : '';
-      const time = info.timeAgo ? `<div style="font-size:0.72rem; color:#64748b; margin-top:3px;">🕒 Báo: <b>${escapeHtml(info.timeAgo)}</b> (${escapeHtml(info.reported_at)})</div>` : '';
+      const time = (info.timestamp > 0 && info.timeAgo) ? `<div style="font-size:0.72rem; color:#64748b; margin-top:3px;">🕒 Báo: <b>${escapeHtml(info.timeAgo)}</b> (${escapeHtml(info.reported_at)})</div>` : '';
       const chain = (configData.chainNames && configData.chainNames[store.chain]) || store.chain || 'Cửa hàng';
       const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent((store.name || '') + ' ' + (store.address || ''))}`;
 
@@ -2373,8 +2379,11 @@ def render_thongbao_page() -> str:
             <button class="filter-option-btn" data-val="out" onclick="selectModalStatus('out')">
               <span class="chip-dot dot-red"></span> 🔴 Báo hết hàng
             </button>
+            <button class="filter-option-btn" data-val="n" onclick="selectModalStatus('n')">
+              <span class="chip-dot dot-gray"></span> ⚪ Quán không bán thẻ (扱無)
+            </button>
             <button class="filter-option-btn" data-val="unknown" onclick="selectModalStatus('unknown')">
-              ⚪ Chưa rõ trạng thái
+              🔘 Chưa có tin báo nào
             </button>
           </div>
         </div>
@@ -2524,8 +2533,9 @@ def render_thongbao_page() -> str:
       <button class="list-tab-chip" id="list-tab-in" onclick="setListStatusTab('in')">🟢 Có hàng</button>
       <button class="list-tab-chip" id="list-tab-onsite" onclick="setListStatusTab('onsite')">📍 Tại quán (GPS)</button>
       <button class="list-tab-chip" id="list-tab-out" onclick="setListStatusTab('out')">🔴 Hết hàng</button>
+      <button class="list-tab-chip" id="list-tab-n" onclick="setListStatusTab('n')">⚪ Không bán thẻ</button>
       <button class="list-tab-chip" id="list-tab-recent" onclick="setListStatusTab('recent')">★ Từng có</button>
-      <button class="list-tab-chip" id="list-tab-unknown" onclick="setListStatusTab('unknown')">⚪ Chưa rõ</button>
+      <button class="list-tab-chip" id="list-tab-unknown" onclick="setListStatusTab('unknown')">🔘 Chưa có tin</button>
     </div>
 
     <!-- Radius filter row -->
@@ -2642,7 +2652,8 @@ def render_thongbao_page() -> str:
           else timeAgo = `${Math.floor(diffSec / 86400)}日前`;
         }
       }
-      return { code, label: code === 'i' ? '在庫あり' : (code === 'o' ? '在庫なし' : '不明'), packs, reported_at: dtStr, timeAgo, onsite, timestamp };
+      const labelMap = { 'i': '在庫あり', 'o': '在庫なし', 'n': '扱ってない', 'u': '未確認' };
+      return { code, label: labelMap[code] || '未確認', packs, reported_at: dtStr, timeAgo, onsite, timestamp };
     }
 
     function calcDistanceKm(lat1, lon1, lat2, lon2) {
@@ -2697,8 +2708,9 @@ def render_thongbao_page() -> str:
         if (listStatusFilter === 'in') stName = '🟢 Có hàng';
         else if (listStatusFilter === 'onsite') stName = '📍 Tại quán (GPS)';
         else if (listStatusFilter === 'out') stName = '🔴 Hết hàng';
+        else if (listStatusFilter === 'n') stName = '⚪ Không bán thẻ';
         else if (listStatusFilter === 'recent') stName = '★ Từng có';
-        else if (listStatusFilter === 'unknown') stName = '⚪ Chưa rõ';
+        else if (listStatusFilter === 'unknown') stName = '🔘 Chưa có tin';
 
         let rName = listRadiusFilter === 'all' ? 'Toàn khu vực' : `Bán kính ${listRadiusFilter}km`;
         bannerTextEl.innerText = `${regName} • ${stName} • ${rName}`;
@@ -2733,8 +2745,9 @@ def render_thongbao_page() -> str:
         if (listStatusFilter === 'in' && info.code !== 'i') continue;
         if (listStatusFilter === 'onsite' && (!info.onsite || info.code !== 'i')) continue;
         if (listStatusFilter === 'out' && info.code !== 'o') continue;
+        if (listStatusFilter === 'n' && info.code !== 'n') continue;
         if (listStatusFilter === 'recent' && (info.code !== 'i' && !(info.timestamp > 0 && (now - info.timestamp <= 86400 * 7) && info.code !== 'n'))) continue;
-        if (listStatusFilter === 'unknown' && info.code !== 'u' && info.code) continue;
+        if (listStatusFilter === 'unknown' && info.timestamp > 0) continue;
 
         // Chain
         if (!matchesChainFilter(store.chain, listChainFilter)) continue;
@@ -2801,9 +2814,10 @@ def render_thongbao_page() -> str:
 
       listContainer.innerHTML = renderSlice.map(item => {
         const { store, info, dist } = item;
-        let badgeClass = 'badge-none', badgeText = '⚪ Chưa rõ';
+        let badgeClass = 'badge-none', badgeText = '🔘 Chưa có tin';
         if (info.code === 'i') { badgeClass = 'badge-in'; badgeText = '🟢 Có hàng'; }
         else if (info.code === 'o') { badgeClass = 'badge-out'; badgeText = '🔴 Hết hàng'; }
+        else if (info.code === 'n') { badgeClass = 'badge-none'; badgeText = '⚪ Không bán thẻ'; }
 
         const onsiteBadge = (info.onsite && info.code === 'i')
           ? `<span class="card-badge" style="background:#dcfce7; color:#15803d; border:1px solid #bbf7d0; padding:2px 6px; font-size:0.68rem;">📸 Tại chỗ</span>`
@@ -2812,7 +2826,7 @@ def render_thongbao_page() -> str:
         const counts = storeCountsCache[store.id] || { in: info.code === 'i' ? 1 : 0, out: info.code === 'o' ? 1 : 0 };
         const chain = (configData.chainNames && configData.chainNames[store.chain]) || store.chain || 'Cửa hàng';
         const distStr = dist !== null ? ` • 📍 Cách ${formatDist(dist)}` : '';
-        const timeStr = info.timeAgo ? ` • 🕒 ${escapeHtml(info.timeAgo)}` : '';
+        const timeStr = (info.timestamp > 0 && info.timeAgo) ? ` • 🕒 ${escapeHtml(info.timeAgo)}` : '';
         const packHtml = info.packs.length ? `<div style="font-size:0.72rem; color:#2563eb; font-weight:700; margin-top:3px;">📦 ${escapeHtml(info.packs.join(', '))}</div>` : '';
 
         return `
