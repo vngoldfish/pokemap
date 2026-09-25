@@ -59,7 +59,8 @@ DEFAULT_SETTINGS = {
         "discordEnabled": False,      # Bật gửi Discord khi có hàng
         "telegramBotToken": "",       # Token bot Telegram (từ @BotFather)
         "telegramChatId": "",         # ID chat hoặc nhóm Telegram
-        "telegramEnabled": False      # Bật gửi Telegram khi có hàng
+        "telegramEnabled": False,     # Bật gửi Telegram khi có hàng
+        "notifyPrefs": ["osaka", "aichi", "kanagawa", "gifu", "mie"]  # Các tỉnh nhận thông báo
     },
 
     # Chế độ xem danh sách sidebar: 'feed' (Thông báo có hàng) hoặc 'all' (Tất cả cửa hàng bản đồ)
@@ -144,6 +145,12 @@ async def send_webhook_notification(request: Request):
         
         cfg = load_user_settings().get("notifications", {})
         results = {}
+
+        # Check prefecture filter for notifications
+        store_pref = store.get("pref") or ""
+        allowed_prefs = cfg.get("notifyPrefs")
+        if not is_test and allowed_prefs and store_pref and store_pref not in allowed_prefs:
+            return JSONResponse(content={"status": "filtered", "reason": f"pref '{store_pref}' not in allowed notification prefectures"})
 
         # Fetch store report history if store_id available
         store_id = store.get("id") or ""
@@ -306,6 +313,9 @@ async def send_webhook_notification(request: Request):
                     f"🔥 <b>{store_name}</b> - CÓ HÀNG!",
                     f"📦 {packs_text}{dist_part} • ⏱ {time_display}",
                 ]
+                app_url = body.get("app_url") or ""
+                if app_url:
+                    msg_lines.append(f"⚡ <a href=\"{app_url}\">Mở trên PokéMap App ↗</a>")
                 
                 tg_payload = {
                     "chat_id": tg_chat_id,
@@ -3239,6 +3249,39 @@ def index():
             </div>
             <div style="font-size: 0.68rem; color: #94a3b8;">* Tạo Bot qua @BotFather để nhận Token, lấy Chat ID cá nhân/nhóm qua @userinfobot</div>
           </div>
+
+          <!-- PREFECTURE FILTER FOR NOTIFICATIONS -->
+          <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px; margin-top: 10px;">
+            <div style="font-size: 0.82rem; font-weight: 700; color: #0f172a; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between;">
+              <span>🗾 Lựa chọn tỉnh thành nhận tin (Telegram &amp; App)</span>
+              <span style="font-size: 0.68rem; color: #2563eb; font-weight: 600;">Chỉ báo khi có hàng ở tỉnh chọn</span>
+            </div>
+            <div style="font-size: 0.72rem; color: #64748b; margin-bottom: 6px;">
+              Bỏ chọn các tỉnh bạn không muốn nhận tin nhắn Telegram và thông báo trên App:
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 6px;">
+              <label style="display: flex; align-items: center; gap: 5px; font-size: 0.78rem; font-weight: 600; cursor: pointer;">
+                <input type="checkbox" class="notif-pref-check" value="osaka" onchange="updateNotifPrefSetting(this)" checked />
+                <span>🏯 大阪府 (Osaka)</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 5px; font-size: 0.78rem; font-weight: 600; cursor: pointer;">
+                <input type="checkbox" class="notif-pref-check" value="aichi" onchange="updateNotifPrefSetting(this)" checked />
+                <span>🏯 愛知県 (Aichi)</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 5px; font-size: 0.78rem; font-weight: 600; cursor: pointer;">
+                <input type="checkbox" class="notif-pref-check" value="kanagawa" onchange="updateNotifPrefSetting(this)" checked />
+                <span>🏯 神奈川県 (Kanagawa)</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 5px; font-size: 0.78rem; font-weight: 600; cursor: pointer;">
+                <input type="checkbox" class="notif-pref-check" value="gifu" onchange="updateNotifPrefSetting(this)" checked />
+                <span>🏯 岐阜県 (Gifu)</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 5px; font-size: 0.78rem; font-weight: 600; cursor: pointer;">
+                <input type="checkbox" class="notif-pref-check" value="mie" onchange="updateNotifPrefSetting(this)" checked />
+                <span>🏯 三重県 (Mie)</span>
+              </label>
+            </div>
+          </div>
         </div>
 
         <!-- SECTION 7: THỬ NGHIỆM -->
@@ -3340,7 +3383,8 @@ def index():
       discordEnabled: false,
       telegramBotToken: '',
       telegramChatId: '',
-      telegramEnabled: false
+      telegramEnabled: false,
+      notifyPrefs: ['osaka', 'aichi', 'kanagawa', 'gifu', 'mie']
     };
 
     if ("Notification" in window && Notification.permission === "default") {
@@ -3396,6 +3440,12 @@ def index():
       if (tgTokenInput && document.activeElement !== tgTokenInput) tgTokenInput.value = notifSettings.telegramBotToken || '';
       const tgChatIdInput = document.getElementById('notif-input-tg-chatid');
       if (tgChatIdInput && document.activeElement !== tgChatIdInput) tgChatIdInput.value = notifSettings.telegramChatId || '';
+
+      // Sync prefecture checkboxes for notifications
+      const curNotifyPrefs = Array.isArray(notifSettings.notifyPrefs) ? notifSettings.notifyPrefs : ['osaka', 'aichi', 'kanagawa', 'gifu', 'mie'];
+      document.querySelectorAll('.notif-pref-check').forEach(cb => {
+        cb.checked = curNotifyPrefs.includes(cb.value);
+      });
 
       // Sync max report age radio buttons in notif modal
       const ageRadios = document.querySelectorAll('input[name="notif-max-age"]');
@@ -3483,6 +3533,23 @@ def index():
     }
     window.updateNotifSetting = updateNotifSetting;
 
+    function updateNotifPrefSetting(cb) {
+      if (!Array.isArray(notifSettings.notifyPrefs)) {
+        notifSettings.notifyPrefs = ['osaka', 'aichi', 'kanagawa', 'gifu', 'mie'];
+      }
+      const val = cb.value;
+      if (cb.checked) {
+        if (!notifSettings.notifyPrefs.includes(val)) {
+          notifSettings.notifyPrefs.push(val);
+        }
+      } else {
+        notifSettings.notifyPrefs = notifSettings.notifyPrefs.filter(p => p !== val);
+      }
+      syncNotifUI();
+      saveSettings();
+    }
+    window.updateNotifPrefSetting = updateNotifPrefSetting;
+
     function toggleSound() {
       updateNotifSetting('soundEnabled', !notifSettings.soundEnabled);
       if (notifSettings.soundEnabled) playChime(true);
@@ -3530,7 +3597,11 @@ def index():
 
     async function triggerWebhooks(store, info, isTest = false) {
       if (!isTest && !notifSettings.discordEnabled && !notifSettings.telegramEnabled) return;
+      if (!isTest && Array.isArray(notifSettings.notifyPrefs) && store.pref && !notifSettings.notifyPrefs.includes(store.pref)) {
+        return;
+      }
       try {
+        const appStoreUrl = `${window.location.origin}/?store=${encodeURIComponent(store.id)}`;
         await fetch('/api/notify/webhook', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -3541,7 +3612,8 @@ def index():
               chain_label: store.chain_label || store.chain,
               address: store.address || '',
               lat: store.lat,
-              lng: store.lng
+              lng: store.lng,
+              pref: store.pref || ''
             },
             info: {
               label: info.label,
@@ -3551,6 +3623,7 @@ def index():
               confirms: info.confirms || 0,
               onsite: !!info.onsite
             },
+            app_url: appStoreUrl,
             is_test: isTest
           })
         });
@@ -3590,12 +3663,14 @@ def index():
       }
 
       try {
+        const appStoreUrl = `${window.location.origin}/?store=${encodeURIComponent(demoStore.id)}`;
         const resp = await fetch('/api/notify/webhook', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            store: demoStore,
+            store: { ...demoStore, pref: 'osaka' },
             info: demoInfo,
+            app_url: appStoreUrl,
             is_test: true
           })
         });
@@ -4356,6 +4431,7 @@ def index():
         if (notifSettings.notifyChain && store.chain !== notifSettings.notifyChain) return;
         if (notifSettings.onlyOnsiteGps && !info.onsite) return;
         if (!storePassesPrefFilter(store)) return;
+        if (Array.isArray(notifSettings.notifyPrefs) && store.pref && !notifSettings.notifyPrefs.includes(store.pref)) return;
       }
 
       playChime(force);
@@ -5052,12 +5128,22 @@ def index():
     window.loadAllStores = loadAllStores;
 
     function focusStore(sid, openPopup = true) {
-      navigateMenu('map');
+      if (typeof showAppView === 'function') {
+        showAppView('map');
+      } else if (typeof navigateMenu === 'function') {
+        navigateMenu('map');
+      }
       const store = storesDict[sid];
       if (store && store.lat && store.lng) {
-        map.flyTo([store.lat, store.lng], 16, { duration: 0.8 });
-        if (openPopup && markerMap[sid]) {
-          setTimeout(() => markerMap[sid].openPopup(), 400);
+        if (markerMap[sid] && markersLayer && typeof markersLayer.zoomToShowLayer === 'function') {
+          markersLayer.zoomToShowLayer(markerMap[sid], () => {
+            if (openPopup) markerMap[sid].openPopup();
+          });
+        } else {
+          map.flyTo([store.lat, store.lng], 16, { duration: 0.8 });
+          if (openPopup && markerMap[sid]) {
+            setTimeout(() => markerMap[sid].openPopup(), 400);
+          }
         }
       }
     }
@@ -5849,6 +5935,25 @@ def index():
       latestMergedStatus = { ...coldStatus, ...hotStatus };
       renderUI();
 
+      // Kiểm tra tham số ?store= trên URL (khi bấm link từ Telegram / thông báo)
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const targetStoreId = urlParams.get('store');
+        if (targetStoreId) {
+          setTimeout(() => {
+            const targetStore = storesDict[targetStoreId];
+            if (targetStore) {
+              focusStore(targetStoreId, true);
+              const rawVal = latestMergedStatus[targetStoreId];
+              const info = decodeStatus(rawVal, latestMergedStatus[targetStoreId + '_c']);
+              if (info) {
+                showMapToast(targetStore, info);
+              }
+            }
+          }, 800);
+        }
+      } catch (e) {}
+
       // Cập nhật phút/giờ liên tục mỗi 15 giây theo thời gian thực (không cần bấm reload/reset)
       setInterval(() => {
         try {
@@ -5903,6 +6008,7 @@ def index():
               const prevV = previousRawStatus[k];
               if (prevV !== v) {
                 const store = storesDict[k] || { id: k, name: 'Cửa hàng', chain: 'other', address: '', lat: null, lng: null };
+                if (!store.pref) store.pref = pref;
                 const info = decodeStatus(v, nextData[k + '_c']);
                 if (info) {
                   if (info.code === 'i') {
