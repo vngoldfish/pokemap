@@ -640,15 +640,59 @@ def index():
       color: #1d4ed8;
       box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25);
     }
+    .poketan-chip.chip-secondary {
+      background: #f8fafc;
+      border-color: #e2e8f0;
+      font-size: 0.71rem;
+      font-weight: 600;
+      color: #475569;
+    }
+    .poketan-chip.chip-secondary:hover {
+      background: #ffffff;
+      border-color: #cbd5e1;
+    }
+    .poketan-chip.chip-secondary.active {
+      background: #f5f3ff;
+      border-color: #6366f1;
+      color: #4f46e5;
+      font-weight: 700;
+      box-shadow: 0 2px 8px rgba(99, 102, 241, 0.25);
+    }
 
     .chip-dot {
       width: 8px;
       height: 8px;
       border-radius: 50%;
+      flex-shrink: 0;
     }
     .dot-green { background: #22c55e; }
     .dot-yellow { background: #eab308; }
     .dot-red { background: #ef4444; }
+    .dot-gray { background: #94a3b8; }
+    .dot-blue { background: #3b82f6; }
+
+    /* List Tab Chips */
+    .list-tab-chip {
+      padding: 6px 12px;
+      border-radius: 99px;
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+      color: #64748b;
+      font-size: 0.74rem;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+    }
+    .list-tab-chip:hover {
+      background: #e2e8f0;
+    }
+    .list-tab-chip.active {
+      background: #eff6ff;
+      border-color: #3b82f6;
+      color: #1d4ed8;
+      font-weight: 800;
+    }
 
     /* REAL-TIME STOCK TOAST (Exact Image 3 replica) */
     #live-stock-toast {
@@ -1451,20 +1495,71 @@ def index():
     </button>
   </header>
 
-  <!-- 2. SUB-HEADER FLOATING FILTER BAR (Exact Image 3 replica) -->
+  <!-- 2. SUB-HEADER FLOATING FILTER BAR (Status, Brand/Chain & Radius Filters) -->
   <div id="filter-bar-container">
+    <!-- Row 1: Status Filters -->
     <div class="filter-chips-scroll">
-      <button class="poketan-chip" id="chip-in" onclick="toggleFilter('in')">
+      <button class="poketan-chip active" id="chip-status-all" onclick="setStatusFilter('all')">
+        🌐 すべて
+      </button>
+      <button class="poketan-chip" id="chip-status-in" onclick="setStatusFilter('in')">
         <span class="chip-dot dot-green"></span> 在庫あり
       </button>
-      <button class="poketan-chip" id="chip-onsite" onclick="toggleFilter('onsite')">
+      <button class="poketan-chip" id="chip-status-onsite" onclick="setStatusFilter('onsite')">
         <span class="chip-dot dot-green"></span> 現地の在庫あり
       </button>
-      <button class="poketan-chip" id="chip-recent" onclick="toggleFilter('recent')">
+      <button class="poketan-chip" id="chip-status-out" onclick="setStatusFilter('out')">
+        <span class="chip-dot dot-red"></span> 在庫なし
+      </button>
+      <button class="poketan-chip" id="chip-status-recent" onclick="setStatusFilter('recent')">
         <span style="color:#eab308;font-size:0.75rem;">★</span> 実績あり
       </button>
-      <button class="poketan-chip" id="chip-hidenone" onclick="toggleFilter('hidenone')">
+      <button class="poketan-chip" id="chip-status-hidenone" onclick="setStatusFilter('hidenone')">
         <span class="chip-dot dot-yellow"></span> 扱ってない店を隠す
+      </button>
+      <button class="poketan-chip" id="chip-status-unknown" onclick="setStatusFilter('unknown')">
+        <span class="chip-dot dot-gray"></span> 未確認・不明
+      </button>
+    </div>
+
+    <!-- Row 2: Brand/Chain & Distance Radius Filters -->
+    <div class="filter-chips-scroll" style="margin-top: -2px;">
+      <button class="poketan-chip chip-secondary active" id="chip-chain-all" onclick="setChainFilter('all')">
+        🏢 Tất cả chuỗi
+      </button>
+      <button class="poketan-chip chip-secondary" id="chip-chain-conbini" onclick="setChainFilter('conbini')">
+        🏪 Tất cả Conbini
+      </button>
+      <button class="poketan-chip chip-secondary" id="chip-chain-seven" onclick="setChainFilter('seven')">
+        7-Eleven
+      </button>
+      <button class="poketan-chip chip-secondary" id="chip-chain-lawson" onclick="setChainFilter('lawson')">
+        Lawson
+      </button>
+      <button class="poketan-chip chip-secondary" id="chip-chain-familymart" onclick="setChainFilter('familymart')">
+        FamilyMart
+      </button>
+      <button class="poketan-chip chip-secondary" id="chip-chain-ministop" onclick="setChainFilter('ministop')">
+        Ministop
+      </button>
+      <button class="poketan-chip chip-secondary" id="chip-chain-specialty" onclick="setChainFilter('specialty')">
+        🃏 Card Shop chuyên biệt
+      </button>
+      <button class="poketan-chip chip-secondary" id="chip-chain-electronics" onclick="setChainFilter('electronics')">
+        🎮 Điện máy & GEO
+      </button>
+      <span style="width:1px; height:18px; background:#cbd5e1; margin:0 3px; align-self:center; flex-shrink:0;"></span>
+      <button class="poketan-chip chip-secondary" id="chip-dist-1" onclick="setRadiusFilter(1)">
+        📍 ≤ 1km
+      </button>
+      <button class="poketan-chip chip-secondary" id="chip-dist-3" onclick="setRadiusFilter(3)">
+        📍 ≤ 3km
+      </button>
+      <button class="poketan-chip chip-secondary" id="chip-dist-5" onclick="setRadiusFilter(5)">
+        📍 ≤ 5km
+      </button>
+      <button class="poketan-chip chip-secondary" id="chip-dist-10" onclick="setRadiusFilter(10)">
+        📍 ≤ 10km
       </button>
     </div>
 
@@ -1500,15 +1595,34 @@ def index():
         ✕ Đóng
       </button>
     </div>
+
+    <!-- 4 status tabs matching PokéTan -->
+    <div class="list-tabs-row" style="padding: 8px 12px 4px 12px; display: flex; gap: 6px; overflow-x: auto; background: #ffffff; border-bottom: 1px solid #f1f5f9; scrollbar-width: none;">
+      <button class="list-tab-chip active" id="list-tab-all" onclick="setListStatusTab('all')">🌐 すべて</button>
+      <button class="list-tab-chip" id="list-tab-in" onclick="setListStatusTab('in')">🟢 在庫あり</button>
+      <button class="list-tab-chip" id="list-tab-out" onclick="setListStatusTab('out')">🔴 在庫なし</button>
+      <button class="list-tab-chip" id="list-tab-recent" onclick="setListStatusTab('recent')">★ 実績あり</button>
+      <button class="list-tab-chip" id="list-tab-unknown" onclick="setListStatusTab('unknown')">⚪ 不明</button>
+    </div>
+
+    <!-- Search & Chain selection -->
     <div style="padding:8px 12px; border-bottom:1px solid #f1f5f9; display:flex; gap:8px; align-items:center; background:#fafafa;">
       <div class="list-search-box" style="flex:1;">
         <span class="icon">🔍</span>
         <input type="text" id="list-search-input" placeholder="Tìm tên quán, địa chỉ..." oninput="onListSearch(this.value)" />
       </div>
-      <button id="list-filter-in-btn" onclick="toggleListInStockFilter()" style="background:#f1f5f9; border:1px solid #cbd5e1; border-radius:8px; padding:7px 10px; font-size:0.72rem; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px; color:#334155;">
-        🟢 Chỉ có hàng
-      </button>
+      <select id="list-chain-select" onchange="setListChainFilter(this.value)" style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:7px 8px; font-size:0.75rem; font-weight:700; color:#334155; outline:none; max-width: 140px;">
+        <option value="all">🏢 Tất cả chuỗi</option>
+        <option value="conbini">🏪 Tất cả Conbini</option>
+        <option value="seven">7-Eleven</option>
+        <option value="lawson">Lawson</option>
+        <option value="familymart">FamilyMart</option>
+        <option value="ministop">Ministop</option>
+        <option value="specialty">🃏 Card Shop</option>
+        <option value="electronics">🎮 Điện máy & GEO</option>
+      </select>
     </div>
+
     <!-- Sort controls bar -->
     <div class="list-sort-bar">
       <span style="font-size:0.72rem; color:#64748b; font-weight:700;">Sắp xếp theo:</span>
@@ -1520,6 +1634,9 @@ def index():
           📍 Gần nhất
         </button>
       </div>
+      <span id="list-count-badge" style="margin-left:auto; font-size:0.72rem; color:#4f46e5; font-weight:800;">
+        0 quán
+      </span>
     </div>
     <div class="list-cards-scroll" id="store-cards-list"></div>
   </div>
@@ -1771,7 +1888,11 @@ def index():
     let coldStatus = {};
     let configData = {};
     let currentPref = 'osaka';
-    let activeFilter = 'none'; // 'none' | 'in' | 'onsite' | 'recent' | 'hidenone'
+    let activeFilter = 'all'; // 'all' | 'in' | 'onsite' | 'out' | 'recent' | 'hidenone' | 'unknown'
+    let activeChain = 'all';  // 'all' | 'conbini' | 'seven' | 'lawson' | 'familymart' | 'ministop' | 'specialty' | 'electronics'
+    let activeRadius = null;  // null | 1 | 3 | 5 | 10
+    let listStatusFilter = 'all'; // 'all' | 'in' | 'out' | 'recent' | 'unknown'
+    let listChainFilter = 'all';  // 'all' | 'conbini' | 'seven' | ...
     let latestStockStoreId = null;
     const storeHistoryCache = {};
     const openPopupHistStoreIds = new Set();
@@ -1961,12 +2082,35 @@ def index():
       iconAnchor: [5, 5]
     });
 
+    const yellowDotIcon = L.divIcon({
+      html: '<div style="width:8px;height:8px;border-radius:50%;background:#eab308;border:1px solid #ffffff;box-shadow:0 1px 2px rgba(0,0,0,0.2);"></div>',
+      className: 'poketan-dot-wrap',
+      iconSize: [8, 8],
+      iconAnchor: [4, 4]
+    });
+
     const grayDotIcon = L.divIcon({
       html: '<div style="width:8px;height:8px;border-radius:50%;background:#94a3b8;border:1px solid #ffffff;box-shadow:0 1px 2px rgba(0,0,0,0.2);"></div>',
       className: 'poketan-dot-wrap',
       iconSize: [8, 8],
       iconAnchor: [4, 4]
     });
+
+    // Brand / Chain matching helper
+    function matchesChainFilter(chain, filter) {
+      if (!filter || filter === 'all') return true;
+      const c = (chain || '').toLowerCase();
+      if (filter === 'conbini') {
+        return ['seven', 'lawson', 'familymart', 'ministop'].includes(c);
+      }
+      if (filter === 'specialty') {
+        return c === 'specialty';
+      }
+      if (filter === 'electronics') {
+        return ['geo', 'joshin', 'edion', 'aeon', 'yamada', 'ks', 'toysrus', 'biccamera', 'yodobashi'].includes(c);
+      }
+      return c === filter;
+    }
 
     // 6. RENDER MARKERS (CLUSTERS + IN-STOCK PINS)
     function renderMapMarkers() {
@@ -1981,6 +2125,10 @@ def index():
       let newestInStore = null;
       let newestInfo = null;
       let maxTimestamp = 0;
+
+      // Distance center (GPS coordinates or map center)
+      const centerLat = userLat !== null ? userLat : (map ? map.getCenter().lat : null);
+      const centerLng = userLng !== null ? userLng : (map ? map.getCenter().lng : null);
 
       for (const store of allStores) {
         if (!store.lat || !store.lng) continue;
@@ -2000,11 +2148,22 @@ def index():
           }
         }
 
-        // Chip Filters
+        // 1. Status Filter
         if (activeFilter === 'in' && info.code !== 'i') continue;
         if (activeFilter === 'onsite' && (!info.onsite || info.code !== 'i')) continue;
-        if (activeFilter === 'recent' && (info.code !== 'i' && (now - info.timestamp > 86400))) continue;
+        if (activeFilter === 'out' && info.code !== 'o') continue;
+        if (activeFilter === 'recent' && (info.code !== 'i' && !(info.timestamp > 0 && (now - info.timestamp <= 86400 * 7) && info.code !== 'n'))) continue;
         if (activeFilter === 'hidenone' && info.code === 'n') continue;
+        if (activeFilter === 'unknown' && info.code !== 'u' && info.code) continue;
+
+        // 2. Chain / Brand Filter
+        if (!matchesChainFilter(store.chain, activeChain)) continue;
+
+        // 3. Distance Radius Filter
+        if (activeRadius && centerLat !== null && centerLng !== null) {
+          const d = calcDistanceKm(centerLat, centerLng, store.lat, store.lng);
+          if (d > activeRadius) continue;
+        }
 
         const currentZoom = map ? map.getZoom() : 13;
         if (info.code === 'i') {
@@ -2024,7 +2183,9 @@ def index():
           }
         } else {
           // Normal stores get added to clusterBatch with L.marker
-          const dotIcon = info.code === 'o' ? redDotIcon : grayDotIcon;
+          let dotIcon = grayDotIcon;
+          if (info.code === 'o') dotIcon = redDotIcon;
+          else if (info.code === 'n') dotIcon = yellowDotIcon;
           const cm = L.marker([store.lat, store.lng], {
             icon: dotIcon,
             hasStock: false
@@ -2034,7 +2195,7 @@ def index():
         }
       }
 
-      // Fast batch add to clusterGroup (takes ~15ms!)
+      // Fast batch add to clusterGroup
       if (clusterBatch.length > 0) {
         clusterGroup.addLayers(clusterBatch);
       }
@@ -2124,30 +2285,74 @@ def index():
     }
     window.hideToast = hideToast;
 
-    // 8. FILTER CHIP HANDLERS
+    // 8. FILTER CHIP HANDLERS (STATUS, CHAIN, RADIUS)
+    function setStatusFilter(filterName) {
+      activeFilter = filterName;
+      const statusChips = ['all', 'in', 'onsite', 'out', 'recent', 'hidenone', 'unknown'];
+      statusChips.forEach(s => {
+        const btn = document.getElementById(`chip-status-${s}`);
+        if (btn) {
+          if (s === filterName) btn.classList.add('active');
+          else btn.classList.remove('active');
+        }
+      });
+      renderMapMarkers();
+    }
+    window.setStatusFilter = setStatusFilter;
+
+    function setChainFilter(chain) {
+      activeChain = chain;
+      const chainChips = ['all', 'conbini', 'seven', 'lawson', 'familymart', 'ministop', 'specialty', 'electronics'];
+      chainChips.forEach(c => {
+        const btn = document.getElementById(`chip-chain-${c}`);
+        if (btn) {
+          if (c === chain) btn.classList.add('active');
+          else btn.classList.remove('active');
+        }
+      });
+      renderMapMarkers();
+    }
+    window.setChainFilter = setChainFilter;
+
+    function setRadiusFilter(km) {
+      if (activeRadius === km) {
+        activeRadius = null;
+      } else {
+        activeRadius = km;
+        if (userLat === null && typeof locateUser === 'function') {
+          locateUser(false);
+        }
+      }
+      [1, 3, 5, 10].forEach(d => {
+        const btn = document.getElementById(`chip-dist-${d}`);
+        if (btn) {
+          if (activeRadius === d) btn.classList.add('active');
+          else btn.classList.remove('active');
+        }
+      });
+      renderMapMarkers();
+    }
+    window.setRadiusFilter = setRadiusFilter;
+
     function toggleFilter(filterName) {
       if (activeFilter === filterName) {
-        activeFilter = 'none';
+        setStatusFilter('all');
       } else {
-        activeFilter = filterName;
+        setStatusFilter(filterName);
       }
-      // Update UI active states
-      document.querySelectorAll('.poketan-chip').forEach(b => b.classList.remove('active'));
-      if (activeFilter !== 'none') {
-        const btn = document.getElementById(`chip-${activeFilter}`);
-        if (btn) btn.classList.add('active');
-      }
-      renderMapMarkers();
     }
     window.toggleFilter = toggleFilter;
 
     // 9. GACHI MEGURI (⚡ Săn thẻ - Instant Quick Hunt)
     function triggerGachiMeguri() {
-      // Switch filter to only in-stock stores
-      activeFilter = 'in';
-      document.querySelectorAll('.poketan-chip').forEach(b => b.classList.remove('active'));
-      const chipIn = document.getElementById('chip-in');
-      if (chipIn) chipIn.classList.add('active');
+      // Switch filter to only in-stock stores & reset other filters
+      setStatusFilter('in');
+      setChainFilter('all');
+      activeRadius = null;
+      [1, 3, 5, 10].forEach(d => {
+        const btn = document.getElementById(`chip-dist-${d}`);
+        if (btn) btn.classList.remove('active');
+      });
 
       renderMapMarkers();
       switchFooterTab('map');
@@ -2156,7 +2361,7 @@ def index():
       const effectiveStatus = { ...coldStatus, ...hotStatus };
       const inStockStores = Object.values(storesDict).filter(s => {
         if (currentPref !== 'all' && s.pref !== currentPref) return false;
-        const info = decodeStatus(effectiveStatus[s.id]);
+        const info = decodeStatus(effectiveStatus[s.id] || effectiveStatus[s.id + '_c']);
         return info.code === 'i';
       });
 
@@ -2209,22 +2414,34 @@ def index():
     }
     window.setListSortMode = setListSortMode;
 
-    function toggleListInStockFilter() {
-      listOnlyInStock = !listOnlyInStock;
-      const btn = document.getElementById('list-filter-in-btn');
-      if (btn) {
-        if (listOnlyInStock) {
-          btn.style.background = '#dcfce7';
-          btn.style.borderColor = '#86efac';
-          btn.style.color = '#15803d';
-        } else {
-          btn.style.background = '#f1f5f9';
-          btn.style.borderColor = '#cbd5e1';
-          btn.style.color = '#334155';
+    function setListStatusTab(tab) {
+      listStatusFilter = tab;
+      const tabs = ['all', 'in', 'out', 'recent', 'unknown'];
+      tabs.forEach(t => {
+        const btn = document.getElementById(`list-tab-${t}`);
+        if (btn) {
+          if (t === tab) btn.classList.add('active');
+          else btn.classList.remove('active');
         }
+      });
+      const q = document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '';
+      renderStoreList(q);
+    }
+    window.setListStatusTab = setListStatusTab;
+
+    function setListChainFilter(chain) {
+      listChainFilter = chain;
+      const selectEl = document.getElementById('list-chain-select');
+      if (selectEl && selectEl.value !== chain) {
+        selectEl.value = chain;
       }
       const q = document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '';
       renderStoreList(q);
+    }
+    window.setListChainFilter = setListChainFilter;
+
+    function toggleListInStockFilter() {
+      setListStatusTab(listStatusFilter === 'in' ? 'all' : 'in');
     }
     window.toggleListInStockFilter = toggleListInStockFilter;
 
@@ -2234,6 +2451,7 @@ def index():
       if (!listContainer) return;
       const allStores = Object.values(storesDict);
       const effectiveStatus = { ...coldStatus, ...hotStatus };
+      const now = Math.floor(Date.now() / 1000);
       const q = query.toLowerCase().trim();
 
       let matched = [];
@@ -2241,7 +2459,14 @@ def index():
         if (currentPref !== 'all' && store.pref !== currentPref) continue;
         const info = decodeStatus(effectiveStatus[store.id] || effectiveStatus[store.id + '_c']);
 
-        if (listOnlyInStock && info.code !== 'i') continue;
+        // List Status Tab Filter
+        if (listStatusFilter === 'in' && info.code !== 'i') continue;
+        if (listStatusFilter === 'out' && info.code !== 'o') continue;
+        if (listStatusFilter === 'recent' && (info.code !== 'i' && !(info.timestamp > 0 && (now - info.timestamp <= 86400 * 7) && info.code !== 'n'))) continue;
+        if (listStatusFilter === 'unknown' && info.code !== 'u' && info.code) continue;
+
+        // List Chain Filter
+        if (!matchesChainFilter(store.chain, listChainFilter)) continue;
 
         if (q) {
           const mName = (store.name || '').toLowerCase().includes(q);
@@ -2254,6 +2479,12 @@ def index():
           dist = calcDistanceKm(userLat, userLng, store.lat, store.lng);
         }
         matched.push({ store, info, dist });
+      }
+
+      // Update count badge
+      const countBadge = document.getElementById('list-count-badge');
+      if (countBadge) {
+        countBadge.innerText = `${matched.length.toLocaleString()} quán`;
       }
 
       // Sort: in-stock first, then by selected sort mode (nearest or newest)
@@ -2550,7 +2781,7 @@ def index():
       const radios = document.getElementsByName('set-filter-radio');
       if (radios) {
         radios.forEach(r => {
-          r.checked = (r.value === activeFilter);
+          r.checked = (r.value === activeFilter || (r.value === 'none' && activeFilter === 'all'));
         });
       }
       const prefLabelEl = document.getElementById('header-loc-name');
@@ -2568,13 +2799,7 @@ def index():
     window.closeSettingsModal = closeSettingsModal;
 
     function setSettingsFilter(filterName) {
-      activeFilter = filterName;
-      document.querySelectorAll('.poketan-chip').forEach(b => b.classList.remove('active'));
-      if (activeFilter !== 'none') {
-        const btn = document.getElementById(`chip-${activeFilter}`);
-        if (btn) btn.classList.add('active');
-      }
-      renderMapMarkers();
+      setStatusFilter(filterName === 'none' ? 'all' : filterName);
     }
     window.setSettingsFilter = setSettingsFilter;
 
