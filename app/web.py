@@ -4283,6 +4283,9 @@ def index():
       }
     }
 
+    let gpsWatchId = null;
+    let gpsFirstFix = false;
+
     function requestUserLocation(fly = true) {
       const headerLoc = document.getElementById('header-loc-summary');
       if (!navigator.geolocation) {
@@ -4292,45 +4295,56 @@ def index():
 
       if (headerLoc) headerLoc.innerText = 'Đang định vị...';
 
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          isMockLocation = false;
-          userLat = pos.coords.latitude;
-          userLng = pos.coords.longitude;
-          userAccuracy = pos.coords.accuracy;
+      // Start continuous tracking if not already watching
+      if (gpsWatchId === null) {
+        gpsFirstFix = fly; // fly on first fix only
+        gpsWatchId = navigator.geolocation.watchPosition(
+          (pos) => {
+            isMockLocation = false;
+            userLat = pos.coords.latitude;
+            userLng = pos.coords.longitude;
+            userAccuracy = pos.coords.accuracy;
 
-          // Lưu cache vị trí vào sessionStorage để tránh giật bản đồ khi tải lại trang
-          try {
-            sessionStorage.setItem('bawui_last_lat', String(userLat));
-            sessionStorage.setItem('bawui_last_lng', String(userLng));
-            sessionStorage.setItem('bawui_last_acc', String(userAccuracy));
-          } catch(e) {}
+            // Cache position
+            try {
+              sessionStorage.setItem('bawui_last_lat', String(userLat));
+              sessionStorage.setItem('bawui_last_lng', String(userLng));
+              sessionStorage.setItem('bawui_last_acc', String(userAccuracy));
+            } catch(e) {}
 
-          const distToOsaka = calcDistanceKm(userLat, userLng, 34.6937, 135.5023);
-          let note = `(Cách Osaka ~${Math.round(distToOsaka)}km)`;
-          if (distToOsaka < 30) note = `(Tại Osaka)`;
+            const distToOsaka = calcDistanceKm(userLat, userLng, 34.6937, 135.5023);
+            let note = `(Cách Osaka ~${Math.round(distToOsaka)}km)`;
+            if (distToOsaka < 30) note = `(Tại Osaka)`;
+            if (headerLoc) headerLoc.innerText = `GPS của bạn ${note}`;
 
-          if (headerLoc) headerLoc.innerText = `GPS của bạn ${note}`;
-          renderUserLocation(fly);
-          renderUI();
-        },
-        (err) => {
-          console.warn("GPS error:", err.message);
-          if (headerLoc) headerLoc.innerText = 'Chưa bật GPS';
-        },
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: fly ? 0 : 30000 }
-      );
+            // First fix: fly to location. Subsequent: just update marker
+            if (gpsFirstFix) {
+              renderUserLocation(true);
+              gpsFirstFix = false;
+            } else {
+              renderUserLocation(false);
+            }
+            renderUI();
+          },
+          (err) => {
+            console.warn("GPS error:", err.message);
+            if (headerLoc) headerLoc.innerText = 'Chưa bật GPS';
+          },
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
+        );
+      } else if (fly && userLat !== null) {
+        // Already watching — just fly to current position
+        map.flyTo([userLat, userLng], 15, { duration: 0.8 });
+      }
     }
     window.requestUserLocation = requestUserLocation;
 
     function flyToMyLocation() {
       if (userLat !== null && userLng !== null) {
-        // Already have GPS — just fly to it
         map.flyTo([userLat, userLng], 15, { duration: 0.8 });
         const btn = document.getElementById('gps-locate-btn');
         if (btn) { btn.classList.add('active'); setTimeout(() => btn.classList.remove('active'), 1500); }
       } else {
-        // No GPS yet — request it (will auto-fly)
         requestUserLocation(true);
       }
     }
