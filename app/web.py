@@ -877,6 +877,34 @@ def index():
       font-weight: 800;
     }
 
+    /* List Radius Chips */
+    .list-radius-chip {
+      padding: 4px 10px;
+      border-radius: 99px;
+      border: 1px solid #cbd5e1;
+      background: #ffffff;
+      color: #475569;
+      font-size: 0.72rem;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .list-radius-chip:hover {
+      background: #f1f5f9;
+      border-color: #94a3b8;
+    }
+    .list-radius-chip.active {
+      background: #eff6ff;
+      border-color: #3b82f6;
+      color: #1d4ed8;
+      font-weight: 800;
+      box-shadow: 0 1px 4px rgba(59, 130, 246, 0.2);
+    }
+
     /* FILTER MODAL & TRIGGER BUTTON */
     .chip-main-filter {
       background: #0f172a !important;
@@ -1967,6 +1995,28 @@ def index():
       <button class="list-tab-chip" id="list-tab-out" onclick="setListStatusTab('out')">🔴 Hết hàng</button>
       <button class="list-tab-chip" id="list-tab-recent" onclick="setListStatusTab('recent')">★ Từng có</button>
       <button class="list-tab-chip" id="list-tab-unknown" onclick="setListStatusTab('unknown')">⚪ Chưa rõ</button>
+    </div>
+
+    <!-- Radius / Distance filter chips bar (Bán kính tìm kiếm quanh bạn) -->
+    <div class="list-radius-row" style="padding: 6px 12px; display: flex; align-items: center; gap: 6px; overflow-x: auto; background: #f8fafc; border-bottom: 1px solid #e2e8f0; scrollbar-width: none;">
+      <span style="font-size: 0.72rem; font-weight: 800; color: #334155; white-space: nowrap; display: flex; align-items: center; gap: 3px;">
+        <span>📍 Khoảng cách:</span>
+      </span>
+      <button class="list-radius-chip active" id="list-radius-chip-all" onclick="setListRadiusFilter('all')">
+        🌐 Tất cả
+      </button>
+      <button class="list-radius-chip" id="list-radius-chip-1" onclick="setListRadiusFilter('1')">
+        📍 1 km
+      </button>
+      <button class="list-radius-chip" id="list-radius-chip-3" onclick="setListRadiusFilter('3')">
+        📍 3 km
+      </button>
+      <button class="list-radius-chip" id="list-radius-chip-5" onclick="setListRadiusFilter('5')">
+        📍 5 km
+      </button>
+      <button class="list-radius-chip" id="list-radius-chip-10" onclick="setListRadiusFilter('10')">
+        📍 10 km
+      </button>
     </div>
 
     <!-- Search and Filter Trigger -->
@@ -3578,6 +3628,13 @@ def index():
         const btn = document.getElementById(`list-tab-${t}`);
         if (btn) btn.classList.toggle('active', listStatusFilter === t || (t === 'all' && listStatusFilter === 'hidenone'));
       });
+
+      // Update list radius chips
+      const radiusChips = ['all', '1', '3', '5', '10'];
+      radiusChips.forEach(r => {
+        const btn = document.getElementById(`list-radius-chip-${r}`);
+        if (btn) btn.classList.toggle('active', listRadiusFilter === r);
+      });
     }
     window.updateListFilterBadges = updateListFilterBadges;
 
@@ -3751,6 +3808,7 @@ def index():
 
     function setListRadiusFilter(val) {
       listRadiusFilter = String(val);
+      modalTempRadius = listRadiusFilter;
       if (listRadiusFilter !== 'all' && userLat === null && typeof locateUser === 'function') {
         locateUser(false);
       }
@@ -3934,6 +3992,24 @@ def index():
       let matched = [];
       const allowedPrefs = (REGIONS[targetRegion] ? REGIONS[targetRegion].prefs : [targetRegion]) || ['osaka'];
 
+      // Toạ độ tham chiếu tính khoảng cách: Ưu tiên GPS thật ở Nhật -> Tâm bản đồ -> Tâm khu vực chọn
+      let refLat = userLat;
+      let refLng = userLng;
+      const hasGps = (userLat !== null && userLng !== null && isCoordInJapan(userLat, userLng));
+      if (!hasGps) {
+        if (typeof map !== 'undefined' && map) {
+          const c = map.getCenter();
+          if (c && isCoordInJapan(c.lat, c.lng)) {
+            refLat = c.lat;
+            refLng = c.lng;
+          }
+        }
+        if ((refLat === null || !isCoordInJapan(refLat, refLng)) && REGIONS[targetRegion]) {
+          refLat = REGIONS[targetRegion].center[0];
+          refLng = REGIONS[targetRegion].center[1];
+        }
+      }
+
       for (const store of allStores) {
         // 0. Lọc đúng khu vực / vùng đã chọn (Ví dụ: Osaka chỉ hiện quán ở Osaka!)
         if (targetRegion !== 'all') {
@@ -3968,8 +4044,8 @@ def index():
 
         // 4. Bán kính khoảng cách quanh bạn
         let dist = null;
-        if (userLat !== null && userLng !== null && store.lat && store.lng) {
-          dist = calcDistanceKm(userLat, userLng, store.lat, store.lng);
+        if (refLat !== null && refLng !== null && store.lat && store.lng) {
+          dist = calcDistanceKm(refLat, refLng, store.lat, store.lng);
         }
         if (listRadiusFilter && listRadiusFilter !== 'all') {
           const maxKm = parseFloat(listRadiusFilter);
@@ -4005,13 +4081,16 @@ def index():
       });
 
       if (matched.length === 0) {
-        if (listRadiusFilter && listRadiusFilter !== 'all' && (userLat === null || userLng === null)) {
+        if (listRadiusFilter && listRadiusFilter !== 'all') {
           listContainer.innerHTML = `
             <div style="text-align:center; padding:36px 12px; color:#64748b;">
               <div style="font-size:2rem; margin-bottom:8px;">📍</div>
-              <div style="font-weight:700; color:#334155; font-size:0.88rem;">Chưa xác định được vị trí GPS của bạn</div>
-              <div style="font-size:0.75rem; margin-top:4px;">Bạn đang lọc theo bán kính ${listRadiusFilter} km. Vui lòng bấm nút dưới đây để lấy vị trí GPS hoặc tắt bộ lọc bán kính.</div>
-              <button onclick="locateUser(true)" style="margin-top:12px; background:#4f46e5; color:#ffffff; border:none; padding:8px 16px; border-radius:8px; font-weight:800; cursor:pointer;">📍 Xác định vị trí ngay</button>
+              <div style="font-weight:700; color:#334155; font-size:0.88rem;">Không có quán nào trong bán kính ${listRadiusFilter} km</div>
+              <div style="font-size:0.75rem; margin-top:4px;">Thử mở rộng bán kính lên 3km, 5km, 10km hoặc bấm [🌐 Tất cả].</div>
+              <div style="display:flex; justify-content:center; gap:8px; margin-top:12px;">
+                <button onclick="setListRadiusFilter('all')" style="background:#4f46e5; color:#ffffff; border:none; padding:8px 14px; border-radius:8px; font-weight:800; font-size:0.78rem; cursor:pointer;">🌐 Xem tất cả quán</button>
+                <button onclick="locateUser(true)" style="background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; padding:8px 14px; border-radius:8px; font-weight:800; font-size:0.78rem; cursor:pointer;">📍 Lấy vị trí GPS</button>
+              </div>
             </div>
           `;
         } else {
