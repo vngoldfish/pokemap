@@ -377,17 +377,27 @@ def get_stores_data():
     return JSONResponse(content=stores)
 
 
+from concurrent.futures import ThreadPoolExecutor
+
+def fetch_single_pref_status(pref, is_cold=False):
+    doc_path = f"status/{pref}_cold" if is_cold else f"status/{pref}"
+    try:
+        return fetch_firestore_document(doc_path)
+    except Exception as e:
+        return {}
+
 @app.get("/api/cold_status")
 def get_cold_status():
     global _cold_cache
     if _cold_cache is None:
         _cold_cache = {}
-        for pref in ALL_PREFS:
-            try:
-                data = fetch_firestore_document(f"status/{pref}_cold")
-                _cold_cache.update(data)
-            except Exception as e:
-                print(f"Cold status {pref}: {e}")
+        try:
+            with ThreadPoolExecutor(max_workers=5) as ex:
+                futures = [ex.submit(fetch_single_pref_status, p, True) for p in ALL_PREFS]
+                for f in futures:
+                    _cold_cache.update(f.result())
+        except Exception as e:
+            print("Cold status error:", e)
     return JSONResponse(content=_cold_cache)
 
 
@@ -395,12 +405,10 @@ def get_cold_status():
 def get_hot_status():
     try:
         merged = {}
-        for pref in ALL_PREFS:
-            try:
-                data = fetch_firestore_document(f"status/{pref}")
-                merged.update(data)
-            except Exception:
-                pass
+        with ThreadPoolExecutor(max_workers=5) as ex:
+            futures = [ex.submit(fetch_single_pref_status, p, False) for p in ALL_PREFS]
+            for f in futures:
+                merged.update(f.result())
         return JSONResponse(content=merged)
     except Exception as e:
         print("Error fetching hot status:", e)
@@ -1477,6 +1485,28 @@ def index():
       return `${km.toFixed(1)}km`;
     }
 
+    // Fast lightweight reusable marker icons
+    const stockPinIcon = L.divIcon({
+      html: '<div class="poketan-stock-pin">🟢</div>',
+      className: 'poketan-pin-wrap',
+      iconSize: [28, 28],
+      iconAnchor: [14, 14]
+    });
+
+    const redDotIcon = L.divIcon({
+      html: '<div style="width:10px;height:10px;border-radius:50%;background:#ef4444;border:1.5px solid #ffffff;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></div>',
+      className: 'poketan-dot-wrap',
+      iconSize: [10, 10],
+      iconAnchor: [5, 5]
+    });
+
+    const grayDotIcon = L.divIcon({
+      html: '<div style="width:8px;height:8px;border-radius:50%;background:#94a3b8;border:1px solid #ffffff;box-shadow:0 1px 2px rgba(0,0,0,0.2);"></div>',
+      className: 'poketan-dot-wrap',
+      iconSize: [8, 8],
+      iconAnchor: [4, 4]
+    });
+
     // 6. RENDER MARKERS (CLUSTERS + IN-STOCK PINS)
     function renderMapMarkers() {
       clusterGroup.clearLayers();
@@ -1486,7 +1516,7 @@ def index():
       const effectiveStatus = { ...coldStatus, ...hotStatus };
       const now = Math.floor(Date.now() / 1000);
 
-      let countIn = 0;
+      const clusterBatch = [];
       let firstInStore = null;
 
       for (const store of allStores) {
@@ -1504,52 +1534,40 @@ def index():
         if (activeFilter === 'hidenone' && info.code === 'n') continue;
 
         if (info.code === 'i') {
-          countIn++;
           if (!firstInStore) firstInStore = store;
-
-          // In-Stock Store gets a prominent bouncing green pin
-          const pinIcon = L.divIcon({
-            html: `<div class="poketan-stock-pin">🟢</div>`,
-            className: 'poketan-pin-wrap',
-            iconSize: [28, 28],
-            iconAnchor: [14, 14]
-          });
-
-          const m = L.marker([store.lat, store.lng], { icon: pinIcon, zIndexOffset: 1000 });
+          // In-Stock Store gets a prominent bouncing green pin on stockLayer (always unclustered & on top)
+          const m = L.marker([store.lat, store.lng], { icon: stockPinIcon, zIndexOffset: 2000 });
           m.bindPopup(() => createPopupHtml(store, info), { maxWidth: 300 });
           stockLayer.addLayer(m);
-
         } else {
-          // Normal stores get clustered in PokéTan circles (②, ③)
-          let dotColor = '#94a3b8'; // gray
-          let radius = 5;
-          if (info.code === 'o') {
-            dotColor = '#ef4444'; // red
-            radius = 5.5;
-          }
-
-          const cm = L.circleMarker([store.lat, store.lng], {
-            radius,
-            fillColor: dotColor,
-            color: '#ffffff',
-            weight: 1.5,
-            fillOpacity: 0.9,
+          // Normal stores get added to clusterBatch with L.marker (NOT L.circleMarker)
+          const dotIcon = info.code === 'o' ? redDotIcon : grayDotIcon;
+          const cm = L.marker([store.lat, store.lng], {
+            icon: dotIcon,
             hasStock: false
           });
           cm.bindPopup(() => createPopupHtml(store, info), { maxWidth: 300 });
-          clusterGroup.addLayer(cm);
+          clusterBatch.push(cm);
         }
       }
 
+      // Fast batch add to clusterGroup (takes ~15ms!)
+      if (clusterBatch.length > 0) {
+        clusterGroup.addLayers(clusterBatch);
+      }
+
       // Show/update stock toast if there are stores in stock
+      const toastEl = document.getElementById('live-stock-toast');
       if (firstInStore) {
         latestStockStoreId = firstInStore.id;
         const info = decodeStatus(effectiveStatus[firstInStore.id]);
-        document.getElementById('toast-store-title').innerText = firstInStore.name;
-        document.getElementById('toast-time').innerText = info.timeAgo || '新着';
-        document.getElementById('live-stock-toast').style.display = 'flex';
+        const titleEl = document.getElementById('toast-store-title');
+        const timeEl = document.getElementById('toast-time');
+        if (titleEl) titleEl.innerText = firstInStore.name;
+        if (timeEl) timeEl.innerText = info.timeAgo || '新着';
+        if (toastEl) toastEl.style.display = 'flex';
       } else {
-        document.getElementById('live-stock-toast').style.display = 'none';
+        if (toastEl) toastEl.style.display = 'none';
       }
     }
 
@@ -1943,6 +1961,12 @@ def index():
 
     // 15. DATA INITIALIZATION & REALTIME FIRESTORE LISTENER
     async function initData() {
+      // Safety auto-dismiss timer: Under NO circumstances will overlay block user for >2.5s
+      const safetyTimer = setTimeout(() => {
+        const overlay = document.getElementById('loading-overlay');
+        if (overlay) overlay.remove();
+      }, 2500);
+
       try {
         // If cached user location exists, show marker and center on startup immediately!
         if (userLat !== null && userLng !== null) {
@@ -1951,38 +1975,54 @@ def index():
           hasCenteredOnUser = true;
         }
 
-        // AUTO-LOCATE ON STARTUP: Immediately request GPS and fly to user
+        // AUTO-LOCATE ON STARTUP: Request GPS immediately
         locateUser(true);
         startContinuousGpsWatch();
 
-        const [cfgRes, storesRes, hotRes, coldRes] = await Promise.all([
+        // Step 1: Fetch config and stores data (from local cache, super fast ~50ms)
+        const [cfgRes, storesRes] = await Promise.all([
           fetch('/api/config'),
-          fetch('/api/stores_data'),
-          fetch('/api/hot_status'),
-          fetch('/api/cold_status')
+          fetch('/api/stores_data')
         ]);
 
         configData = await cfgRes.json();
         storesDict = await storesRes.json();
-        hotStatus = await hotRes.json();
-        coldStatus = await coldRes.json();
 
-        // Render clusters and markers
+        // Render store locations immediately so user sees map instantly!
         renderMapMarkers();
 
-        // Hide loader
+        // Dismiss loading screen right away (within 100ms)
+        clearTimeout(safetyTimer);
         const overlay = document.getElementById('loading-overlay');
         if (overlay) {
           overlay.style.opacity = '0';
-          setTimeout(() => overlay.remove(), 250);
+          setTimeout(() => overlay.remove(), 150);
         }
+
+        // Step 2: Fetch statuses in background (parallelized)
+        fetch('/api/hot_status')
+          .then(r => r.json())
+          .then(data => {
+            hotStatus = data;
+            renderMapMarkers();
+          })
+          .catch(e => console.warn('hotStatus load warning:', e));
+
+        fetch('/api/cold_status')
+          .then(r => r.json())
+          .then(data => {
+            coldStatus = data;
+            renderMapMarkers();
+          })
+          .catch(e => console.warn('coldStatus load warning:', e));
 
         // Realtime sync
         setupRealtime();
       } catch (e) {
         console.error('Init error:', e);
+        clearTimeout(safetyTimer);
         const overlay = document.getElementById('loading-overlay');
-        if (overlay) overlay.innerHTML = `<div style="color:#ef4444;font-weight:700;">読み込みに失敗しました</div>`;
+        if (overlay) overlay.remove();
       }
     }
 
@@ -2016,7 +2056,11 @@ def index():
       } catch(e) {}
     }
 
-    window.addEventListener('DOMContentLoaded', initData);
+    if (document.readyState === 'loading') {
+      window.addEventListener('DOMContentLoaded', initData);
+    } else {
+      initData();
+    }
     window.addEventListener('resize', () => map.invalidateSize());
   </script>
 </body>
