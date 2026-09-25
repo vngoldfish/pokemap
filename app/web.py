@@ -447,6 +447,9 @@ def index():
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
@@ -3682,7 +3685,16 @@ def index():
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
-    let markersLayer = L.layerGroup().addTo(map);
+    let markersLayer = L.markerClusterGroup({
+      maxClusterRadius: 50,
+      spiderfyOnMaxZoom: true,
+      showCoverageOnHover: false,
+      zoomToBoundsOnClick: true,
+      disableClusteringAtZoom: 16,
+      chunkedLoading: true,
+      chunkInterval: 100,
+      chunkDelay: 20
+    }).addTo(map);
     let userLocationLayer = L.layerGroup().addTo(map);
     let markerMap = {};
     let storesDict = {};
@@ -4317,14 +4329,15 @@ def index():
             if (distToOsaka < 30) note = `(Tại Osaka)`;
             if (headerLoc) headerLoc.innerText = `GPS của bạn ${note}`;
 
-            // First fix: fly to location. Subsequent: just update marker
+            // First fix: fly to location + full render
             if (gpsFirstFix) {
               renderUserLocation(true);
               gpsFirstFix = false;
+              renderUI();
             } else {
+              // Subsequent: only move marker (lightweight, no re-render)
               renderUserLocation(false);
             }
-            renderUI();
           },
           (err) => {
             console.warn("GPS error:", err.message);
@@ -5029,9 +5042,14 @@ def index():
       `;
     }
 
+    let _renderUITimer = null;
     function renderUI() {
-      renderMapMarkersOnly();
-      renderSidebarListOnly();
+      if (_renderUITimer) clearTimeout(_renderUITimer);
+      _renderUITimer = setTimeout(() => {
+        _renderUITimer = null;
+        renderMapMarkersOnly();
+        renderSidebarListOnly();
+      }, 100);
     }
     window.renderUI = renderUI;
 
