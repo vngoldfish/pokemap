@@ -848,10 +848,16 @@ def index():
       box-shadow: 0 0 12px rgba(22, 163, 74, 0.6);
     }
 
-    /* IN-STOCK PIN MARKER */
-    .poketan-pin-wrap {
+    /* IN-STOCK PIN MARKER WITH TIME BADGE */
+    .poketan-pin-wrap, .poketan-pin-leaflet-icon {
       background: transparent;
       border: none;
+    }
+    .poketan-pin-wrapper {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      pointer-events: auto;
     }
     .poketan-stock-pin {
       width: 28px;
@@ -866,6 +872,21 @@ def index():
       font-size: 0.95rem;
       cursor: pointer;
       animation: bouncePin 1.6s infinite;
+      flex-shrink: 0;
+    }
+    .poketan-pin-time-pill {
+      background: rgba(15, 23, 42, 0.92);
+      color: #4ade80;
+      font-size: 0.65rem;
+      font-weight: 800;
+      padding: 2px 7px;
+      border-radius: 10px;
+      border: 1px solid rgba(74, 222, 128, 0.45);
+      white-space: nowrap;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      backdrop-filter: blur(4px);
+      letter-spacing: 0.02em;
+      pointer-events: auto;
     }
     @keyframes bouncePin {
       0%, 100% { transform: translateY(0); }
@@ -1522,7 +1543,7 @@ def index():
       </button>
     </div>
 
-    <!-- Row 2: Brand/Chain & Distance Radius Filters -->
+    <!-- Row 2: Brand/Chain, Time Range & Distance Radius Filters -->
     <div class="filter-chips-scroll" style="margin-top: -2px;">
       <button class="poketan-chip chip-secondary active" id="chip-chain-all" onclick="setChainFilter('all')">
         🏢 Tất cả chuỗi
@@ -1543,10 +1564,29 @@ def index():
         Ministop
       </button>
       <button class="poketan-chip chip-secondary" id="chip-chain-specialty" onclick="setChainFilter('specialty')">
-        🃏 Card Shop chuyên biệt
+        🃏 Card Shop
       </button>
       <button class="poketan-chip chip-secondary" id="chip-chain-electronics" onclick="setChainFilter('electronics')">
         🎮 Điện máy & GEO
+      </button>
+      <span style="width:1px; height:18px; background:#cbd5e1; margin:0 3px; align-self:center; flex-shrink:0;"></span>
+      <button class="poketan-chip chip-secondary active" id="chip-time-all" onclick="setTimeFilter('all')">
+        ⏱️ Toàn thời gian
+      </button>
+      <button class="poketan-chip chip-secondary" id="chip-time-1" onclick="setTimeFilter(1)">
+        ⚡ ≤ 1h
+      </button>
+      <button class="poketan-chip chip-secondary" id="chip-time-3" onclick="setTimeFilter(3)">
+        ⏱️ ≤ 3h
+      </button>
+      <button class="poketan-chip chip-secondary" id="chip-time-6" onclick="setTimeFilter(6)">
+        ⏱️ ≤ 6h
+      </button>
+      <button class="poketan-chip chip-secondary" id="chip-time-24" onclick="setTimeFilter(24)">
+        ⏱️ ≤ 24h
+      </button>
+      <button class="poketan-chip chip-secondary" id="chip-time-72" onclick="setTimeFilter(72)">
+        ⏱️ ≤ 3 ngày
       </button>
       <span style="width:1px; height:18px; background:#cbd5e1; margin:0 3px; align-self:center; flex-shrink:0;"></span>
       <button class="poketan-chip chip-secondary" id="chip-dist-1" onclick="setRadiusFilter(1)">
@@ -1605,13 +1645,13 @@ def index():
       <button class="list-tab-chip" id="list-tab-unknown" onclick="setListStatusTab('unknown')">⚪ 不明</button>
     </div>
 
-    <!-- Search & Chain selection -->
-    <div style="padding:8px 12px; border-bottom:1px solid #f1f5f9; display:flex; gap:8px; align-items:center; background:#fafafa;">
-      <div class="list-search-box" style="flex:1;">
+    <!-- Search, Chain & Time selection -->
+    <div style="padding:8px 12px; border-bottom:1px solid #f1f5f9; display:flex; gap:6px; align-items:center; background:#fafafa; flex-wrap:wrap;">
+      <div class="list-search-box" style="flex:1; min-width: 140px;">
         <span class="icon">🔍</span>
         <input type="text" id="list-search-input" placeholder="Tìm tên quán, địa chỉ..." oninput="onListSearch(this.value)" />
       </div>
-      <select id="list-chain-select" onchange="setListChainFilter(this.value)" style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:7px 8px; font-size:0.75rem; font-weight:700; color:#334155; outline:none; max-width: 140px;">
+      <select id="list-chain-select" onchange="setListChainFilter(this.value)" style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:7px 8px; font-size:0.75rem; font-weight:700; color:#334155; outline:none; max-width: 125px;">
         <option value="all">🏢 Tất cả chuỗi</option>
         <option value="conbini">🏪 Tất cả Conbini</option>
         <option value="seven">7-Eleven</option>
@@ -1620,6 +1660,14 @@ def index():
         <option value="ministop">Ministop</option>
         <option value="specialty">🃏 Card Shop</option>
         <option value="electronics">🎮 Điện máy & GEO</option>
+      </select>
+      <select id="list-time-select" onchange="setListTimeFilter(this.value)" style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:7px 8px; font-size:0.75rem; font-weight:700; color:#334155; outline:none; max-width: 120px;">
+        <option value="all">⏱️ Toàn bộ</option>
+        <option value="1">⚡ Trong 1h</option>
+        <option value="3">⏱️ Trong 3h</option>
+        <option value="6">⏱️ Trong 6h</option>
+        <option value="24">⏱️ Trong 24h</option>
+        <option value="72">⏱️ Trong 3 ngày</option>
       </select>
     </div>
 
@@ -1807,6 +1855,19 @@ def index():
           </div>
         </div>
 
+        <!-- Time Window Filter Section -->
+        <div style="margin-bottom:14px;">
+          <div style="font-weight:800; font-size:0.85rem; color:#1e293b; margin-bottom:6px;">⏱️ Thời gian hiển thị báo cáo / 表示期間</div>
+          <select id="settings-time-select" onchange="setTimeFilter(this.value)" style="width:100%; padding:9px 12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; font-weight:700; color:#334155; outline:none; font-size:0.8rem;">
+            <option value="all">⏱️ Toàn bộ thời gian (全期間)</option>
+            <option value="1">⚡ Trong 1 giờ (1時間以内)</option>
+            <option value="3">⏱️ Trong 3 giờ (3時間以内)</option>
+            <option value="6">⏱️ Trong 6 giờ (6時間以内)</option>
+            <option value="24">⏱️ Trong 24 giờ / 1 ngày (24時間以内)</option>
+            <option value="72">⏱️ Trong 3 ngày (3日以内)</option>
+          </select>
+        </div>
+
         <!-- Area / Prefecture Selection -->
         <div style="margin-bottom:14px;">
           <div style="font-weight:800; font-size:0.85rem; color:#1e293b; margin-bottom:6px;">🗾 Khu vực tỉnh thành / エリア</div>
@@ -1891,8 +1952,10 @@ def index():
     let activeFilter = 'all'; // 'all' | 'in' | 'onsite' | 'out' | 'recent' | 'hidenone' | 'unknown'
     let activeChain = 'all';  // 'all' | 'conbini' | 'seven' | 'lawson' | 'familymart' | 'ministop' | 'specialty' | 'electronics'
     let activeRadius = null;  // null | 1 | 3 | 5 | 10
+    let activeTime = 'all';   // 'all' | 1 | 3 | 6 | 24 | 72 (hours)
     let listStatusFilter = 'all'; // 'all' | 'in' | 'out' | 'recent' | 'unknown'
     let listChainFilter = 'all';  // 'all' | 'conbini' | 'seven' | ...
+    let listTimeFilter = 'all';   // 'all' | 1 | 3 | 6 | 24 | 72 (hours)
     let latestStockStoreId = null;
     const storeHistoryCache = {};
     const openPopupHistStoreIds = new Set();
@@ -2023,7 +2086,10 @@ def index():
         if (!isNaN(parsed) && parsed > 0) {
           timestamp = parsed;
           const d = new Date(parsed * 1000);
-          dtStr = d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+          const month = d.getMonth() + 1;
+          const day = d.getDate();
+          const time = d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false });
+          dtStr = `${time} (${month}/${day})`;
           const diffSec = Math.floor(Date.now() / 1000 - parsed);
           if (diffSec < 60) timeAgo = 'たった今';
           else if (diffSec < 3600) timeAgo = `${Math.floor(diffSec / 60)}分前`;
@@ -2067,13 +2133,21 @@ def index():
       return `${km.toFixed(1)}km`;
     }
 
-    // Fast lightweight reusable marker icons
-    const stockPinIcon = L.divIcon({
-      html: '<div class="poketan-stock-pin">🟢</div>',
-      className: 'poketan-pin-wrap',
-      iconSize: [28, 28],
-      iconAnchor: [14, 14]
-    });
+    // Fast lightweight reusable marker icons & dynamic in-stock pin with time pill
+    function createStockPinIcon(timeAgo) {
+      const label = timeAgo || 'たった今';
+      return L.divIcon({
+        html: `
+          <div class="poketan-pin-wrapper">
+            <div class="poketan-stock-pin">🟢</div>
+            <div class="poketan-pin-time-pill">${escapeHtml(label)}</div>
+          </div>
+        `,
+        className: 'poketan-pin-leaflet-icon',
+        iconSize: [90, 28],
+        iconAnchor: [14, 14]
+      });
+    }
 
     const redDotIcon = L.divIcon({
       html: '<div style="width:10px;height:10px;border-radius:50%;background:#ef4444;border:1.5px solid #ffffff;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></div>',
@@ -2165,17 +2239,24 @@ def index():
           if (d > activeRadius) continue;
         }
 
+        // 4. Time Display Filter (Thời gian hiển thị báo cáo)
+        if (activeTime && activeTime !== 'all') {
+          const maxSec = parseInt(activeTime, 10) * 3600;
+          if (!info.timestamp || (now - info.timestamp > maxSec)) continue;
+        }
+
         const currentZoom = map ? map.getZoom() : 13;
         if (info.code === 'i') {
-          // If close zoom (>= 12) or filter "Chỉ có hàng", show bouncing green pin
+          // If close zoom (>= 12) or filter "Chỉ có hàng", show bouncing green pin with time badge
+          const pinIcon = createStockPinIcon(info.timeAgo);
           if (currentZoom >= 12 || activeFilter === 'in') {
-            const m = L.marker([store.lat, store.lng], { icon: stockPinIcon, zIndexOffset: 2000 });
+            const m = L.marker([store.lat, store.lng], { icon: pinIcon, zIndexOffset: 2000 });
             m.bindPopup(() => createPopupHtml(store, info), { maxWidth: 300 });
             stockLayer.addLayer(m);
           } else {
             // When zoomed out, cluster cleanly with hasStock: true so the cluster ring glows green
             const cm = L.marker([store.lat, store.lng], {
-              icon: stockPinIcon,
+              icon: pinIcon,
               hasStock: true
             });
             cm.bindPopup(() => createPopupHtml(store, info), { maxWidth: 300 });
@@ -2231,7 +2312,7 @@ def index():
       }
 
       const packs = (info.packs && info.packs.length) ? `<div style="font-size:0.74rem; margin-top:4px;"><b>📦 Gói:</b> ${info.packs.join(', ')}</div>` : '';
-      const time = info.timeAgo ? `<div style="font-size:0.72rem; color:#64748b; margin-top:3px;">🕒 Báo: ${info.timeAgo} (${info.reported_at})</div>` : '';
+      const time = info.timeAgo ? `<div style="font-size:0.72rem; color:#64748b; margin-top:3px;">🕒 Báo: <b>${escapeHtml(info.timeAgo)}</b> • ${escapeHtml(info.reported_at)}</div>` : '';
       const chain = (configData.chainNames && configData.chainNames[store.chain]) || store.chain || 'Cửa hàng';
       const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent((store.name || '') + ' ' + (store.address || ''))}`;
 
@@ -2334,6 +2415,38 @@ def index():
     }
     window.setRadiusFilter = setRadiusFilter;
 
+    function setTimeFilter(val) {
+      if (val === 'all' || val === null || val === undefined) {
+        activeTime = 'all';
+      } else {
+        const num = parseInt(val, 10);
+        activeTime = (activeTime === num) ? 'all' : num;
+      }
+      const timeChips = ['all', '1', '3', '6', '24', '72'];
+      timeChips.forEach(t => {
+        const btn = document.getElementById(`chip-time-${t}`);
+        if (btn) {
+          if (t === String(activeTime)) btn.classList.add('active');
+          else btn.classList.remove('active');
+        }
+      });
+      const settingsSelect = document.getElementById('settings-time-select');
+      if (settingsSelect) settingsSelect.value = String(activeTime);
+      renderMapMarkers();
+    }
+    window.setTimeFilter = setTimeFilter;
+
+    function setListTimeFilter(val) {
+      listTimeFilter = val;
+      const selectEl = document.getElementById('list-time-select');
+      if (selectEl && selectEl.value !== String(val)) {
+        selectEl.value = String(val);
+      }
+      const q = document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '';
+      renderStoreList(q);
+    }
+    window.setListTimeFilter = setListTimeFilter;
+
     function toggleFilter(filterName) {
       if (activeFilter === filterName) {
         setStatusFilter('all');
@@ -2349,6 +2462,7 @@ def index():
       setStatusFilter('in');
       setChainFilter('all');
       activeRadius = null;
+      setTimeFilter('all');
       [1, 3, 5, 10].forEach(d => {
         const btn = document.getElementById(`chip-dist-${d}`);
         if (btn) btn.classList.remove('active');
@@ -2468,6 +2582,12 @@ def index():
         // List Chain Filter
         if (!matchesChainFilter(store.chain, listChainFilter)) continue;
 
+        // List Time Filter (Thời gian hiển thị báo cáo)
+        if (listTimeFilter && listTimeFilter !== 'all') {
+          const maxSec = parseInt(listTimeFilter, 10) * 3600;
+          if (!info.timestamp || (now - info.timestamp > maxSec)) continue;
+        }
+
         if (q) {
           const mName = (store.name || '').toLowerCase().includes(q);
           const mAddr = (store.address || '').toLowerCase().includes(q);
@@ -2511,7 +2631,7 @@ def index():
           <div style="text-align:center; padding:36px 12px; color:#64748b;">
             <div style="font-size:2rem; margin-bottom:8px;">📭</div>
             <div style="font-weight:700; color:#334155; font-size:0.88rem;">Không tìm thấy báo cáo cửa hàng phù hợp</div>
-            <div style="font-size:0.75rem; margin-top:4px;">Thử đổi từ khóa hoặc tắt lọc "Chỉ có hàng".</div>
+            <div style="font-size:0.75rem; margin-top:4px;">Thử đổi từ khóa hoặc điều chỉnh bộ lọc thời gian / chuỗi.</div>
           </div>
         `;
         return;
@@ -2530,7 +2650,7 @@ def index():
 
         const chain = (configData.chainNames && configData.chainNames[store.chain]) || store.chain || 'Cửa hàng';
         const distStr = dist !== null ? ` • 📍 Cách ${formatDist(dist)}` : '';
-        const timeStr = info.timeAgo ? ` • 🕒 ${escapeHtml(info.timeAgo)}${info.reported_at ? ` (${escapeHtml(info.reported_at)})` : ''}` : '';
+        const timeStr = info.timeAgo ? ` • 🕒 ${escapeHtml(info.timeAgo)}${info.reported_at ? ` • ${escapeHtml(info.reported_at)}` : ''}` : '';
         const packHtml = (info.packs && info.packs.length > 0)
           ? `<div style="font-size:0.72rem; color:#2563eb; font-weight:700; margin-top:3px;">📦 ${escapeHtml(info.packs.join(', '))}</div>`
           : '';
