@@ -694,6 +694,96 @@ def index():
       font-weight: 800;
     }
 
+    /* FILTER MODAL & TRIGGER BUTTON */
+    .chip-main-filter {
+      background: #0f172a !important;
+      color: #ffffff !important;
+      border-color: #0f172a !important;
+      box-shadow: 0 3px 10px rgba(15, 23, 42, 0.25) !important;
+    }
+    .chip-main-filter:hover {
+      background: #1e293b !important;
+    }
+    .filter-count-pill {
+      background: #3b82f6;
+      color: #ffffff;
+      font-size: 0.65rem;
+      font-weight: 800;
+      padding: 1px 6px;
+      border-radius: 10px;
+      line-height: 1.2;
+    }
+    .filter-section-title {
+      font-size: 0.8rem;
+      font-weight: 800;
+      color: #1e293b;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .filter-options-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .filter-option-btn {
+      padding: 7px 11px;
+      border-radius: 10px;
+      border: 1px solid #cbd5e1;
+      background: #f8fafc;
+      color: #334155;
+      font-size: 0.75rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s ease;
+    }
+    .filter-option-btn:hover {
+      background: #f1f5f9;
+      border-color: #94a3b8;
+    }
+    .filter-option-btn.active {
+      background: #eff6ff;
+      border-color: #3b82f6;
+      color: #1d4ed8;
+      font-weight: 800;
+      box-shadow: 0 1px 4px rgba(59, 130, 246, 0.2);
+    }
+    .btn-apply-filter {
+      flex: 1;
+      padding: 11px;
+      background: #4f46e5;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-weight: 800;
+      font-size: 0.85rem;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
+      transition: background 0.15s;
+    }
+    .btn-apply-filter:hover {
+      background: #4338ca;
+    }
+    .btn-reset-filter {
+      padding: 11px 16px;
+      background: #f1f5f9;
+      color: #475569;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-reset-filter:hover {
+      background: #e2e8f0;
+      color: #1e293b;
+    }
+
     /* REAL-TIME STOCK TOAST (Exact Image 3 replica) */
     #live-stock-toast {
       pointer-events: auto;
@@ -1516,90 +1606,30 @@ def index():
     </button>
   </header>
 
-  <!-- 2. SUB-HEADER FLOATING FILTER BAR (Status, Brand/Chain & Radius Filters) -->
+  <!-- 2. FLOATING SUB-HEADER FILTER BAR (Minimal Single-Row with Popup Trigger) -->
   <div id="filter-bar-container">
-    <!-- Row 1: Status Filters -->
     <div class="filter-chips-scroll">
-      <button class="poketan-chip active" id="chip-status-all" onclick="setStatusFilter('all')">
-        🌐 すべて
+      <!-- Main Popup Trigger Button -->
+      <button class="poketan-chip chip-main-filter" onclick="openFilterModal()">
+        <span>⚙️ Bộ lọc & Sắp xếp</span>
+        <span id="filter-active-badge" class="filter-count-pill" style="display:none;">0</span>
       </button>
-      <button class="poketan-chip" id="chip-status-in" onclick="setStatusFilter('in')">
-        <span class="chip-dot dot-green"></span> 在庫あり
-      </button>
-      <button class="poketan-chip" id="chip-status-onsite" onclick="setStatusFilter('onsite')">
-        <span class="chip-dot dot-green"></span> 現地の在庫あり
-      </button>
-      <button class="poketan-chip" id="chip-status-out" onclick="setStatusFilter('out')">
-        <span class="chip-dot dot-red"></span> 在庫なし
-      </button>
-      <button class="poketan-chip" id="chip-status-recent" onclick="setStatusFilter('recent')">
-        <span style="color:#eab308;font-size:0.75rem;">★</span> 実績あり
-      </button>
-      <button class="poketan-chip" id="chip-status-hidenone" onclick="setStatusFilter('hidenone')">
-        <span class="chip-dot dot-yellow"></span> 扱ってない店を隠す
-      </button>
-      <button class="poketan-chip" id="chip-status-unknown" onclick="setStatusFilter('unknown')">
-        <span class="chip-dot dot-gray"></span> 未確認・不明
-      </button>
-    </div>
 
-    <!-- Row 2: Brand/Chain, Time Range & Distance Radius Filters -->
-    <div class="filter-chips-scroll" style="margin-top: -2px;">
-      <button class="poketan-chip chip-secondary active" id="chip-chain-all" onclick="setChainFilter('all')">
-        🏢 Tất cả chuỗi
+      <!-- Quick 1-tap shortcuts -->
+      <button class="poketan-chip active" id="quick-chip-all" onclick="quickSelectStatus('all')">
+        🌐 Tất cả
       </button>
-      <button class="poketan-chip chip-secondary" id="chip-chain-conbini" onclick="setChainFilter('conbini')">
-        🏪 Tất cả Conbini
+      <button class="poketan-chip" id="quick-chip-in" onclick="quickSelectStatus('in')">
+        <span class="chip-dot dot-green"></span> 🟢 Có hàng
       </button>
-      <button class="poketan-chip chip-secondary" id="chip-chain-seven" onclick="setChainFilter('seven')">
-        7-Eleven
+      <button class="poketan-chip" id="quick-chip-recent" onclick="quickSelectStatus('recent')">
+        <span style="color:#eab308;font-size:0.75rem;">★</span> Từng có hàng
       </button>
-      <button class="poketan-chip chip-secondary" id="chip-chain-lawson" onclick="setChainFilter('lawson')">
-        Lawson
-      </button>
-      <button class="poketan-chip chip-secondary" id="chip-chain-familymart" onclick="setChainFilter('familymart')">
-        FamilyMart
-      </button>
-      <button class="poketan-chip chip-secondary" id="chip-chain-ministop" onclick="setChainFilter('ministop')">
-        Ministop
-      </button>
-      <button class="poketan-chip chip-secondary" id="chip-chain-specialty" onclick="setChainFilter('specialty')">
-        🃏 Card Shop
-      </button>
-      <button class="poketan-chip chip-secondary" id="chip-chain-electronics" onclick="setChainFilter('electronics')">
-        🎮 Điện máy & GEO
-      </button>
-      <span style="width:1px; height:18px; background:#cbd5e1; margin:0 3px; align-self:center; flex-shrink:0;"></span>
-      <button class="poketan-chip chip-secondary active" id="chip-time-all" onclick="setTimeFilter('all')">
-        ⏱️ Toàn thời gian
-      </button>
-      <button class="poketan-chip chip-secondary" id="chip-time-1" onclick="setTimeFilter(1)">
+      <button class="poketan-chip" id="quick-chip-1h" onclick="quickToggle1Hour()">
         ⚡ ≤ 1h
       </button>
-      <button class="poketan-chip chip-secondary" id="chip-time-3" onclick="setTimeFilter(3)">
-        ⏱️ ≤ 3h
-      </button>
-      <button class="poketan-chip chip-secondary" id="chip-time-6" onclick="setTimeFilter(6)">
-        ⏱️ ≤ 6h
-      </button>
-      <button class="poketan-chip chip-secondary" id="chip-time-24" onclick="setTimeFilter(24)">
-        ⏱️ ≤ 24h
-      </button>
-      <button class="poketan-chip chip-secondary" id="chip-time-72" onclick="setTimeFilter(72)">
-        ⏱️ ≤ 3 ngày
-      </button>
-      <span style="width:1px; height:18px; background:#cbd5e1; margin:0 3px; align-self:center; flex-shrink:0;"></span>
-      <button class="poketan-chip chip-secondary" id="chip-dist-1" onclick="setRadiusFilter(1)">
-        📍 ≤ 1km
-      </button>
-      <button class="poketan-chip chip-secondary" id="chip-dist-3" onclick="setRadiusFilter(3)">
-        📍 ≤ 3km
-      </button>
-      <button class="poketan-chip chip-secondary" id="chip-dist-5" onclick="setRadiusFilter(5)">
-        📍 ≤ 5km
-      </button>
-      <button class="poketan-chip chip-secondary" id="chip-dist-10" onclick="setRadiusFilter(10)">
-        📍 ≤ 10km
+      <button class="poketan-chip" id="quick-chip-conbini" onclick="quickToggleConbini()">
+        🏪 Conbini
       </button>
     </div>
 
@@ -1645,29 +1675,33 @@ def index():
       <button class="list-tab-chip" id="list-tab-unknown" onclick="setListStatusTab('unknown')">⚪ 不明</button>
     </div>
 
-    <!-- Search, Chain & Time selection -->
-    <div style="padding:8px 12px; border-bottom:1px solid #f1f5f9; display:flex; gap:6px; align-items:center; background:#fafafa; flex-wrap:wrap;">
-      <div class="list-search-box" style="flex:1; min-width: 140px;">
+    <!-- Search and Filter Trigger -->
+    <div style="padding:8px 12px; border-bottom:1px solid #f1f5f9; display:flex; gap:6px; align-items:center; background:#fafafa;">
+      <div class="list-search-box" style="flex:1;">
         <span class="icon">🔍</span>
         <input type="text" id="list-search-input" placeholder="Tìm tên quán, địa chỉ..." oninput="onListSearch(this.value)" />
       </div>
-      <select id="list-chain-select" onchange="setListChainFilter(this.value)" style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:7px 8px; font-size:0.75rem; font-weight:700; color:#334155; outline:none; max-width: 125px;">
-        <option value="all">🏢 Tất cả chuỗi</option>
-        <option value="conbini">🏪 Tất cả Conbini</option>
-        <option value="seven">7-Eleven</option>
-        <option value="lawson">Lawson</option>
-        <option value="familymart">FamilyMart</option>
-        <option value="ministop">Ministop</option>
-        <option value="specialty">🃏 Card Shop</option>
-        <option value="electronics">🎮 Điện máy & GEO</option>
+      <button onclick="openFilterModal()" class="list-sort-btn" style="display:inline-flex; align-items:center; gap:5px; font-weight:800; background:#0f172a; color:#ffffff; border-color:#0f172a; padding:7px 11px; border-radius:8px; cursor:pointer;">
+        <span>⚙️ Bộ lọc</span>
+        <span id="list-filter-active-badge" class="filter-count-pill" style="display:none;">0</span>
+      </button>
+      <select id="list-chain-select" onchange="setListChainFilter(this.value)" style="display:none;">
+        <option value="all">all</option>
+        <option value="conbini">conbini</option>
+        <option value="seven">seven</option>
+        <option value="lawson">lawson</option>
+        <option value="familymart">familymart</option>
+        <option value="ministop">ministop</option>
+        <option value="specialty">specialty</option>
+        <option value="electronics">electronics</option>
       </select>
-      <select id="list-time-select" onchange="setListTimeFilter(this.value)" style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:7px 8px; font-size:0.75rem; font-weight:700; color:#334155; outline:none; max-width: 120px;">
-        <option value="all">⏱️ Toàn bộ</option>
-        <option value="1">⚡ Trong 1h</option>
-        <option value="3">⏱️ Trong 3h</option>
-        <option value="6">⏱️ Trong 6h</option>
-        <option value="24">⏱️ Trong 24h</option>
-        <option value="72">⏱️ Trong 3 ngày</option>
+      <select id="list-time-select" onchange="setListTimeFilter(this.value)" style="display:none;">
+        <option value="all">all</option>
+        <option value="1">1</option>
+        <option value="3">3</option>
+        <option value="6">6</option>
+        <option value="24">24</option>
+        <option value="72">72</option>
       </select>
     </div>
 
@@ -1724,6 +1758,162 @@ def index():
       <span class="tab-label">設定</span>
     </button>
   </footer>
+
+  <!-- 5.5 FILTER & SORT MODAL (Dedicated, Clean, Popup on Demand) -->
+  <div id="filter-modal" class="modal-overlay" onclick="if(event.target===this) closeFilterModal()">
+    <div class="modal-card" style="max-height:85vh; max-height:85dvh;">
+      <div class="modal-header">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:1.15rem;">⚡</span>
+          <h3 style="font-weight:800; font-size:1.02rem; color:#0f172a; margin:0;">Bộ lọc & Sắp xếp</h3>
+        </div>
+        <button class="modal-close-btn" onclick="closeFilterModal()">✕</button>
+      </div>
+
+      <div class="modal-body" style="padding:14px 16px; overflow-y:auto; display:flex; flex-direction:column; gap:16px;">
+        <!-- SECTION 1: TRẠNG THÁI HÀNG HÓA -->
+        <div>
+          <div class="filter-section-title">
+            <span>📊</span>
+            <span>Trạng thái hàng hóa (在庫状況)</span>
+          </div>
+          <div class="filter-options-grid" id="modal-status-group">
+            <button class="filter-option-btn active" data-val="all" onclick="selectModalStatus('all')">
+              🌐 Tất cả cửa hàng
+            </button>
+            <button class="filter-option-btn" data-val="in" onclick="selectModalStatus('in')">
+              <span class="chip-dot dot-green"></span> 🟢 Đang có hàng
+            </button>
+            <button class="filter-option-btn" data-val="out" onclick="selectModalStatus('out')">
+              <span class="chip-dot dot-red"></span> 🔴 Hết hàng
+            </button>
+            <button class="filter-option-btn" data-val="recent" onclick="selectModalStatus('recent')">
+              <span style="color:#eab308;font-size:0.75rem;">★</span> Từng có hàng gần đây
+            </button>
+            <button class="filter-option-btn" data-val="onsite" onclick="selectModalStatus('onsite')">
+              📍 Báo cáo tại quán (GPS)
+            </button>
+            <button class="filter-option-btn" data-val="unknown" onclick="selectModalStatus('unknown')">
+              ⚪ Chưa rõ trạng thái
+            </button>
+          </div>
+        </div>
+
+        <!-- SECTION 2: CHUỖI & THƯƠNG HIỆU -->
+        <div>
+          <div class="filter-section-title">
+            <span>🏢</span>
+            <span>Chuỗi cửa hàng & Thương hiệu (店舗チェーン)</span>
+          </div>
+          <div class="filter-options-grid" id="modal-chain-group">
+            <button class="filter-option-btn active" data-val="all" onclick="selectModalChain('all')">
+              🏢 Tất cả chuỗi
+            </button>
+            <button class="filter-option-btn" data-val="conbini" onclick="selectModalChain('conbini')">
+              🏪 Tất cả Conbini
+            </button>
+            <button class="filter-option-btn" data-val="seven" onclick="selectModalChain('seven')">
+              🏪 7-Eleven
+            </button>
+            <button class="filter-option-btn" data-val="lawson" onclick="selectModalChain('lawson')">
+              🏪 Lawson
+            </button>
+            <button class="filter-option-btn" data-val="familymart" onclick="selectModalChain('familymart')">
+              🏪 FamilyMart
+            </button>
+            <button class="filter-option-btn" data-val="ministop" onclick="selectModalChain('ministop')">
+              🏪 Ministop
+            </button>
+            <button class="filter-option-btn" data-val="specialty" onclick="selectModalChain('specialty')">
+              🃏 Card Shop chuyên biệt
+            </button>
+            <button class="filter-option-btn" data-val="electronics" onclick="selectModalChain('electronics')">
+              🎮 Điện máy, GEO, Tsutaya
+            </button>
+          </div>
+        </div>
+
+        <!-- SECTION 3: THỜI GIAN BÁO CÁO -->
+        <div>
+          <div class="filter-section-title">
+            <span>⏱️</span>
+            <span>Thời gian hiển thị báo cáo (報告時間)</span>
+          </div>
+          <div class="filter-options-grid" id="modal-time-group">
+            <button class="filter-option-btn active" data-val="all" onclick="selectModalTime('all')">
+              ⏱️ Toàn bộ thời gian
+            </button>
+            <button class="filter-option-btn" data-val="1" onclick="selectModalTime('1')">
+              ⚡ Trong 1 giờ qua
+            </button>
+            <button class="filter-option-btn" data-val="3" onclick="selectModalTime('3')">
+              ⏱️ Trong 3 giờ qua
+            </button>
+            <button class="filter-option-btn" data-val="6" onclick="selectModalTime('6')">
+              ⏱️ Trong 6 giờ qua
+            </button>
+            <button class="filter-option-btn" data-val="24" onclick="selectModalTime('24')">
+              ⏱️ Trong 24 giờ qua
+            </button>
+            <button class="filter-option-btn" data-val="72" onclick="selectModalTime('72')">
+              ⏱️ Trong 3 ngày qua
+            </button>
+          </div>
+        </div>
+
+        <!-- SECTION 4: BÁN KÍNH KHOẢNG CÁCH -->
+        <div>
+          <div class="filter-section-title">
+            <span>📍</span>
+            <span>Bán kính tìm kiếm quanh bạn (距離・半径)</span>
+          </div>
+          <div class="filter-options-grid" id="modal-radius-group">
+            <button class="filter-option-btn active" data-val="all" onclick="selectModalRadius('all')">
+              🌐 Không giới hạn bán kính
+            </button>
+            <button class="filter-option-btn" data-val="1" onclick="selectModalRadius('1')">
+              📍 Bán kính 1 km
+            </button>
+            <button class="filter-option-btn" data-val="3" onclick="selectModalRadius('3')">
+              📍 Bán kính 3 km
+            </button>
+            <button class="filter-option-btn" data-val="5" onclick="selectModalRadius('5')">
+              📍 Bán kính 5 km
+            </button>
+            <button class="filter-option-btn" data-val="10" onclick="selectModalRadius('10')">
+              📍 Bán kính 10 km
+            </button>
+          </div>
+        </div>
+
+        <!-- SECTION 5: THỨ TỰ SẮP XẾP -->
+        <div>
+          <div class="filter-section-title">
+            <span>🔃</span>
+            <span>Thứ tự sắp xếp danh sách (並び順)</span>
+          </div>
+          <div class="filter-options-grid" id="modal-sort-group">
+            <button class="filter-option-btn active" data-val="newest" onclick="selectModalSort('newest')">
+              🕒 Báo cáo mới nhất trước
+            </button>
+            <button class="filter-option-btn" data-val="nearest" onclick="selectModalSort('nearest')">
+              📍 Gần vị trí bạn nhất
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- MODAL FOOTER BUTTONS -->
+      <div style="padding:12px 16px; border-top:1px solid #f1f5f9; background:#f8fafc; display:flex; gap:10px; align-items:center;">
+        <button class="btn-reset-filter" onclick="resetAllFilters()">
+          🔄 Đặt lại
+        </button>
+        <button class="btn-apply-filter" onclick="applyAndCloseFilterModal()">
+          ✅ Áp dụng bộ lọc
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- 6. PREFECTURE & AREA SELECTION MODAL (Exact PokéTan Replica) -->
   <div id="pref-modal" class="modal-overlay" onclick="if(event.target===this) closePrefModal()">
@@ -2293,6 +2483,9 @@ def index():
       } else {
         if (toastEl) toastEl.style.display = 'none';
       }
+      if (typeof updateActiveFilterBadges === 'function') {
+        updateActiveFilterBadges();
+      }
     }
 
     function createPopupHtml(store, info) {
@@ -2366,51 +2559,243 @@ def index():
     }
     window.hideToast = hideToast;
 
-    // 8. FILTER CHIP HANDLERS (STATUS, CHAIN, RADIUS)
-    function setStatusFilter(filterName) {
-      activeFilter = filterName;
-      const statusChips = ['all', 'in', 'onsite', 'out', 'recent', 'hidenone', 'unknown'];
-      statusChips.forEach(s => {
-        const btn = document.getElementById(`chip-status-${s}`);
-        if (btn) {
-          if (s === filterName) btn.classList.add('active');
-          else btn.classList.remove('active');
-        }
+    // 8. FILTER & SORT MODAL HANDLERS + QUICK SHORTCUTS
+    let modalTempFilter = 'all';
+    let modalTempChain = 'all';
+    let modalTempTime = 'all';
+    let modalTempRadius = 'all';
+    let modalTempSort = 'newest';
+
+    function openFilterModal() {
+      modalTempFilter = activeFilter || 'all';
+      modalTempChain = activeChain || 'all';
+      modalTempTime = String(activeTime || 'all');
+      modalTempRadius = (activeRadius !== null && activeRadius !== undefined) ? String(activeRadius) : 'all';
+      modalTempSort = listSortMode || 'newest';
+      syncFilterModalUI();
+      const modal = document.getElementById('filter-modal');
+      if (modal) modal.classList.add('open');
+    }
+    window.openFilterModal = openFilterModal;
+
+    function closeFilterModal() {
+      const modal = document.getElementById('filter-modal');
+      if (modal) modal.classList.remove('open');
+    }
+    window.closeFilterModal = closeFilterModal;
+
+    function syncFilterModalUI() {
+      // Status
+      document.querySelectorAll('#modal-status-group .filter-option-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-val') === modalTempFilter);
       });
+      // Chain
+      document.querySelectorAll('#modal-chain-group .filter-option-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-val') === modalTempChain);
+      });
+      // Time
+      document.querySelectorAll('#modal-time-group .filter-option-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-val') === modalTempTime);
+      });
+      // Radius
+      document.querySelectorAll('#modal-radius-group .filter-option-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-val') === modalTempRadius);
+      });
+      // Sort
+      document.querySelectorAll('#modal-sort-group .filter-option-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-val') === modalTempSort);
+      });
+    }
+
+    function selectModalStatus(val) {
+      modalTempFilter = val;
+      syncFilterModalUI();
+    }
+    window.selectModalStatus = selectModalStatus;
+
+    function selectModalChain(val) {
+      modalTempChain = val;
+      syncFilterModalUI();
+    }
+    window.selectModalChain = selectModalChain;
+
+    function selectModalTime(val) {
+      modalTempTime = val;
+      syncFilterModalUI();
+    }
+    window.selectModalTime = selectModalTime;
+
+    function selectModalRadius(val) {
+      modalTempRadius = val;
+      if (val !== 'all' && userLat === null && typeof locateUser === 'function') {
+        locateUser(false);
+      }
+      syncFilterModalUI();
+    }
+    window.selectModalRadius = selectModalRadius;
+
+    function selectModalSort(val) {
+      modalTempSort = val;
+      if (val === 'nearest' && userLat === null && typeof locateUser === 'function') {
+        locateUser(false);
+      }
+      syncFilterModalUI();
+    }
+    window.selectModalSort = selectModalSort;
+
+    function resetAllFilters() {
+      modalTempFilter = 'all';
+      modalTempChain = 'all';
+      modalTempTime = 'all';
+      modalTempRadius = 'all';
+      modalTempSort = 'newest';
+      syncFilterModalUI();
+    }
+    window.resetAllFilters = resetAllFilters;
+
+    function applyAndCloseFilterModal() {
+      activeFilter = modalTempFilter;
+      listStatusFilter = (modalTempFilter === 'onsite' || modalTempFilter === 'hidenone') ? 'all' : modalTempFilter;
+      
+      activeChain = modalTempChain;
+      listChainFilter = modalTempChain;
+      const chainSel = document.getElementById('list-chain-select');
+      if (chainSel) chainSel.value = modalTempChain;
+
+      activeTime = (modalTempTime === 'all' || !modalTempTime) ? 'all' : parseInt(modalTempTime, 10);
+      listTimeFilter = modalTempTime;
+      const timeSel = document.getElementById('list-time-select');
+      if (timeSel) timeSel.value = modalTempTime;
+
+      activeRadius = (modalTempRadius === 'all' || !modalTempRadius) ? null : parseInt(modalTempRadius, 10);
+      listSortMode = modalTempSort;
+
+      // Update list sort mode buttons
+      document.querySelectorAll('.list-sort-btn').forEach(b => b.classList.remove('active'));
+      const activeSortBtn = document.getElementById(`sort-btn-${listSortMode}`);
+      if (activeSortBtn) activeSortBtn.classList.add('active');
+
+      updateActiveFilterBadges();
+      closeFilterModal();
+
       renderMapMarkers();
+      const q = document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '';
+      renderStoreList(q);
+    }
+    window.applyAndCloseFilterModal = applyAndCloseFilterModal;
+
+    function updateActiveFilterBadges() {
+      let count = 0;
+      if (activeFilter && activeFilter !== 'all') count++;
+      if (activeChain && activeChain !== 'all') count++;
+      if (activeTime && activeTime !== 'all') count++;
+      if (activeRadius !== null && activeRadius !== undefined) count++;
+
+      // Badges
+      const bMap = document.getElementById('filter-active-badge');
+      if (bMap) {
+        if (count > 0) {
+          bMap.innerText = count;
+          bMap.style.display = 'inline-block';
+        } else {
+          bMap.style.display = 'none';
+        }
+      }
+      const bList = document.getElementById('list-filter-active-badge');
+      if (bList) {
+        if (count > 0) {
+          bList.innerText = count;
+          bList.style.display = 'inline-block';
+        } else {
+          bList.style.display = 'none';
+        }
+      }
+
+      // Quick chips on the map floating bar
+      const qAll = document.getElementById('quick-chip-all');
+      const qIn = document.getElementById('quick-chip-in');
+      const qRecent = document.getElementById('quick-chip-recent');
+      const q1h = document.getElementById('quick-chip-1h');
+      const qConbini = document.getElementById('quick-chip-conbini');
+
+      if (qAll) qAll.classList.toggle('active', activeFilter === 'all' && activeChain === 'all' && activeTime === 'all' && activeRadius === null);
+      if (qIn) qIn.classList.toggle('active', activeFilter === 'in');
+      if (qRecent) qRecent.classList.toggle('active', activeFilter === 'recent');
+      if (q1h) q1h.classList.toggle('active', String(activeTime) === '1');
+      if (qConbini) qConbini.classList.toggle('active', activeChain === 'conbini');
+
+      // Update list tabs
+      const tabs = ['all', 'in', 'out', 'recent', 'unknown'];
+      tabs.forEach(t => {
+        const btn = document.getElementById(`list-tab-${t}`);
+        if (btn) btn.classList.toggle('active', listStatusFilter === t);
+      });
+    }
+    window.updateActiveFilterBadges = updateActiveFilterBadges;
+
+    // Quick shortcuts on the slim single-row floating bar
+    function quickSelectStatus(st) {
+      activeFilter = st;
+      listStatusFilter = (st === 'onsite' || st === 'hidenone') ? 'all' : st;
+      updateActiveFilterBadges();
+      renderMapMarkers();
+      renderStoreList(document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '');
+    }
+    window.quickSelectStatus = quickSelectStatus;
+
+    function quickToggle1Hour() {
+      if (String(activeTime) === '1') {
+        activeTime = 'all';
+        listTimeFilter = 'all';
+      } else {
+        activeTime = 1;
+        listTimeFilter = '1';
+      }
+      const timeSel = document.getElementById('list-time-select');
+      if (timeSel) timeSel.value = String(activeTime);
+      updateActiveFilterBadges();
+      renderMapMarkers();
+      renderStoreList(document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '');
+    }
+    window.quickToggle1Hour = quickToggle1Hour;
+
+    function quickToggleConbini() {
+      if (activeChain === 'conbini') {
+        activeChain = 'all';
+        listChainFilter = 'all';
+      } else {
+        activeChain = 'conbini';
+        listChainFilter = 'conbini';
+      }
+      const chainSel = document.getElementById('list-chain-select');
+      if (chainSel) chainSel.value = activeChain;
+      updateActiveFilterBadges();
+      renderMapMarkers();
+      renderStoreList(document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '');
+    }
+    window.quickToggleConbini = quickToggleConbini;
+
+    // Backward-compatible individual handlers
+    function setStatusFilter(filterName) {
+      quickSelectStatus(filterName);
     }
     window.setStatusFilter = setStatusFilter;
 
     function setChainFilter(chain) {
       activeChain = chain;
-      const chainChips = ['all', 'conbini', 'seven', 'lawson', 'familymart', 'ministop', 'specialty', 'electronics'];
-      chainChips.forEach(c => {
-        const btn = document.getElementById(`chip-chain-${c}`);
-        if (btn) {
-          if (c === chain) btn.classList.add('active');
-          else btn.classList.remove('active');
-        }
-      });
+      listChainFilter = chain;
+      updateActiveFilterBadges();
       renderMapMarkers();
+      renderStoreList(document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '');
     }
     window.setChainFilter = setChainFilter;
 
     function setRadiusFilter(km) {
-      if (activeRadius === km) {
-        activeRadius = null;
-      } else {
-        activeRadius = km;
-        if (userLat === null && typeof locateUser === 'function') {
-          locateUser(false);
-        }
+      activeRadius = (activeRadius === km) ? null : km;
+      if (activeRadius !== null && userLat === null && typeof locateUser === 'function') {
+        locateUser(false);
       }
-      [1, 3, 5, 10].forEach(d => {
-        const btn = document.getElementById(`chip-dist-${d}`);
-        if (btn) {
-          if (activeRadius === d) btn.classList.add('active');
-          else btn.classList.remove('active');
-        }
-      });
+      updateActiveFilterBadges();
       renderMapMarkers();
     }
     window.setRadiusFilter = setRadiusFilter;
@@ -2422,36 +2807,23 @@ def index():
         const num = parseInt(val, 10);
         activeTime = (activeTime === num) ? 'all' : num;
       }
-      const timeChips = ['all', '1', '3', '6', '24', '72'];
-      timeChips.forEach(t => {
-        const btn = document.getElementById(`chip-time-${t}`);
-        if (btn) {
-          if (t === String(activeTime)) btn.classList.add('active');
-          else btn.classList.remove('active');
-        }
-      });
-      const settingsSelect = document.getElementById('settings-time-select');
-      if (settingsSelect) settingsSelect.value = String(activeTime);
+      listTimeFilter = String(activeTime);
+      updateActiveFilterBadges();
       renderMapMarkers();
+      renderStoreList(document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '');
     }
     window.setTimeFilter = setTimeFilter;
 
     function setListTimeFilter(val) {
-      listTimeFilter = val;
-      const selectEl = document.getElementById('list-time-select');
-      if (selectEl && selectEl.value !== String(val)) {
-        selectEl.value = String(val);
-      }
-      const q = document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '';
-      renderStoreList(q);
+      setTimeFilter(val);
     }
     window.setListTimeFilter = setListTimeFilter;
 
     function toggleFilter(filterName) {
       if (activeFilter === filterName) {
-        setStatusFilter('all');
+        quickSelectStatus('all');
       } else {
-        setStatusFilter(filterName);
+        quickSelectStatus(filterName);
       }
     }
     window.toggleFilter = toggleFilter;
@@ -2538,6 +2910,7 @@ def index():
           else btn.classList.remove('active');
         }
       });
+      updateActiveFilterBadges();
       const q = document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '';
       renderStoreList(q);
     }
@@ -2549,6 +2922,7 @@ def index():
       if (selectEl && selectEl.value !== chain) {
         selectEl.value = chain;
       }
+      updateActiveFilterBadges();
       const q = document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '';
       renderStoreList(q);
     }
