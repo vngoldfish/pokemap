@@ -2845,20 +2845,71 @@ def index():
     let hotStatus = {};
     let coldStatus = {};
     let configData = {};
-    let mapRegionFilter = currentRegion || 'osaka'; // 'osaka' | 'tokyo' | 'nagoya' | 'all' (Dùng cho Bản đồ)
-    let mapStatusFilter = 'all'; // 'all' | 'in' | 'recent' | 'out' | 'onsite' | 'unknown' (Chỉ dùng cho Bản đồ)
-    let mapChainFilter = 'all';  // 'all' | 'conbini' | 'seven' | ... (Chỉ dùng cho Bản đồ)
-    let mapTimeFilter = 'all';   // 'all' | '1' | '3' | '6' | '24' | '72' (Chỉ dùng cho Bản đồ)
-    let activeFilter = 'all';    // backward compatible alias
-    let activeChain = 'all';     // backward compatible alias
+    // Persistent Map Filters (Lưu trữ và phục hồi khi tải lại trang / F5)
+    let mapRegionFilter = currentRegion || 'osaka';
+    let mapStatusFilter = 'all';
+    let mapChainFilter = 'all';
+    let mapTimeFilter = 'all';
+    try {
+      const savedMapReg = localStorage.getItem('poketan_map_region');
+      if (savedMapReg && (REGIONS[savedMapReg] || savedMapReg === 'all')) mapRegionFilter = savedMapReg;
+      const savedMapSt = localStorage.getItem('poketan_map_status');
+      if (savedMapSt) mapStatusFilter = savedMapSt;
+      const savedMapChain = localStorage.getItem('poketan_map_chain');
+      if (savedMapChain) mapChainFilter = savedMapChain;
+      const savedMapTime = localStorage.getItem('poketan_map_time');
+      if (savedMapTime) mapTimeFilter = savedMapTime;
+    } catch(e) {}
+
+    let activeFilter = mapStatusFilter;    // backward compatible alias
+    let activeChain = mapChainFilter;     // backward compatible alias
     let activeRadius = null;
-    let activeTime = 'all';
-    let listRegionFilter = currentRegion || 'osaka'; // 'osaka' | 'tokyo' | 'nagoya' | 'all' (Dùng cho Báo cáo)
-    let listStatusFilter = 'all'; // 'all' | 'in' | 'onsite' | 'out' | 'recent' | 'unknown' (Dùng cho Báo cáo)
-    let listChainFilter = 'all';  // 'all' | 'conbini' | 'seven' | ... (Dùng cho Báo cáo)
-    let listTimeFilter = 'all';   // 'all' | '1' | '3' | '6' | '24' | '72' (Dùng cho Báo cáo)
-    let listRadiusFilter = 'all'; // 'all' | '1' | '3' | '5' | '10' (Dùng cho Báo cáo)
-    let listSortMode = 'newest';  // 'newest' | 'nearest' (Dùng cho Báo cáo)
+    let activeTime = mapTimeFilter;
+
+    // Persistent List / Report Filters (Lưu trữ và phục hồi khi tải lại trang / F5)
+    let listRegionFilter = currentRegion || 'osaka';
+    let listStatusFilter = 'all';
+    let listChainFilter = 'all';
+    let listTimeFilter = 'all';
+    let listRadiusFilter = 'all';
+    let listSortMode = 'newest';
+    try {
+      const savedListReg = localStorage.getItem('poketan_list_region');
+      if (savedListReg && (REGIONS[savedListReg] || savedListReg === 'all')) listRegionFilter = savedListReg;
+      const savedListSt = localStorage.getItem('poketan_list_status');
+      if (savedListSt) listStatusFilter = savedListSt;
+      const savedListChain = localStorage.getItem('poketan_list_chain');
+      if (savedListChain) listChainFilter = savedListChain;
+      const savedListTime = localStorage.getItem('poketan_list_time');
+      if (savedListTime) listTimeFilter = savedListTime;
+      const savedListRadius = localStorage.getItem('poketan_list_radius');
+      if (savedListRadius) listRadiusFilter = savedListRadius;
+      const savedListSort = localStorage.getItem('poketan_list_sort');
+      if (savedListSort) listSortMode = savedListSort;
+    } catch(e) {}
+
+    function saveMapFiltersToStorage() {
+      try {
+        localStorage.setItem('poketan_map_region', mapRegionFilter || 'osaka');
+        localStorage.setItem('poketan_map_status', mapStatusFilter || 'all');
+        localStorage.setItem('poketan_map_chain', mapChainFilter || 'all');
+        localStorage.setItem('poketan_map_time', String(mapTimeFilter || 'all'));
+      } catch(e) {}
+    }
+    window.saveMapFiltersToStorage = saveMapFiltersToStorage;
+
+    function saveListFiltersToStorage() {
+      try {
+        localStorage.setItem('poketan_list_region', listRegionFilter || 'osaka');
+        localStorage.setItem('poketan_list_status', listStatusFilter || 'all');
+        localStorage.setItem('poketan_list_chain', listChainFilter || 'all');
+        localStorage.setItem('poketan_list_time', String(listTimeFilter || 'all'));
+        localStorage.setItem('poketan_list_radius', String(listRadiusFilter || 'all'));
+        localStorage.setItem('poketan_list_sort', listSortMode || 'newest');
+      } catch(e) {}
+    }
+    window.saveListFiltersToStorage = saveListFiltersToStorage;
+
     let latestStockStoreId = null;
     const storeHistoryCache = {};
     const openPopupHistStoreIds = new Set();
@@ -3581,6 +3632,7 @@ def index():
       listTimeFilter = modalTempTime;
       listRadiusFilter = modalTempRadius;
       listSortMode = modalTempSort;
+      saveListFiltersToStorage();
 
       const chainSel = document.getElementById('list-chain-select');
       if (chainSel) chainSel.value = listChainFilter;
@@ -3635,6 +3687,16 @@ def index():
         const btn = document.getElementById(`list-radius-chip-${r}`);
         if (btn) btn.classList.toggle('active', listRadiusFilter === r);
       });
+
+      // Update list sort mode buttons
+      document.querySelectorAll('.list-sort-btn').forEach(b => b.classList.remove('active'));
+      const activeSortBtn = document.getElementById(`sort-btn-${listSortMode}`);
+      if (activeSortBtn) activeSortBtn.classList.add('active');
+
+      const chainSel = document.getElementById('list-chain-select');
+      if (chainSel && chainSel.value !== listChainFilter) chainSel.value = listChainFilter;
+      const timeSel = document.getElementById('list-time-select');
+      if (timeSel && timeSel.value !== listTimeFilter) timeSel.value = listTimeFilter;
     }
     window.updateListFilterBadges = updateListFilterBadges;
 
@@ -3715,6 +3777,7 @@ def index():
       mapStatusFilter = mapModalTempStatus;
       mapChainFilter = mapModalTempChain;
       mapTimeFilter = mapModalTempTime;
+      saveMapFiltersToStorage();
 
       closeMapFilterModal();
       updateMapFilterUI();
@@ -3731,6 +3794,7 @@ def index():
     function setMapStatusFilter(st) {
       mapStatusFilter = st;
       activeFilter = st;
+      saveMapFiltersToStorage();
       updateMapFilterUI();
       renderMapMarkers();
     }
@@ -3739,10 +3803,19 @@ def index():
     function setMapChainFilter(chain) {
       mapChainFilter = chain;
       activeChain = chain;
+      saveMapFiltersToStorage();
       updateMapFilterUI();
       renderMapMarkers();
     }
     window.setMapChainFilter = setMapChainFilter;
+
+    function setMapTimeFilter(val) {
+      mapTimeFilter = String(val);
+      saveMapFiltersToStorage();
+      updateMapFilterUI();
+      renderMapMarkers();
+    }
+    window.setMapTimeFilter = setMapTimeFilter;
 
     function updateMapFilterUI() {
       ['all', 'in', 'recent', 'out'].forEach(st => {
@@ -3809,6 +3882,7 @@ def index():
     function setListRadiusFilter(val) {
       listRadiusFilter = String(val);
       modalTempRadius = listRadiusFilter;
+      saveListFiltersToStorage();
       if (listRadiusFilter !== 'all' && userLat === null && typeof locateUser === 'function') {
         locateUser(false);
       }
@@ -3820,6 +3894,7 @@ def index():
 
     function setListTimeFilter(val) {
       listTimeFilter = String(val);
+      saveListFiltersToStorage();
       updateListFilterBadges();
       const q = document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '';
       renderStoreList(q);
@@ -3864,6 +3939,9 @@ def index():
 
     // 10. FOOTER NAVIGATION TABS
     function switchFooterTab(tab) {
+      try {
+        localStorage.setItem('poketan_active_tab', tab);
+      } catch(e) {}
       document.querySelectorAll('.footer-tab-btn').forEach(b => b.classList.remove('active'));
 
       if (tab === 'map') {
@@ -3882,6 +3960,7 @@ def index():
 
     function setListSortMode(mode) {
       listSortMode = mode;
+      saveListFiltersToStorage();
       document.querySelectorAll('.list-sort-btn').forEach(b => b.classList.remove('active'));
       const activeBtn = document.getElementById(`sort-btn-${mode}`);
       if (activeBtn) activeBtn.classList.add('active');
@@ -3899,6 +3978,7 @@ def index():
 
     function setListStatusTab(tab) {
       listStatusFilter = tab;
+      saveListFiltersToStorage();
       const tabs = ['all', 'in', 'onsite', 'out', 'recent', 'unknown'];
       tabs.forEach(t => {
         const btn = document.getElementById(`list-tab-${t}`);
@@ -3915,6 +3995,7 @@ def index():
 
     function setListChainFilter(chain) {
       listChainFilter = chain;
+      saveListFiltersToStorage();
       const selectEl = document.getElementById('list-chain-select');
       if (selectEl && selectEl.value !== chain) {
         selectEl.value = chain;
@@ -4234,6 +4315,8 @@ def index():
       mapRegionFilter = regionId;
       listRegionFilter = regionId;
       localStorage.setItem('poketan_selected_region', regionId);
+      saveMapFiltersToStorage();
+      saveListFiltersToStorage();
       updateSettings('currentRegion', regionId);
 
       // Sync radio in Settings Modal
@@ -5343,6 +5426,10 @@ def index():
         // Sync Telegram UI Badges
         updateTelegramUIBadge();
 
+        // Sync persistent Map & List filters UI
+        updateMapFilterUI();
+        updateListFilterBadges();
+
         if (hotRes && hotRes.ok) {
           try { hotStatus = await hotRes.json(); } catch(e) {}
         }
@@ -5371,9 +5458,16 @@ def index():
           }
         }).catch(() => {});
 
-        // Direct URL routing for /thongbao and /stores
+        // Direct URL routing for /thongbao and /stores, or restore saved active tab
         if (window.location.pathname === '/thongbao' || window.location.pathname === '/stores') {
           switchFooterTab('list');
+        } else {
+          try {
+            const savedTab = localStorage.getItem('poketan_active_tab');
+            if (savedTab === 'list' && window.location.pathname !== '/calendar') {
+              switchFooterTab('list');
+            }
+          } catch(e) {}
         }
 
         // Dismiss loading screen right away
