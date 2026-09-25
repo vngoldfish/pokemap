@@ -4,9 +4,9 @@
     "chain": "",
     "includeCold": true,
     "showInStock": true,
-    "showOutOfStock": false,
-    "showNotHandled": false,
-    "showUnknown": false
+    "showOutOfStock": true,
+    "showNotHandled": true,
+    "showUnknown": true
   },
   "notifications": {
     "soundEnabled": true,

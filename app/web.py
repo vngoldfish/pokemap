@@ -438,948 +438,36 @@ def get_calendar(include_expired: bool = False):
 @app.get("/calendar", response_class=HTMLResponse)
 @app.get("/events", response_class=HTMLResponse)
 def index():
-    return """
-<!DOCTYPE html>
+    return """<!DOCTYPE html>
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <title>BAWUI POKE APP - Định Vị, Tồn Kho & Lịch Bốc Thăm Thẻ Pokémon</title>
+  <title>⚡ PokéMap - Bản Đồ Thẻ Pokémon</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
-  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <!-- Firebase JS SDK for real-time Firestore sync -->
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js';
+    import { initializeFirestore, doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/11.4.0/firebase-firestore.js';
+    window.FirebaseInit = { initializeApp, initializeFirestore, doc, onSnapshot };
+  </script>
+
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
-    html, body {
-      width: 100vw;
-      height: 100vh;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-      background: #f8fafc;
-      color: #1e293b;
-    }
-    
-    /* 1. COMPACT TOP NAVBAR (PoKeTan Style) */
-    #top-navbar {
-      height: 48px;
-      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-      color: white;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 14px;
-      border-bottom: 1px solid #334155;
-      z-index: 2000;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
-      flex-shrink: 0;
-    }
-    
-    .navbar-left {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .brand-logo {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      text-decoration: none;
-      cursor: pointer;
-    }
-    .brand-icon {
-      width: 28px;
-      height: 28px;
-      background: #6366f1;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.9rem;
-      box-shadow: 0 0 12px rgba(99, 102, 241, 0.5);
-    }
-    .brand-text {
-      display: flex;
-      flex-direction: column;
-    }
-    .brand-title {
-      font-size: 1rem;
-      font-weight: 900;
-      letter-spacing: 0.02em;
-      color: #ffffff;
-    }
-    .brand-sub {
-      display: none;
-    }
-    
-    .header-location-pill {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 4px 12px;
-      background: rgba(255,255,255,0.08);
-      border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 20px;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-    .header-location-pill:hover {
-      background: rgba(255,255,255,0.15);
-    }
-    .header-location-pill .loc-main {
-      font-size: 0.78rem;
-      font-weight: 700;
-      color: #e2e8f0;
-    }
-    .header-location-pill .loc-sub {
-      font-size: 0.6rem;
-      color: #64748b;
-    }
-    
-    .live-pill { display: none; }
-    .live-dot { display: none; }
-
-    /* CENTER MENU - HIDDEN (replaced by bottom nav) */
-    .navbar-menu { display: none !important; }
-    .nav-menu-link, .nav-icon, .nav-text, .nav-badge, .stock-badge, .cal-badge { }
-
-    /* RIGHT: Hamburger menu button only */
-    .navbar-right { display: none; }
-    .header-gps-btn { display: none; }
-    .header-action-btn { display: none; }
-    
-    #hamburger-btn {
-      background: none;
-      border: none;
-      color: #e2e8f0;
-      font-size: 1.4rem;
-      cursor: pointer;
-      padding: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 8px;
-      transition: background 0.2s;
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       -webkit-tap-highlight-color: transparent;
     }
-    #hamburger-btn:hover {
-      background: rgba(255,255,255,0.1);
-    }
-
-    /* SIDE DRAWER MENU (slides from left) */
-    #side-drawer-overlay {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.5);
-      z-index: 5000;
-      opacity: 0;
-      visibility: hidden;
-      transition: opacity 0.3s, visibility 0.3s;
-    }
-    #side-drawer-overlay.open {
-      opacity: 1;
-      visibility: visible;
-    }
-    #side-drawer {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 320px;
-      max-width: 85vw;
-      height: 100%;
-      background: #ffffff;
-      z-index: 5001;
-      transform: translateX(-100%);
-      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-      display: flex;
-      flex-direction: column;
-      box-shadow: 4px 0 24px rgba(0,0,0,0.2);
-    }
-    #side-drawer-overlay.open #side-drawer {
-      transform: translateX(0);
-    }
-    .drawer-header {
-      padding: 18px 20px;
-      background: #0f172a;
-      color: white;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .drawer-header-title {
-      font-weight: 900;
-      font-size: 1rem;
-    }
-    .drawer-close-btn {
-      background: none;
-      border: none;
-      color: #94a3b8;
-      font-size: 1.3rem;
-      cursor: pointer;
-      padding: 4px;
-    }
-    .drawer-body {
-      flex: 1;
-      overflow-y: auto;
-      padding: 0;
-    }
-    .drawer-section {
-      padding: 14px 20px;
-      border-bottom: 1px solid #f1f5f9;
-    }
-    .drawer-section-title {
-      font-size: 0.72rem;
-      font-weight: 800;
-      color: #64748b;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      margin-bottom: 10px;
-    }
-    .drawer-menu-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 4px;
-      font-size: 0.85rem;
-      font-weight: 600;
-      color: #1e293b;
-      cursor: pointer;
-      border-radius: 8px;
-      transition: background 0.15s;
-    }
-    .drawer-menu-item:hover {
-      background: #f1f5f9;
-    }
-    .drawer-menu-item .dm-icon {
-      font-size: 1.1rem;
-      width: 28px;
-      text-align: center;
-    }
-    /* NOTIFICATION SETTINGS FULL-SCREEN VIEW */
-    #view-notif-mode {
-      flex-direction: column;
-      background: #f8fafc;
-    }
-    #view-notif-mode .notif-view-header {
-      padding: 16px 20px;
-      background: #0f172a;
-      color: white;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-shrink: 0;
-    }
-    #view-notif-mode .notif-view-header h3 {
-      font-size: 1.05rem;
-      font-weight: 800;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    #view-notif-mode .notif-view-header .nv-subtitle {
-      font-size: 0.72rem;
-      color: #94a3b8;
-      margin-top: 2px;
-    }
-    #view-notif-mode .notif-view-body {
-      flex: 1;
-      overflow-y: auto;
-      padding: 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 18px;
-      -webkit-overflow-scrolling: touch;
-    }
-
-    /* 2. APP CONTAINER & VIEW SWITCHER */
-    #app-container {
-      flex: 1;
-      display: flex;
-      overflow: hidden;
-      position: relative;
-      padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
-    }
-    .app-view {
+    html, body {
       width: 100%;
       height: 100%;
-      display: none;
-    }
-    .app-view.active {
-      display: flex;
-    }
-
-    /* VIEW 1: STORE STOCK & MAP */
-    #view-stores-mode {
-      flex-direction: row;
-      position: relative;
-    }
-    #sidebar {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      display: none;
-      flex-direction: column;
-      background: white;
-      z-index: 1500;
-      transition: none;
-    }
-    #sidebar.view-active {
-      display: flex;
-    }
-
-    /* Floating toggle button for sidebar - HIDDEN in new layout */
-    .sidebar-collapse-trigger {
-      display: none !important;
-    }
-    .sidebar-collapse-trigger:hover {
-      background: #f1f5f9;
-      color: #2563eb;
-    }
-    #view-stores-mode.sidebar-hidden .sidebar-collapse-trigger {
-      left: 0;
-      border-left: 1px solid #cbd5e1;
-    }
-
-    @media (max-width: 768px) {
-      .sidebar-collapse-trigger {
-        display: none !important;
-      }
-    }
-    
-    .location-bar {
-      padding: 8px 16px;
-      background: #eff6ff;
-      border-bottom: 1px solid #dbeafe;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 0.78rem;
-    }
-    .location-info {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      color: #1e40af;
-      font-weight: 600;
       overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .loc-btn {
-      padding: 4px 10px;
-      background: #2563eb;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      font-size: 0.72rem;
-      cursor: pointer;
-      font-weight: 700;
-      transition: background 0.2s;
-    }
-    .loc-btn:hover { background: #1d4ed8; }
-    
-    /* SIDEBAR TAB SWITCHER (TÁCH BIỆT BÁO CÓ HÀNG & TRA CỨU TOÀN BỘ) */
-    .sidebar-tab-switcher {
-      display: flex;
-      background: #f1f5f9;
-      padding: 6px 12px;
-      gap: 6px;
-      border-bottom: 1px solid #e2e8f0;
-    }
-    .sidebar-tab-btn {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      padding: 8px 10px;
-      border: 1.5px solid transparent;
-      border-radius: 8px;
-      background: transparent;
-      color: #64748b;
-      font-size: 0.8rem;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all 0.15s ease;
-      user-select: none;
-    }
-    .sidebar-tab-btn:hover {
-      color: #0f172a;
-      background: rgba(255, 255, 255, 0.7);
-    }
-    .sidebar-tab-btn.active {
-      background: white;
-      color: #0f172a;
-      border-color: #cbd5e1;
-      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-    }
-    .tab-pill-badge {
-      font-size: 0.68rem;
-      padding: 1px 7px;
-      border-radius: 12px;
-      background: #16a34a;
-      color: white;
-      font-weight: 800;
-    }
-    .tab-pill-badge.muted {
-      background: #94a3b8;
-    }
-
-    .stats-bar {
-      display: flex;
-      padding: 10px 16px;
-      background: #f8fafc;
-      border-bottom: 1px solid #e2e8f0;
-      gap: 8px;
-    }
-    .stat-badge {
-      flex: 1;
-      background: white;
-      padding: 8px;
-      border-radius: 8px;
-      text-align: center;
-      border: 1px solid #e2e8f0;
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-    .stat-badge:hover { border-color: #2563eb; transform: translateY(-1px); }
-    .stat-badge .num { font-size: 1.18rem; font-weight: 800; }
-    .stat-badge .label { font-size: 0.68rem; color: #64748b; font-weight: 600; margin-top: 2px; }
-    .stat-in { color: #16a34a; }
-    .stat-out { color: #dc2626; }
-    
-    /* CONTROLS BAR WITH SEARCH, TIME FILTER & SETTINGS ICON */
-    .controls {
-      padding: 12px 16px;
-      border-bottom: 1px solid #e2e8f0;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    .search-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .search-box {
-      flex: 1;
-      padding: 9px 14px;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      font-size: 0.88rem;
-      outline: none;
-      transition: border-color 0.2s;
-    }
-    .search-box:focus { border-color: #2563eb; }
-    
-    .settings-icon-btn {
-      width: 40px;
-      height: 40px;
-      border-radius: 8px;
-      background: #f1f5f9;
-      border: 1px solid #cbd5e1;
-      color: #334155;
-      font-size: 1.15rem;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.2s;
-      flex-shrink: 0;
-    }
-    .settings-icon-btn:hover {
       background: #0f172a;
-      color: white;
-      border-color: #0f172a;
-      transform: rotate(45deg);
-    }
-    .settings-icon-btn.active {
-      background: #2563eb;
-      color: white;
-      border-color: #2563eb;
-    }
-
-    /* COMPACT CONTROLS GRID (ZERO HORIZONTAL SCROLLBARS) */
-    .controls-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      width: 100%;
-    }
-    .control-box {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      min-width: 0;
-    }
-    .control-box-label {
-      font-size: 0.72rem;
-      font-weight: 700;
-      color: #475569;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .control-dropdown {
-      width: 100%;
-      height: 38px;
-      padding: 0 10px;
-      border-radius: 8px;
-      border: 1.5px solid #cbd5e1;
-      background-color: white;
-      font-size: 0.8rem;
-      font-weight: 600;
-      color: #1e293b;
-      outline: none;
-      cursor: pointer;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      overflow: hidden;
-      appearance: none;
-      -webkit-appearance: none;
-      -moz-appearance: none;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23334155' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-      background-repeat: no-repeat;
-      background-position: right 10px center;
-      padding-right: 28px;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-      transition: all 0.15s ease;
-    }
-    .control-dropdown:hover {
-      border-color: #3b82f6;
-      background-color: #f8fafc;
-    }
-    .control-dropdown:focus {
-      border-color: #2563eb;
-      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
-      background-color: white;
-    }
-
-    .status-quick-btn {
-      padding: 5px 11px;
-      border-radius: 16px;
-      border: 1px solid #cbd5e1;
-      background: white;
-      font-size: 0.74rem;
-      font-weight: 700;
-      color: #475569;
-      cursor: pointer;
-      white-space: nowrap;
-      transition: all 0.15s;
-    }
-
-    .filter-status-banner {
-      background: #f1f5f9;
-      padding: 7px 14px;
-      font-size: 0.75rem;
-      color: #475569;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 1px solid #e2e8f0;
-    }
-    
-    #store-list {
-      flex: 1;
-      overflow-y: auto;
-      padding: 10px 14px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    
-    .store-card {
-      background: white;
-      border: 1px solid #e2e8f0;
-      border-radius: 10px;
-      padding: 12px 14px;
-      cursor: pointer;
-      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    .store-card:hover {
-      border-color: #2563eb;
-      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.1);
-      transform: translateY(-1px);
-    }
-    /* ========================================================
-       POKETAN STYLE LIST & PILL FILTERS
-       ======================================================== */
-    .poketan-chips-bar {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      overflow-x: auto;
-      padding-bottom: 4px;
-      margin-bottom: 10px;
-    }
-    .poketan-chip {
-      padding: 6px 14px;
-      border-radius: 9999px;
-      border: 1px solid #e2e8f0;
-      background: #f8fafc;
-      font-size: 0.78rem;
-      font-weight: 700;
-      color: #475569;
-      cursor: pointer;
-      white-space: nowrap;
-      transition: all 0.15s ease;
-    }
-    .poketan-chip:hover {
-      background: #e2e8f0;
-      color: #0f172a;
-    }
-    .poketan-chip.active {
-      background: #0f172a;
-      color: #ffffff;
-      border-color: #0f172a;
-    }
-    .poketan-chip.active-in {
-      background: #15803d;
-      color: #ffffff;
-      border-color: #15803d;
-    }
-    .poketan-chip.active-out {
-      background: #dc2626;
-      color: #ffffff;
-      border-color: #dc2626;
-    }
-
-    .poketan-header-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 6px 4px 8px 4px;
-      border-bottom: 1px solid #f1f5f9;
-      margin-bottom: 6px;
-    }
-    .poketan-header-title {
-      font-size: 0.78rem;
-      font-weight: 800;
-      color: #334155;
-    }
-    .poketan-sort-btn {
-      font-size: 0.72rem;
-      font-weight: 700;
-      color: #64748b;
-      background: #f1f5f9;
-      border: 1px solid #e2e8f0;
-      border-radius: 6px;
-      padding: 3px 8px;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-    }
-    .poketan-sort-btn:hover {
-      background: #e2e8f0;
-      color: #0f172a;
-    }
-
-    /* POKETAN CLEAN ROW */
-    .poketan-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 10px 10px;
-      border-bottom: 1px solid #f1f5f9;
-      cursor: pointer;
-      transition: background 0.15s ease;
-      gap: 12px;
-      background: #ffffff;
-      border-radius: 8px;
-    }
-    .poketan-row:hover {
-      background: #f8fafc;
-    }
-    .poketan-row.active-store-card {
-      background: #eff6ff !important;
-      outline: 2px solid #3b82f6;
-    }
-    .poketan-row-left {
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-      min-width: 0;
-      flex: 1;
-    }
-    .status-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      flex-shrink: 0;
-      margin-top: 5px;
-    }
-    .dot-in {
-      background: #16a34a;
-      box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.2);
-    }
-    .dot-out {
-      background: #dc2626;
-    }
-    .dot-none {
-      background: #d97706;
-    }
-    .dot-u {
-      background: #94a3b8;
-    }
-
-    .poketan-row-main {
-      min-width: 0;
-      flex: 1;
-    }
-    .poketan-store-title-line {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      flex-wrap: wrap;
-    }
-    .poketan-store-name {
-      font-size: 0.88rem;
-      font-weight: 700;
-      color: #0f172a;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .poketan-new-badge {
-      background: #dc2626;
-      color: #ffffff;
-      font-size: 0.65rem;
-      font-weight: 800;
-      padding: 1px 5px;
-      border-radius: 4px;
-      letter-spacing: 0.5px;
-    }
-    .poketan-row-subline {
-      font-size: 0.74rem;
-      color: #64748b;
-      margin-top: 3px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-    .poketan-meta-pack {
-      color: #15803d;
-      font-weight: 600;
-      background: #f0fdf4;
-      padding: 1px 6px;
-      border-radius: 4px;
-    }
-
-    .poketan-row-addr {
-      font-size: 0.72rem;
-      color: #64748b;
-      margin-top: 3px;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .poketan-row-addr-text {
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .poketan-card-actions {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      margin-top: 5px;
-    }
-    .poketan-btn-hist {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 3px 8px;
-      font-size: 0.7rem;
-      font-weight: 700;
-      color: #0f172a;
-      background: #f1f5f9;
-      border: 1px solid #cbd5e1;
-      border-radius: 6px;
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
-    .poketan-btn-hist:hover {
-      background: #e2e8f0;
-      color: #0284c7;
-      border-color: #94a3b8;
-    }
-    .poketan-btn-maps {
-      display: inline-flex;
-      align-items: center;
-      gap: 3px;
-      padding: 3px 8px;
-      font-size: 0.7rem;
-      font-weight: 700;
-      color: #1d4ed8;
-      background: #eff6ff;
-      border: 1px solid #bfdbfe;
-      border-radius: 6px;
-      text-decoration: none;
-      transition: all 0.15s ease;
-    }
-    .poketan-btn-maps:hover {
-      background: #dbeafe;
-      border-color: #93c5fd;
-    }
-
-    /* POKETAN STATUS BADGES ON THE RIGHT */
-    .poketan-status-badge {
-      padding: 5px 12px;
-      border-radius: 9999px;
-      font-size: 0.74rem;
-      font-weight: 700;
-      white-space: nowrap;
-      flex-shrink: 0;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .poketan-badge-in {
-      background: #ecfdf5;
-      color: #059669;
-      border: 1px solid #a7f3d0;
-    }
-    .poketan-badge-out {
-      background: #fef2f2;
-      color: #dc2626;
-      border: 1px solid #fecaca;
-    }
-    .poketan-badge-none {
-      background: #fefce8;
-      color: #ca8a04;
-      border: 1px solid #fef08a;
-    }
-    .poketan-badge-u {
-      background: #f1f5f9;
-      color: #64748b;
-      border: 1px solid #e2e8f0;
-    }
-    .store-hist-btn:hover,
-    .store-accordion-toggle:hover {
-      background: #2563eb;
-      color: white;
-      border-color: #2563eb;
-      box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
-    }
-    .store-accordion-toggle.expanded {
-      background: #1e40af;
-      color: white;
-      border-color: #1e3a8a;
-      box-shadow: 0 2px 6px rgba(30, 64, 175, 0.3);
-    }
-    .accordion-arrow {
-      font-size: 0.72rem;
-      font-weight: 900;
-      display: inline-block;
-      line-height: 1;
-      transition: transform 0.2s ease;
-    }
-    
-    /* ACCORDION COLLAPSIBLE BODY (EXPANDS CARD HEIGHT IN-PLACE) */
-    .store-accordion-body {
-      margin-top: 8px;
-      background: #f8fafc;
-      border: 1.5px solid #cbd5e1;
-      border-radius: 8px;
-      padding: 10px 12px;
-      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.04);
-      cursor: default;
-      max-height: 320px;
-      overflow-y: auto;
-      animation: accordionExpand 0.22s ease-out;
-    }
-    .store-accordion-body::-webkit-scrollbar,
-    .popup-accordion-body::-webkit-scrollbar {
-      width: 5px;
-    }
-    .store-accordion-body::-webkit-scrollbar-thumb,
-    .popup-accordion-body::-webkit-scrollbar-thumb {
-      background: #cbd5e1;
-      border-radius: 3px;
-    }
-    .store-accordion-body::-webkit-scrollbar-thumb:hover,
-    .popup-accordion-body::-webkit-scrollbar-thumb:hover {
-      background: #94a3b8;
-    }
-    @keyframes accordionExpand {
-      from { opacity: 0; transform: translateY(-4px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    .accordion-hist-entry {
-      background: white;
-      border: 1px solid #e2e8f0;
-      border-radius: 6px;
-      padding: 8px 10px;
-      margin-bottom: 6px;
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-      transition: border-color 0.15s ease;
-    }
-    .accordion-hist-entry:hover {
-      border-color: #94a3b8;
-    }
-    .accordion-hist-entry.entry-in {
-      border-left: 4px solid #16a34a;
-      background: #f0fdf4;
-    }
-    .accordion-hist-entry.entry-out {
-      border-left: 4px solid #dc2626;
-      background: #fef2f2;
-    }
-    .accordion-hist-entry.entry-none {
-      border-left: 4px solid #94a3b8;
-      background: #f8fafc;
-    }
-    .accordion-hist-entry:last-child {
-      margin-bottom: 0;
-    }
-
-    .hist-mini-badge {
-      font-size: 0.72rem;
-      font-weight: 700;
-      padding: 2px 7px;
-      border-radius: 10px;
-      display: inline-block;
-      white-space: nowrap;
-    }
-    .hist-mini-badge.mini-in {
-      background: #dcfce7;
-      color: #15803d;
-      border: 1px solid #86efac;
-    }
-    .hist-mini-badge.mini-out {
-      background: #fee2e2;
-      color: #b91c1c;
-      border: 1px solid #fca5a5;
-    }
-    .hist-mini-badge.mini-none {
-      background: #f1f5f9;
-      color: #64748b;
-      border: 1px solid #cbd5e1;
-    }
-
-    .popup-accordion-body {
-      background: #f8fafc;
-      border-radius: 6px;
-      padding: 8px;
     }
 
     #map {
@@ -1388,3384 +476,431 @@ def index():
       position: absolute;
       top: 0;
       left: 0;
+      z-index: 1;
     }
-    .map-controls-box {
+
+    /* TOP FLOATING HEADER */
+    #top-bar {
       position: absolute;
-      bottom: calc(76px + env(safe-area-inset-bottom, 0px));
-      right: 18px;
-      z-index: 1200;
+      top: 12px;
+      left: 12px;
+      right: 12px;
+      z-index: 1000;
       display: flex;
       flex-direction: column;
       gap: 8px;
+      pointer-events: none;
+      max-width: 680px;
+      margin: 0 auto;
     }
-    .floating-btn {
-      background: white;
-      border: 1px solid #cbd5e1;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.15);
-      padding: 8px 14px;
-      border-radius: 8px;
-      font-size: 0.82rem;
-      font-weight: 700;
-      cursor: pointer;
+
+    .top-panel {
+      pointer-events: auto;
+      background: rgba(15, 23, 42, 0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 14px;
+      padding: 10px 14px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+      color: white;
+    }
+
+    .top-row-1 {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .brand-title {
+      font-weight: 900;
+      font-size: 1.05rem;
+      letter-spacing: -0.02em;
       display: flex;
       align-items: center;
       gap: 6px;
-      color: #1e293b;
-      transition: all 0.2s;
+      color: #f8fafc;
     }
-    .floating-btn:hover {
-      background: #f8fafc;
-      border-color: #2563eb;
-      color: #2563eb;
+    .brand-title span.badge {
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 2px 6px;
+      background: #2563eb;
+      border-radius: 6px;
+      text-transform: uppercase;
     }
-    .gps-locate-btn {
+
+    .pref-select {
+      background: #1e293b;
+      color: #f8fafc;
+      border: 1px solid #334155;
+      padding: 5px 10px;
+      border-radius: 8px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      outline: none;
+      cursor: pointer;
+    }
+
+    /* FILTER BUTTONS ROW */
+    .filter-pills {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: 2px;
+    }
+    .filter-pills::-webkit-scrollbar { display: none; }
+
+    .pill-btn {
+      flex: 1;
+      min-width: fit-content;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: #1e293b;
+      color: #94a3b8;
+      font-size: 0.74rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+    .pill-btn:hover {
+      background: #334155;
+      color: white;
+    }
+    .pill-btn.active {
+      background: #2563eb;
+      border-color: #3b82f6;
+      color: white;
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4);
+    }
+    .pill-btn .cnt {
+      font-size: 0.7rem;
+      font-weight: 800;
+      opacity: 0.9;
+    }
+
+    /* SEARCH BAR */
+    .search-row {
+      margin-top: 8px;
+      position: relative;
+    }
+    .search-input {
+      width: 100%;
+      height: 34px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 0 10px 0 32px;
+      font-size: 0.78rem;
+      color: white;
+      outline: none;
+    }
+    .search-input:focus {
+      border-color: #3b82f6;
+    }
+    .search-icon {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.75rem;
+      color: #64748b;
+    }
+
+    /* GPS FLOATING BUTTON */
+    #gps-btn {
+      position: absolute;
+      bottom: 24px;
+      right: 20px;
+      z-index: 1000;
       width: 48px;
       height: 48px;
       border-radius: 50%;
-      padding: 0;
-      justify-content: center;
       background: #ffffff;
       border: 2px solid #2563eb;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+      box-shadow: 0 4px 18px rgba(0,0,0,0.3);
       cursor: pointer;
       display: flex;
       align-items: center;
-      transition: all 0.2s;
-      -webkit-tap-highlight-color: transparent;
+      justify-content: center;
+      font-size: 1.3rem;
+      transition: transform 0.2s, background 0.2s;
     }
-    .gps-locate-btn:hover {
+    #gps-btn:active {
+      transform: scale(0.92);
       background: #eff6ff;
-      transform: scale(1.06);
-    }
-    .gps-locate-btn.active {
-      background: #2563eb;
-      border-color: #2563eb;
-      color: white;
-    }
-    
-    /* 3. DEDICATED CALENDAR VIEW & HEADER */
-    #view-calendar-mode {
-      flex-direction: column;
-      background: #f8fafc;
-      overflow-y: auto;
     }
 
-    #calendar-dedicated-header {
-      background: white;
-      border-bottom: 1px solid #e2e8f0;
-      padding: 20px 32px 16px 32px;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
-      position: sticky;
-      top: 0;
-      z-index: 500;
-    }
-    .cal-header-row-1 {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 16px;
-      margin-bottom: 16px;
-    }
-    .cal-header-title-group h2 {
-      font-size: 1.35rem;
-      font-weight: 800;
-      color: #0f172a;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .cal-header-title-group p {
-      font-size: 0.84rem;
-      color: #64748b;
-      margin-top: 4px;
-      font-weight: 500;
-    }
-    .cal-header-actions-group {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-    .cal-stat-pill {
-      padding: 6px 14px;
-      border-radius: 20px;
-      font-size: 0.8rem;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .cal-stat-pill.open { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
-    .cal-stat-pill.upcoming { background: #fef9c3; color: #854d0e; border: 1px solid #fef08a; }
-    .cal-stat-pill.expired { background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; }
-
-    .cal-btn-toggle-expired {
-      padding: 7px 16px;
-      background: #f8fafc;
-      border: 1px solid #cbd5e1;
-      border-radius: 20px;
-      font-size: 0.8rem;
-      font-weight: 700;
-      color: #334155;
-      cursor: pointer;
-      transition: all 0.2s;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .cal-btn-toggle-expired:hover {
-      background: #e2e8f0;
-      border-color: #94a3b8;
-      color: #0f172a;
-    }
-
-    .cal-filter-toolbar {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      flex-wrap: wrap;
-      padding-top: 14px;
-      border-top: 1px solid #f1f5f9;
-    }
-    .cal-search-box-wrap {
-      position: relative;
-      flex: 1;
-      min-width: 260px;
-      max-width: 440px;
-    }
-    .cal-search-box-wrap input {
-      width: 100%;
-      padding: 8px 14px 8px 36px;
-      border-radius: 8px;
-      border: 1px solid #cbd5e1;
-      font-size: 0.85rem;
-      outline: none;
-      transition: border-color 0.2s;
-    }
-    .cal-search-box-wrap input:focus { border-color: #2563eb; }
-    .cal-search-box-wrap .search-icon {
-      position: absolute;
-      left: 12px;
-      top: 50%;
-      transform: translateY(-50%);
-      font-size: 0.85rem;
-      color: #94a3b8;
-    }
-
-    .cal-chip-group {
-      display: flex;
-      gap: 6px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-    .cal-chip {
-      padding: 6px 14px;
-      border-radius: 18px;
-      border: 1px solid #cbd5e1;
-      background: white;
-      font-size: 0.78rem;
-      font-weight: 600;
-      color: #475569;
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-    .cal-chip:hover { background: #f1f5f9; color: #1e293b; }
-    .cal-chip.active { background: #0f172a; color: white; border-color: #0f172a; }
-
-    #calendar-grid-container {
-      padding: 28px 32px 60px 32px;
-      max-width: 1480px;
-      width: 100%;
-      margin: 0 auto;
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-    }
-    #calendar-cards-grid, #calendar-expired-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-      gap: 18px;
-    }
-    
-    .cal-card {
-      background: white;
-      border: 1px solid #e2e8f0;
-      border-radius: 12px;
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.04);
-      transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
-    }
-    .cal-card:hover {
-      border-color: #3b82f6;
-      box-shadow: 0 6px 18px rgba(0,0,0,0.08);
-      transform: translateY(-2px);
-    }
-    .cal-top {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .cal-status-badge {
-      font-size: 0.74rem;
-      font-weight: 800;
-      padding: 4px 10px;
-      border-radius: 14px;
-    }
-    .cal-open { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
-    .cal-upcoming { background: #fef9c3; color: #854d0e; border: 1px solid #fef08a; }
-    .cal-closed { background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; }
-    
-    .cal-title { font-size: 1.02rem; font-weight: 800; color: #0f172a; line-height: 1.35; }
-    .cal-type { font-size: 0.75rem; color: #0284c7; font-weight: 700; }
-    .cal-note { font-size: 0.8rem; color: #64748b; background: #f8fafc; padding: 10px; border-radius: 8px; line-height: 1.45; border: 1px solid #f1f5f9; }
-    
-    .cal-actions {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-top: 6px;
-      padding-top: 10px;
-      border-top: 1px solid #f1f5f9;
-    }
-    .cal-link-btn {
-      padding: 7px 14px;
-      background: #2563eb;
-      color: white;
-      text-decoration: none;
-      border-radius: 6px;
-      font-size: 0.78rem;
-      font-weight: 700;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      transition: background 0.2s;
-    }
-    .cal-link-btn:hover { background: #1d4ed8; }
-    .cal-checkbox-label {
-      font-size: 0.78rem;
-      color: #475569;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      cursor: pointer;
-      user-select: none;
-      font-weight: 600;
-    }
-
-    .expired-divider {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      margin: 24px 0 12px 0;
-    }
-    .expired-divider-line {
-      flex: 1;
-      height: 1px;
-      background: #cbd5e1;
-      border-bottom: 1px dashed #cbd5e1;
-    }
-    .expired-divider-label {
-      font-size: 0.8rem;
-      font-weight: 800;
-      color: #94a3b8;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    /* 4. SETTINGS MODAL / POPOVER */
-    .modal-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      background: rgba(15, 23, 42, 0.65);
-      backdrop-filter: blur(4px);
-      z-index: 9999;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .modal-content {
-      background: white;
-      border-radius: 14px;
-      width: 92%;
-      max-width: 540px;
-      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      animation: modalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    @keyframes modalFadeIn {
-      from { opacity: 0; transform: scale(0.95); }
-      to { opacity: 1; transform: scale(1); }
-    }
-    .modal-header {
-      padding: 16px 20px;
-      background: #0f172a;
-      color: white;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .modal-header h3 {
-      font-size: 1.05rem;
-      font-weight: 800;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .modal-close-btn {
-      background: rgba(255, 255, 255, 0.15);
-      border: none;
-      color: white;
-      width: 30px;
-      height: 30px;
-      border-radius: 50%;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 800;
-      transition: background 0.2s;
-    }
-    .modal-close-btn:hover { background: rgba(255, 255, 255, 0.3); }
-    .modal-body {
-      padding: 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 18px;
-      max-height: 80vh;
-      overflow-y: auto;
-    }
-    .setting-group {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    .setting-group-title {
-      font-size: 0.72rem;
-      font-weight: 800;
-      color: #64748b;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-    .setting-checkbox-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 10px 14px;
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      background: #f8fafc;
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-    .setting-checkbox-row:hover {
-      background: #f1f5f9;
-      border-color: #cbd5e1;
-    }
-    .setting-checkbox-left {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 0.85rem;
-      font-weight: 600;
-    }
-    .setting-checkbox-left input[type="checkbox"] {
+    /* USER LOCATION PULSE */
+    .user-location-marker {
       width: 18px;
       height: 18px;
-      cursor: pointer;
-    }
-    .status-count-pill {
-      font-size: 0.75rem;
-      font-weight: 800;
-      padding: 3px 9px;
-      border-radius: 12px;
-    }
-    .status-count-pill.in { background: #dcfce7; color: #15803d; }
-    .status-count-pill.out { background: #fee2e2; color: #b91c1c; }
-    .status-count-pill.none { background: #f1f5f9; color: #64748b; }
-    .status-count-pill.u { background: #e0f2fe; color: #0369a1; }
-
-    /* TIME RADIO ROWS */
-    .time-radio-group {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    .time-radio-row {
-      display: flex;
-      align-items: flex-start;
-      gap: 12px;
-      padding: 9px 12px;
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      background: #f8fafc;
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-    .time-radio-row:hover {
-      background: #f1f5f9;
-      border-color: #cbd5e1;
-    }
-    .time-radio-row input[type="radio"] {
-      margin-top: 3px;
-      cursor: pointer;
-      accent-color: #2563eb;
-    }
-    .time-desc {
-      font-size: 0.72rem;
-      color: #64748b;
-      margin-top: 2px;
-      font-weight: 500;
-    }
-
-    .modal-quick-actions {
-      display: flex;
-      gap: 8px;
-      padding-top: 14px;
-      border-top: 1px solid #e2e8f0;
-      flex-wrap: wrap;
-    }
-    .btn-preset {
-      flex: 1;
-      min-width: 130px;
-      padding: 9px 12px;
-      border-radius: 8px;
-      font-size: 0.78rem;
-      font-weight: 700;
-      border: 1px solid #cbd5e1;
-      background: white;
-      cursor: pointer;
-      transition: all 0.2s;
-      text-align: center;
-    }
-    .btn-preset:hover {
-      background: #f8fafc;
-      border-color: #2563eb;
-      color: #2563eb;
-    }
-    .btn-preset.active {
-      background: #0f172a;
-      color: white;
-      border-color: #0f172a;
-    }
-
-    /* USER LOCATION PULSING MARKER */
-    .user-pulse-marker {
-      width: 18px;
-      height: 18px;
-      background: #2563eb;
-      border: 3px solid white;
       border-radius: 50%;
-      box-shadow: 0 0 10px rgba(37, 99, 235, 0.8);
+      background: #2563eb;
+      border: 3px solid #ffffff;
+      box-shadow: 0 0 12px rgba(37, 99, 235, 0.8);
       position: relative;
     }
-    .user-pulse-marker::after {
+    .user-location-marker::after {
       content: '';
       position: absolute;
-      top: -12px;
-      left: -12px;
-      width: 36px;
-      height: 36px;
+      top: -6px;
+      left: -6px;
+      right: -6px;
+      bottom: -6px;
       border-radius: 50%;
       border: 2px solid #3b82f6;
-      animation: userGpsPulse 2s infinite ease-out;
+      animation: pulse 1.8s infinite;
     }
-    @keyframes userGpsPulse {
-      0% { transform: scale(0.5); opacity: 1; }
-      100% { transform: scale(1.8); opacity: 0; }
+    @keyframes pulse {
+      0% { transform: scale(0.9); opacity: 1; }
+      100% { transform: scale(2.2); opacity: 0; }
     }
-    
-    /* OLD TOAST CONTAINER - DISABLED, replaced by map-toast-overlay */
-    #toast-container {
-      display: none;
+
+    /* LEAFLET POPUP STYLES */
+    .leaflet-popup-content-wrapper {
+      background: #ffffff;
+      border-radius: 14px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+      padding: 0;
+      overflow: hidden;
     }
-    .toast {
-      pointer-events: auto;
-      width: 380px;
-      background: white;
-      border-radius: 12px;
-      padding: 16px;
-      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
-      border-left: 6px solid #16a34a;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    .leaflet-popup-content {
+      margin: 0;
+      padding: 14px 16px;
+      font-family: 'Inter', sans-serif;
+      min-width: 240px;
+      max-width: 320px;
+      color: #0f172a;
     }
-    @keyframes slideIn {
-      from { transform: translateX(120%); opacity: 0; }
-      to { transform: translateX(0); opacity: 1; }
-    }
-    .toast-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+    .store-popup-title {
       font-weight: 800;
       font-size: 0.95rem;
-      color: #16a34a;
-    }
-    .toast-time { font-size: 0.75rem; color: #94a3b8; }
-    .toast-body { font-size: 0.88rem; color: #0f172a; font-weight: 700; }
-    .toast-pack { font-size: 0.8rem; color: #b45309; background: #fef3c7; padding: 3px 8px; border-radius: 4px; display: inline-block; width: fit-content; }
-    .toast-btn {
-      margin-top: 4px;
-      align-self: flex-start;
-      padding: 5px 12px;
-      background: #0f172a;
-      color: white;
-      font-size: 0.75rem;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      font-weight: 700;
-    }
-
-    /* 5. STORE HISTORY MODAL & TIMELINE */
-    .btn-store-hist {
-      background: #0f172a;
-      color: white;
-      border: 1px solid #334155;
-      padding: 3px 8px;
-      border-radius: 6px;
-      font-size: 0.72rem;
-      font-weight: 700;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      transition: all 0.15s ease;
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-    .btn-store-hist:hover {
-      background: #2563eb;
-      border-color: #2563eb;
-      color: white;
-    }
-
-    .hist-timeline {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      position: relative;
-      padding-left: 18px;
-    }
-    .hist-timeline::before {
-      content: '';
-      position: absolute;
-      left: 6px;
-      top: 10px;
-      bottom: 10px;
-      width: 2px;
-      background: #e2e8f0;
-    }
-    .hist-item {
-      position: relative;
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 10px;
-      padding: 12px 14px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      transition: all 0.15s ease;
-    }
-    .hist-item:hover {
-      border-color: #cbd5e1;
-      background: white;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-    }
-    .hist-item::before {
-      content: '';
-      position: absolute;
-      left: -17px;
-      top: 16px;
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: #94a3b8;
-      border: 2px solid white;
-      box-shadow: 0 0 0 2px #e2e8f0;
-    }
-    .hist-item.hist-in {
-      border-left: 4px solid #16a34a;
-      background: #f0fdf4;
-    }
-    .hist-item.hist-in::before {
-      background: #16a34a;
-      box-shadow: 0 0 0 2px #bbf7d0;
-    }
-    .hist-item.hist-out {
-      border-left: 4px solid #dc2626;
-      background: #fef2f2;
-    }
-    .hist-item.hist-out::before {
-      background: #dc2626;
-      box-shadow: 0 0 0 2px #fecaca;
-    }
-    .hist-item.hist-none {
-      border-left: 4px solid #64748b;
-      background: #f8fafc;
-    }
-    .hist-item.hist-none::before {
-      background: #64748b;
-      box-shadow: 0 0 0 2px #e2e8f0;
-    }
-
-    .hist-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 6px;
-    }
-    .hist-status-badge {
-      font-size: 0.76rem;
-      font-weight: 800;
-      padding: 3px 8px;
-      border-radius: 6px;
-    }
-    .hist-status-in { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
-    .hist-status-out { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
-    .hist-status-none { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
-    .hist-status-u { background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; }
-
-    .hist-time-ago {
-      font-size: 0.8rem;
-      font-weight: 800;
+      line-height: 1.3;
       color: #0f172a;
     }
-    .hist-timestamp {
+    .store-popup-chain {
       font-size: 0.72rem;
-      color: #64748b;
-    }
-    .hist-note {
-      font-size: 0.82rem;
-      color: #1e293b;
-      background: rgba(255, 255, 255, 0.75);
-      border: 1px solid rgba(0, 0, 0, 0.06);
-      border-radius: 6px;
-      padding: 6px 10px;
-      line-height: 1.4;
-      font-weight: 500;
-    }
-    .hist-meta {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 0.72rem;
-      color: #64748b;
+      color: #0284c7;
+      font-weight: 700;
       margin-top: 2px;
     }
-    .hist-badge-onsite {
-      background: #e0f2fe;
-      color: #0369a1;
-      font-weight: 700;
-      padding: 2px 6px;
-      border-radius: 4px;
-      border: 1px solid #bae6fd;
-    }
-
-    /* 6. DEDICATED TAB BAR FOR MAP SETTINGS & NOTIFICATION SETTINGS */
-    .settings-tab-nav {
-      display: flex;
-      background: #0f172a;
-      padding: 6px 16px 0 16px;
-      gap: 8px;
-      border-bottom: 2px solid #334155;
-    }
-    .settings-tab-btn {
-      flex: 1;
-      padding: 10px 14px;
-      border-radius: 8px 8px 0 0;
-      border: 1px solid transparent;
-      border-bottom: none;
-      background: rgba(255, 255, 255, 0.08);
-      font-size: 0.82rem;
-      font-weight: 700;
-      color: #94a3b8;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      transition: all 0.15s ease;
-    }
-    .settings-tab-btn:hover {
-      color: #ffffff;
-      background: rgba(255, 255, 255, 0.15);
-    }
-    .settings-tab-btn.active {
-      background: white;
-      color: #0f172a;
-      border-color: #cbd5e1;
-      box-shadow: 0 -2px 6px rgba(0,0,0,0.1);
-    }
-    .btn-test-action {
-      padding: 6px 12px;
-      background: #f8fafc;
-      color: #1e293b;
-      border: 1px solid #cbd5e1;
-      border-radius: 6px;
-      font-size: 0.76rem;
-      font-weight: 700;
-      cursor: pointer;
+    .store-popup-status {
       display: inline-flex;
       align-items: center;
-      gap: 5px;
-      transition: all 0.15s;
+      gap: 6px;
+      font-weight: 800;
+      font-size: 0.84rem;
+      padding: 5px 10px;
+      border-radius: 8px;
+      margin: 8px 0;
+      width: 100%;
     }
-    .btn-test-action:hover {
-      background: #2563eb;
-      color: white;
-      border-color: #2563eb;
-    }
-    .notif-badge-state {
-      font-size: 0.72rem;
-      font-weight: 700;
-      padding: 3px 8px;
-      border-radius: 12px;
-    }
-    .notif-badge-granted {
+    .status-in {
       background: #dcfce7;
       color: #15803d;
       border: 1px solid #86efac;
     }
-    .notif-badge-denied {
+    .status-out {
       background: #fee2e2;
       color: #b91c1c;
       border: 1px solid #fca5a5;
     }
-    .notif-badge-default {
-      background: #fef9c3;
-      color: #854d0e;
-      border: 1px solid #fde047;
+    .status-unknown {
+      background: #f1f5f9;
+      color: #64748b;
+      border: 1px solid #e2e8f0;
     }
-    /* ============================================
-       MOBILE BOTTOM NAVIGATION BAR (Hidden on desktop)
-       ============================================ */
-    #mobile-bottom-nav {
+
+    .store-popup-meta {
+      font-size: 0.74rem;
+      color: #475569;
+      line-height: 1.4;
+      margin-bottom: 4px;
+    }
+    .store-popup-addr {
+      font-size: 0.73rem;
+      color: #64748b;
+      background: #f8fafc;
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid #e2e8f0;
+      margin-top: 6px;
+      line-height: 1.35;
+    }
+    .btn-maps-dir {
       display: flex;
-      position: fixed;
-      bottom: 0;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      width: 100%;
+      padding: 8px 12px;
+      margin-top: 10px;
+      background: #2563eb;
+      color: white;
+      text-decoration: none;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.78rem;
+      box-shadow: 0 2px 6px rgba(37,99,235,0.3);
+    }
+    .btn-maps-dir:hover {
+      background: #1d4ed8;
+    }
+
+    /* LOADING SPINNER */
+    #loading-overlay {
+      position: absolute;
+      top: 0;
       left: 0;
       right: 0;
-      height: 60px;
-      padding-bottom: env(safe-area-inset-bottom, 0px);
+      bottom: 0;
       background: #0f172a;
-      border-top: 1px solid #1e293b;
-      z-index: 3000;
-      align-items: stretch;
-      box-shadow: 0 -4px 20px rgba(0,0,0,0.25);
-    }
-    .mobile-nav-btn {
-      flex: 1;
+      z-index: 2000;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 3px;
-      background: none;
-      border: none;
-      color: #64748b;
-      font-size: 0.65rem;
-      font-weight: 700;
-      cursor: pointer;
-      transition: color 0.15s, background 0.15s;
-      position: relative;
-      padding: 6px 0;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .mobile-nav-btn .nav-btn-icon {
-      font-size: 1.3rem;
-      line-height: 1;
-    }
-    .mobile-nav-btn .nav-btn-label {
-      font-size: 0.62rem;
-      font-weight: 700;
-      letter-spacing: 0.02em;
-    }
-    .mobile-nav-btn.active {
-      color: #60a5fa;
-    }
-    .mobile-nav-btn.active::after {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 25%;
-      right: 25%;
-      height: 3px;
-      background: #3b82f6;
-      border-radius: 0 0 3px 3px;
-    }
-    .mobile-nav-btn .nav-btn-badge {
-      position: absolute;
-      top: 4px;
-      right: 50%;
-      transform: translateX(calc(50% + 12px));
-      background: #16a34a;
       color: white;
-      font-size: 0.58rem;
-      font-weight: 800;
-      padding: 1px 5px;
-      border-radius: 8px;
-      min-width: 16px;
-      text-align: center;
-      line-height: 1.3;
+      transition: opacity 0.3s ease;
     }
-    .mobile-nav-btn .nav-btn-badge.cal-badge-color {
-      background: #f59e0b;
+    .spinner {
+      width: 38px;
+      height: 38px;
+      border: 3.5px solid rgba(255,255,255,0.2);
+      border-top-color: #3b82f6;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
     }
-    .mobile-nav-btn.gacha-center-btn .nav-btn-icon {
-      font-size: 1.5rem;
-      background: linear-gradient(135deg, #6366f1, #8b5cf6);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      filter: drop-shadow(0 0 6px rgba(139, 92, 246, 0.4));
-    }
-    .mobile-nav-btn.gacha-center-btn.active {
-      color: #a78bfa;
-    }
-
-    /* MAP TOAST OVERLAY for new stock alerts */
-    #map-toast-overlay {
-      position: fixed;
-      top: 68px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 4000;
-      width: 90%;
-      max-width: 420px;
-      pointer-events: none;
-    }
-    .map-toast {
-      pointer-events: auto;
-      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-      color: white;
-      border-radius: 14px;
-      padding: 14px 18px;
-      margin-bottom: 8px;
-      box-shadow: 0 8px 30px rgba(0,0,0,0.35);
-      border: 1px solid rgba(96, 165, 250, 0.3);
-      cursor: pointer;
-      animation: toastSlideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .map-toast:hover {
-      border-color: rgba(96, 165, 250, 0.6);
-    }
-    .map-toast-icon {
-      font-size: 1.6rem;
-      flex-shrink: 0;
-    }
-    .map-toast-content {
-      flex: 1;
-      min-width: 0;
-    }
-    .map-toast-title {
-      font-weight: 800;
-      font-size: 0.85rem;
-      color: #4ade80;
-    }
-    .map-toast-sub {
-      font-size: 0.73rem;
-      color: #94a3b8;
-      margin-top: 2px;
-    }
-    .map-toast-arrow {
-      color: #60a5fa;
-      font-weight: 800;
-      font-size: 0.9rem;
-      flex-shrink: 0;
-    }
-    @keyframes toastSlideDown {
-      from { transform: translateY(-30px); opacity: 0; }
-      to { transform: translateY(0); opacity: 1; }
-    }
-    @keyframes toastFadeOut {
-      from { opacity: 1; transform: translateY(0); }
-      to { opacity: 0; transform: translateY(-20px); }
-    }
-
-    /* ============================================
-       MOBILE RESPONSIVE STYLES (≤ 768px)
-       ============================================ */
-    @media (max-width: 768px) {
-
-      /* --- GLOBAL MOBILE TOUCH IMPROVEMENTS --- */
-      html, body {
-        -webkit-text-size-adjust: 100%;
-        -webkit-tap-highlight-color: transparent;
-      }
-      #store-list,
-      .modal-body,
-      #view-calendar-mode,
-      .store-accordion-body,
-      .popup-accordion-body {
-        -webkit-overflow-scrolling: touch;
-        overscroll-behavior: contain;
-      }
-
-      /* --- TOP NAVBAR: Already compact in new design --- */
-      #top-navbar {
-        padding: 0 10px;
-      }
-      .header-location-pill .loc-sub {
-        display: none;
-      }
-
-      /* --- APP CONTAINER: Stack vertically --- */
-      #app-container {
-        position: relative;
-        overflow: hidden;
-      }
-
-      /* --- MAP VIEW: Full screen with sidebar overlay --- */
-      #view-stores-mode {
-        flex-direction: column;
-        position: relative;
-      }
-
-      /* Sidebar already styled globally as full-screen overlay */
-
-      /* Map: always full area */
-      #map {
-        width: 100% !important;
-        height: 100% !important;
-        position: absolute;
-        top: 0;
-        left: 0;
-      }
-
-      /* Map floating controls: bottom right corner, above bottom nav */
-      .map-controls-box {
-        bottom: calc(74px + env(safe-area-inset-bottom, 0px));
-        right: 14px;
-        top: auto;
-        gap: 6px;
-      }
-      .floating-btn {
-        padding: 8px 10px;
-        font-size: 0.75rem;
-        border-radius: 8px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-      }
-      .floating-btn span {
-        font-size: 0.75rem;
-      }
-
-      /* --- SIDEBAR INTERNALS: Mobile optimized --- */
-      .location-bar {
-        padding: 8px 12px;
-      }
-      .stats-bar {
-        padding: 8px 12px;
-        gap: 6px;
-      }
-      .stat-badge {
-        padding: 8px 4px;
-        min-height: 54px;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-      }
-      .stat-badge .num {
-        font-size: 1.1rem;
-      }
-      .stat-badge .label {
-        font-size: 0.64rem;
-      }
-
-      .controls {
-        padding: 10px 12px;
-        gap: 8px;
-      }
-      .search-row {
-        gap: 6px;
-      }
-      .search-box {
-        padding: 10px 12px;
-        font-size: 16px; /* prevents iOS zoom on focus */
-        border-radius: 10px;
-      }
-      .settings-icon-btn {
-        width: 44px;
-        height: 44px;
-        font-size: 1.2rem;
-      }
-
-      .controls-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 6px;
-        width: 100%;
-      }
-      .control-box {
-        min-width: 0;
-      }
-      .search-box {
-        height: 36px;
-        padding: 0 10px;
-        font-size: 14px;
-        border-radius: 8px;
-      }
-      .control-dropdown {
-        height: 36px;
-        font-size: 13px;
-        padding: 0 6px;
-        border-radius: 8px;
-        background-position: right 6px center;
-        padding-right: 20px;
-      }
-
-      .filter-status-banner {
-        padding: 6px 12px;
-        font-size: 0.72rem;
-      }
-
-      #store-list {
-        padding: 8px 10px;
-        gap: 8px;
-        padding-bottom: 80px; /* space for bottom nav */
-      }
-
-      /* --- STORE CARDS: Tap-friendly --- */
-      .store-card {
-        padding: 12px;
-        border-radius: 12px;
-        gap: 5px;
-      }
-      .store-name {
-        font-size: 0.88rem;
-      }
-      .store-meta {
-        font-size: 0.72rem;
-        flex-direction: column;
-        gap: 3px;
-      }
-      .store-addr {
-        font-size: 0.72rem;
-      }
-
-      /* Accordion body inside cards */
-      .store-accordion-body {
-        max-height: 260px;
-        padding: 8px 10px;
-      }
-      .store-accordion-toggle,
-      .store-hist-btn {
-        padding: 6px 12px;
-        min-height: 36px;
-        font-size: 0.72rem;
-      }
-
-      /* --- CALENDAR VIEW: Mobile friendly --- */
-      #view-calendar-mode {
-        padding-bottom: 72px; /* space for bottom nav */
-      }
-      #calendar-dedicated-header {
-        padding: 14px 14px 12px 14px;
-        position: sticky;
-        top: 0;
-      }
-      .cal-header-row-1 {
-        gap: 10px;
-        margin-bottom: 10px;
-      }
-      .cal-header-title-group h2 {
-        font-size: 1.05rem;
-        gap: 6px;
-      }
-      .cal-header-title-group p {
-        font-size: 0.75rem;
-        display: none;
-      }
-      .cal-header-actions-group {
-        gap: 6px;
-      }
-      .cal-stat-pill {
-        font-size: 0.7rem;
-        padding: 4px 10px;
-      }
-      .cal-btn-toggle-expired {
-        font-size: 0.72rem;
-        padding: 6px 12px;
-      }
-      .cal-filter-toolbar {
-        gap: 8px;
-        padding-top: 10px;
-      }
-      .cal-search-box-wrap {
-        min-width: unset;
-        max-width: unset;
-        width: 100%;
-      }
-      .cal-search-box-wrap input {
-        font-size: 16px; /* prevents iOS zoom */
-      }
-      .cal-chip-group {
-        overflow-x: auto;
-        flex-wrap: nowrap;
-        -webkit-overflow-scrolling: touch;
-        padding-bottom: 4px;
-      }
-      .cal-chip {
-        flex-shrink: 0;
-      }
-      #calendar-grid-container {
-        padding: 14px 12px 80px 12px;
-      }
-      #calendar-cards-grid,
-      #calendar-expired-grid {
-        grid-template-columns: 1fr;
-        gap: 12px;
-      }
-      .cal-card {
-        padding: 14px;
-      }
-
-      /* --- MODALS: Full-width mobile --- */
-      .modal-overlay {
-        align-items: flex-end;
-        padding: 0;
-      }
-      .modal-content {
-        width: 100% !important;
-        max-width: 100% !important;
-        max-height: 92vh;
-        border-radius: 18px 18px 0 0;
-        animation: modalSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-      }
-      @keyframes modalSlideUp {
-        from { transform: translateY(100%); opacity: 0.5; }
-        to { transform: translateY(0); opacity: 1; }
-      }
-      .modal-header {
-        padding: 14px 16px;
-        border-radius: 18px 18px 0 0;
-        position: relative;
-      }
-      /* Drag handle indicator on modals */
-      .modal-header::before {
-        content: '';
-        position: absolute;
-        top: 6px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 40px;
-        height: 4px;
-        background: rgba(255,255,255,0.3);
-        border-radius: 2px;
-      }
-      .modal-header h3 {
-        font-size: 0.95rem;
-      }
-      .modal-close-btn {
-        width: 36px;
-        height: 36px;
-        font-size: 1.1rem;
-      }
-      .modal-body {
-        padding: 16px;
-        max-height: 75vh;
-        -webkit-overflow-scrolling: touch;
-        overscroll-behavior: contain;
-        padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-      }
-
-      /* Settings tabs */
-      .settings-tab-bar {
-        padding: 4px 12px 0 12px;
-      }
-      .settings-tab-btn {
-        padding: 10px 8px;
-        font-size: 0.78rem;
-      }
-      .setting-checkbox-row {
-        padding: 12px;
-        min-height: 48px;
-      }
-      .time-radio-row {
-        padding: 10px;
-        min-height: 44px;
-      }
-      .modal-quick-actions {
-        gap: 6px;
-      }
-      .btn-preset {
-        min-width: 100px;
-        padding: 10px 8px;
-        font-size: 0.76rem;
-      }
-
-      /* History modal */
-      .hist-timeline {
-        padding-left: 14px;
-      }
-      .hist-item {
-        padding: 10px 12px;
-      }
-
-      /* --- TOAST NOTIFICATIONS: Mobile width --- */
-      #toast-container {
-        top: 56px;
-        right: 8px;
-        left: 8px;
-      }
-      .toast {
-        width: 100%;
-        max-width: 100%;
-        padding: 12px;
-        border-radius: 10px;
-      }
-      .toast-header {
-        font-size: 0.88rem;
-      }
-      .toast-body {
-        font-size: 0.82rem;
-      }
-
-      /* --- MAP POPUPS: Wider on mobile --- */
-      .leaflet-popup-content-wrapper {
-        max-width: 300px !important;
-        border-radius: 12px !important;
-      }
-      .leaflet-popup-content {
-        margin: 12px !important;
-        font-size: 0.85rem;
-      }
-
-      /* Mobile bottom nav already styled globally, only adjust sizes */
-
-      /* Sidebar mobile swipe hint */
-      .mobile-swipe-hint {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 6px;
-        background: linear-gradient(135deg, #eff6ff, #dbeafe);
-        font-size: 0.7rem;
-        color: #3b82f6;
-        font-weight: 600;
-        gap: 6px;
-        border-bottom: 1px solid #bfdbfe;
-      }
-    }
-
-    /* Extra small devices (≤ 380px) */
-    @media (max-width: 380px) {
-      #top-navbar {
-        padding: 0 8px;
-      }
-      .brand-title {
-        font-size: 0.85rem;
-      }
-      .stat-badge .num {
-        font-size: 0.95rem;
-      }
-      .stat-badge .label {
-        font-size: 0.58rem;
-      }
-      .store-name {
-        font-size: 0.82rem;
-      }
-      .controls-grid {
-        grid-template-columns: 1fr;
-      }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
     }
   </style>
-
-  <script type="module">
-    import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js';
-    import { initializeFirestore, doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/11.4.0/firebase-firestore.js';
-
-    window.FirebaseInit = { initializeApp, initializeFirestore, doc, onSnapshot };
-  </script>
 </head>
 <body>
-  <div id="toast-container"></div>
 
-  <!-- SIDE DRAWER OVERLAY -->
-  <div id="side-drawer-overlay" onclick="closeSideDrawer()">
-    <div id="side-drawer" onclick="event.stopPropagation()">
-      <div class="drawer-header">
-        <span class="drawer-header-title">⚡ ポケ探 メニュー</span>
-        <button class="drawer-close-btn" onclick="closeSideDrawer()">✕</button>
-      </div>
-      <div class="drawer-body">
-        <div class="drawer-section">
-          <div class="drawer-section-title">🗾 Hiển thị theo tỉnh</div>
-          <label class="drawer-menu-item" style="cursor:pointer;">
-            <input type="checkbox" value="osaka" checked onchange="togglePrefFilter(this)" style="width:18px;height:18px;margin-right:6px;cursor:pointer;" />
-            <span>🏯 大阪府 (Osaka) — 4,050</span>
-          </label>
-          <label class="drawer-menu-item" style="cursor:pointer;">
-            <input type="checkbox" value="aichi" checked onchange="togglePrefFilter(this)" style="width:18px;height:18px;margin-right:6px;cursor:pointer;" />
-            <span>🏯 愛知県 (Aichi) — 3,849</span>
-          </label>
-          <label class="drawer-menu-item" style="cursor:pointer;">
-            <input type="checkbox" value="kanagawa" checked onchange="togglePrefFilter(this)" style="width:18px;height:18px;margin-right:6px;cursor:pointer;" />
-            <span>🏯 神奈川県 (Kanagawa) — 4,044</span>
-          </label>
-          <label class="drawer-menu-item" style="cursor:pointer;">
-            <input type="checkbox" value="gifu" checked onchange="togglePrefFilter(this)" style="width:18px;height:18px;margin-right:6px;cursor:pointer;" />
-            <span>🏯 岐阜県 (Gifu) — 21</span>
-          </label>
-          <label class="drawer-menu-item" style="cursor:pointer;">
-            <input type="checkbox" value="mie" checked onchange="togglePrefFilter(this)" style="width:18px;height:18px;margin-right:6px;cursor:pointer;" />
-            <span>🏯 三重県 (Mie) — 4</span>
-          </label>
-        </div>
-        <div class="drawer-section">
-          <div class="drawer-section-title">📍 Vị trí GPS</div>
-          <div class="drawer-menu-item" onclick="requestUserLocation(true); closeSideDrawer();">
-            <span class="dm-icon">📍</span>
-            <span id="drawer-loc-summary">Nhấn để định vị GPS</span>
-          </div>
-        </div>
-        <div class="drawer-section">
-          <div class="drawer-section-title">⚙️ Cài đặt &amp; Tùy chỉnh</div>
-          <div class="drawer-menu-item" onclick="mobileNavTo('settings'); closeSideDrawer();">
-            <span class="dm-icon">⚙️</span>
-            <span>Cài đặt bản đồ, cửa hàng &amp; thông báo</span>
-          </div>
-          <div class="drawer-menu-item" onclick="requestPushPermission(); closeSideDrawer();">
-            <span class="dm-icon">📲</span>
-            <span>Bật thông báo trình duyệt (Push)</span>
-          </div>
-        </div>
-        <div class="drawer-section">
-          <div class="drawer-section-title">⚡ Hành động</div>
-          <div class="drawer-menu-item" onclick="refreshAll(); closeSideDrawer();">
-            <span class="dm-icon">🔄</span>
-            <span>Làm mới dữ liệu</span>
-          </div>
-        </div>
-      </div>
+  <!-- LOADING OVERLAY -->
+  <div id="loading-overlay">
+    <div class="spinner"></div>
+    <div style="margin-top: 14px; font-weight: 700; font-size: 0.9rem;" id="loading-text">
+      Đang tải bản đồ & dữ liệu cửa hàng...
     </div>
   </div>
 
-  <!-- 1. COMPACT TOP NAVBAR -->
-  <header id="top-navbar">
-    <div class="navbar-left">
-      <a href="/map" class="brand-logo" onclick="event.preventDefault(); navigateMenu('map');">
-        <span class="brand-icon">⚡</span>
-        <span class="brand-title">ポケ探</span>
-      </a>
-      <div class="header-location-pill" id="header-loc-pill" onclick="requestUserLocation(true)" title="Nhấn để định vị GPS">
-        <span class="loc-main" id="header-loc-main">◎ 大阪エリア</span>
-        <span class="loc-sub">表示中・エリアを変える</span>
-      </div>
-    </div>
-    <!-- Hidden elements for backward compatibility -->
-    <nav class="navbar-menu" id="main-navbar-menu" style="display:none">
-      <a href="/map" class="nav-menu-link active" id="menu-map-link"></a>
-      <a href="/calendar" class="nav-menu-link" id="menu-cal-link"></a>
-    </nav>
-    <span class="nav-badge stock-badge" id="menu-stock-count" style="display:none">0</span>
-    <span class="nav-badge cal-badge" id="menu-cal-count" style="display:none">0</span>
-    <div class="navbar-right" style="display:none">
-      <span id="sound-icon"></span>
-      <span id="sound-text"></span>
-      <span id="header-loc-summary"></span>
-    </div>
-    <button id="hamburger-btn" onclick="openSideDrawer()" title="メニュー">
-      ☰
-    </button>
-  </header>
-
-  <!-- 2. MAIN APP CONTAINER -->
-  <div id="app-container">
-
-    <!-- VIEW 1: STORES LIST & MAP -->
-    <div id="view-stores-mode" class="app-view active">
-      <div id="sidebar">
-        <div class="controls" style="padding: 10px 12px 6px 12px; border-bottom: 1px solid #f1f5f9;">
-          <!-- ROW 1: SEARCH INPUT & CHAIN SELECT (EQUAL 50/50 SPLIT) -->
-          <div class="controls-grid" style="margin-bottom: 6px;">
-            <div class="control-box">
-              <input type="text" id="search-input" class="search-box" placeholder="🔍 Tìm ga, tiệm..." oninput="handleSearchInput(this.value)" style="height:34px; padding: 0 10px; font-size:0.78rem;" />
-            </div>
-            <div class="control-box">
-              <select id="feed-chain-select" class="control-dropdown" onchange="setFeedChain(this.value)" title="Lọc theo chuỗi cửa hàng" style="height:34px; font-size:0.78rem;">
-                <option value="" selected>🏢 Tất cả chuỗi</option>
-                <option value="seven">🏪 7-Eleven</option>
-                <option value="lawson">🏪 Lawson</option>
-                <option value="familymart">🏪 FamilyMart</option>
-                <option value="ministop">🏪 Ministop</option>
-                <option value="specialty">🃏 Shop Pokémon</option>
-              </select>
-            </div>
-          </div>
-
-          <!-- ROW 2: STATUS & FRESHNESS DROPDOWNS (EQUAL 50/50 SPLIT) -->
-          <div class="controls-grid">
-            <div class="control-box">
-              <select id="poketan-status-select" class="control-dropdown" onchange="setPoketanStatusFilter(this.value)" title="Lọc theo trạng thái báo cáo" style="height:34px; font-size:0.78rem; font-weight:700;">
-                <option value="i" selected>🟢 在庫あり (Có hàng)</option>
-                <option value="all">📋 すべて (Tất cả)</option>
-                <option value="o">🔴 在庫なし (Hết hàng)</option>
-                <option value="n">⚪ 不明・扱無 (Chưa rõ)</option>
-              </select>
-            </div>
-            <div class="control-box">
-              <select id="feed-freshness-select" class="control-dropdown" onchange="setFeedFreshness(this.value)" title="Lọc tin báo theo thời gian" style="height:34px; font-size:0.78rem;">
-                <option value="24" selected>📅 24 giờ qua</option>
-                <option value="1">⚡ Mới (&lt;1h)</option>
-                <option value="3">⏱ Trong 3 giờ</option>
-                <option value="6">⏱ Trong 6 giờ</option>
-                <option value="12">📅 Trong 12 giờ</option>
-                <option value="9999">⏳ Mọi lúc</option>
-              </select>
-            </div>
-          </div>
+  <!-- TOP BAR -->
+  <div id="top-bar">
+    <div class="top-panel">
+      <!-- ROW 1: BRAND & PREFECTURE SELECTOR -->
+      <div class="top-row-1">
+        <div class="brand-title">
+          <span>⚡ PokéMap</span>
+          <span class="badge" id="live-indicator">LIVE</span>
         </div>
-
-        <!-- POKETAN HEADER ROW: MINNA NO SAISHIN NO HOKOKU & SORT -->
-        <div class="poketan-header-row" style="padding: 8px 14px 4px 14px;">
-          <div>
-            <div class="poketan-header-title">みんなの最新の報告 (Báo cáo mới nhất)</div>
-            <div style="font-size:0.68rem; color:#94a3b8;" id="poketan-sub-info">大阪府 4,050店舗から探せます</div>
-          </div>
-          <button class="poketan-sort-btn" id="btn-poketan-sort" onclick="togglePoketanSort()" title="Đổi cách sắp xếp">
-            <span id="poketan-sort-icon">⏱</span>
-            <span id="poketan-sort-label">更新順</span>
-          </button>
-        </div>
-        
-        <div id="store-list" style="padding: 4px 14px;">
-          <div style="text-align: center; color: #94a3b8; padding: 25px;">Đang tải dữ liệu thời gian thực Firestore...</div>
-        </div>
+        <select class="pref-select" id="pref-select" onchange="changePrefecture(this.value)">
+          <option value="all" selected>🗾 Tất cả tỉnh (11,968)</option>
+          <option value="osaka">🏯 大阪府 Osaka (4,050)</option>
+          <option value="aichi">🏯 愛知県 Aichi (3,849)</option>
+          <option value="kanagawa">🏯 神奈川県 Kanagawa (4,044)</option>
+          <option value="gifu">🏯 岐阜県 Gifu (21)</option>
+          <option value="mie">🏯 三重県 Mie (4)</option>
+        </select>
       </div>
 
-      <!-- Edge toggle tab button (always accessible) -->
-      <button class="sidebar-collapse-trigger" id="sidebar-toggle-edge" onclick="toggleDesktopSidebar()" title="Ẩn / Hiện thanh danh sách">
-        ◀
-      </button>
-
-      <div id="map">
-        <div class="map-controls-box">
-          <button class="floating-btn gps-locate-btn" onclick="flyToMyLocation()" title="Quay về vị trí của tôi" id="gps-locate-btn">
-            <span style="font-size:1.2rem;">📍</span>
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- VIEW 2: DEDICATED CALENDAR & LOTTERIES VIEW -->
-    <div id="view-calendar-mode" class="app-view">
-      
-      <!-- DEDICATED HEADER FOR CALENDAR -->
-      <div id="calendar-dedicated-header">
-        <div class="cal-header-row-1">
-          <div class="cal-header-title-group">
-            <h2>📅 Lịch Bốc Thăm & Đặt Trước Thẻ Pokémon</h2>
-            <p>Đồng bộ dữ liệu trực tiếp từ Quản trị viên PokéTan • Tự động cảnh báo tức thì khi có bài đăng đợt mới</p>
-          </div>
-          <div class="cal-header-actions-group">
-            <div class="cal-stat-pill open" id="cal-stat-open">🟢 11 Đang nhận đơn</div>
-            <div class="cal-stat-pill upcoming" id="cal-stat-upcoming">🟡 1 Sắp mở</div>
-            <div class="cal-stat-pill expired" id="cal-stat-expired">⏳ 4 Đã quá hạn</div>
-            <button class="cal-btn-toggle-expired" id="cal-header-toggle-expired" onclick="toggleExpiredSection()">
-              👁️ Xem 4 sự kiện quá hạn
-            </button>
-          </div>
-        </div>
-
-        <!-- CALENDAR FILTER TOOLBAR -->
-        <div class="cal-filter-toolbar">
-          <div class="cal-search-box-wrap">
-            <span class="search-icon">🔍</span>
-            <input type="text" id="cal-search-input" placeholder="Tìm theo nhà bán lẻ (Amazon, Geo, Tsutaya, Toys'R'Us, Yamada...)" oninput="handleCalSearch(this.value)" />
-          </div>
-          
-          <div class="cal-chip-group" id="cal-type-chips">
-            <button class="cal-chip active" onclick="setCalTypeFilter('')">Tất cả hình thức</button>
-            <button class="cal-chip" onclick="setCalTypeFilter('lottery')">🎲 Bốc thăm quyền mua (Lottery)</button>
-            <button class="cal-chip" onclick="setCalTypeFilter('invite')">✉️ Thư mời mua (Invite)</button>
-            <button class="cal-chip" onclick="setCalTypeFilter('release')">🎉 Phát hành chính thức (Release)</button>
-          </div>
-
-          <div class="cal-chip-group" id="cal-status-chips">
-            <button class="cal-chip active" id="chip-status-active" onclick="setCalStatusFilter('active')">🟢 Đang mở & Sắp mở</button>
-            <button class="cal-chip" id="chip-status-all" onclick="setCalStatusFilter('all')">📋 Xem tất cả</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- CALENDAR CARDS GRID CONTAINER -->
-      <div id="calendar-grid-container">
-        <div id="calendar-cards-grid">
-          <div style="text-align: center; color: #94a3b8; padding: 40px; grid-column: 1 / -1;">Đang tải lịch bốc thăm và đặt trước...</div>
-        </div>
-
-        <!-- EXPIRED EVENTS SEPARATED AT BOTTOM -->
-        <div id="calendar-expired-wrapper" style="display: none;">
-          <div class="expired-divider">
-            <div class="expired-divider-line"></div>
-            <span class="expired-divider-label" id="expired-divider-label">── CÁC ĐỢT ĐÃ HẾT HẠN ĐĂNG KÝ (4) ──</span>
-            <div class="expired-divider-line"></div>
-          </div>
-          <div id="calendar-expired-grid"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- VIEW 3: UNIFIED SETTINGS & PREFERENCES (FULL SCREEN) -->
-    <div id="view-notif-mode" class="app-view">
-      <div class="notif-view-header">
-        <div>
-          <h3>⚙️ Cài Đặt &amp; Tùy Chỉnh Toàn Diện</h3>
-          <div class="nv-subtitle">Bản đồ, trạng thái cửa hàng, tỉnh thành, thông báo &amp; kết nối bot</div>
-        </div>
-        <button type="button" onclick="mobileNavTo('map')" style="background:#1e293b;border:1px solid #334155;color:white;padding:6px 12px;border-radius:8px;font-size:0.75rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;">
-          🗺️ Về Bản Đồ
+      <!-- ROW 2: 3 STATUS FILTER PILLS -->
+      <div class="filter-pills">
+        <button class="pill-btn active" id="btn-filter-all" onclick="setStatusFilter('all')">
+          <span>🏢 Tất cả</span>
+          <span class="cnt" id="cnt-all">...</span>
+        </button>
+        <button class="pill-btn" id="btn-filter-in" onclick="setStatusFilter('in')">
+          <span>🟢 Có hàng</span>
+          <span class="cnt" id="cnt-in">0</span>
+        </button>
+        <button class="pill-btn" id="btn-filter-out" onclick="setStatusFilter('out')">
+          <span>🔴 Hết hàng</span>
+          <span class="cnt" id="cnt-out">0</span>
+        </button>
+        <button class="pill-btn" id="btn-filter-unknown" onclick="setStatusFilter('unknown')">
+          <span>🔘 Chưa có tin</span>
+          <span class="cnt" id="cnt-unknown">...</span>
         </button>
       </div>
-      <div class="notif-view-body" id="notif-view-body-container">
 
-        <!-- KHU VỰC 1: CÀI ĐẶT BẢN ĐỒ & HIỂN THỊ CỬA HÀNG -->
-        <div class="setting-group" style="border: 1.5px solid #93c5fd; background: #f0f7ff; border-radius: 12px; padding: 16px;">
-          <label class="setting-group-title" style="color: #1d4ed8; font-size: 0.92rem; display: flex; align-items: center; justify-content: space-between;">
-            <span>🗺️ CÀI ĐẶT HIỂN THỊ TRÊN BẢN ĐỒ</span>
-            <span style="font-size: 0.72rem; color: #1e40af; background: #dbeafe; padding: 2px 8px; border-radius: 10px; font-weight: 700;">Bản đồ</span>
-          </label>
-          <div style="font-size: 0.75rem; color: #475569; margin-bottom: 12px;">
-            Tùy chọn hiển thị cửa hàng theo trạng thái hàng, chuỗi và dữ liệu lịch sử trên bản đồ.
-          </div>
-
-          <!-- Nút chọn nhanh (Presets) -->
-          <div style="font-size:0.75rem; font-weight:700; color:#0f172a; margin-bottom:6px;">⚡ Chế độ chọn nhanh:</div>
-          <div class="modal-quick-actions" style="margin-bottom: 14px;">
-            <button type="button" class="btn-preset active" id="btn-map-preset-all" onclick="applyMapStatusPreset('all')">
-              🏢 Hiện tất cả (Cả 4 loại)
-            </button>
-            <button type="button" class="btn-preset" id="btn-map-preset-in" onclick="applyMapStatusPreset('only_in')">
-              🟢 Chỉ điểm Có Hàng
-            </button>
-            <button type="button" class="btn-preset" id="btn-map-preset-both" onclick="applyMapStatusPreset('with_out')">
-              🟢🔴 Có Hàng &amp; Hết Hàng
-            </button>
-          </div>
-
-          <!-- Chi tiết từng trạng thái hiển thị -->
-          <div style="background: white; border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
-            <div style="font-size: 0.8rem; font-weight: 700; color: #0f172a; margin-bottom: 8px;">
-              📍 Tùy chỉnh chi tiết từng trạng thái hiển thị:
-            </div>
-            <div style="display: flex; flex-direction: column; gap: 8px;">
-              <label class="setting-checkbox-row" style="padding: 4px 0;">
-                <div class="setting-checkbox-left">
-                  <input type="checkbox" id="map-check-instock" checked onchange="updateMapStatusItem('showInStock', this.checked)" />
-                  <div>
-                    <b style="color: #16a34a;">🟢 Cửa hàng CÓ HÀNG (In Stock)</b>
-                    <div class="time-desc">Hiển thị các điểm vừa có người dùng báo cáo còn hàng mở bán.</div>
-                  </div>
-                </div>
-              </label>
-              <label class="setting-checkbox-row" style="padding: 4px 0;">
-                <div class="setting-checkbox-left">
-                  <input type="checkbox" id="map-check-outofstock" checked onchange="updateMapStatusItem('showOutOfStock', this.checked)" />
-                  <div>
-                    <b style="color: #dc2626;">🔴 Cửa hàng HẾT HÀNG (Out of Stock)</b>
-                    <div class="time-desc">Hiển thị các điểm vừa có người dùng báo cáo đã hết hàng.</div>
-                  </div>
-                </div>
-              </label>
-              <label class="setting-checkbox-row" style="padding: 4px 0;">
-                <div class="setting-checkbox-left">
-                  <input type="checkbox" id="map-check-nothandled" checked onchange="updateMapStatusItem('showNotHandled', this.checked)" />
-                  <div>
-                    <b style="color: #64748b;">⚪ Cửa hàng KHÔNG BÁN THẺ (Not Handled)</b>
-                    <div class="time-desc">Hiển thị các cửa hàng không kinh doanh thẻ Pokémon.</div>
-                  </div>
-                </div>
-              </label>
-              <label class="setting-checkbox-row" style="padding: 4px 0;">
-                <div class="setting-checkbox-left">
-                  <input type="checkbox" id="map-check-unknown" checked onchange="updateMapStatusItem('showUnknown', this.checked)" />
-                  <div>
-                    <b style="color: #94a3b8;">🔘 Cửa hàng CHƯA CÓ THÔNG BÁO GÌ (Chưa rõ / Chưa có tin gần đây)</b>
-                    <div class="time-desc">Hiển thị toàn bộ các điểm còn lại chưa có ai báo cáo gần đây.</div>
-                  </div>
-                </div>
-              </label>
-            </div>
-          </div>
-
-          <!-- Lọc chuỗi trên bản đồ -->
-          <div style="background: white; border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
-            <div style="font-size: 0.8rem; font-weight: 700; color: #0f172a; margin-bottom: 4px;">
-              🏪 Lọc chuỗi cửa hàng trên bản đồ:
-            </div>
-            <select id="map-modal-chain-select" class="control-dropdown" onchange="setMapChain(this.value)" style="height:38px; width:100%;">
-              <option value="" selected>🏢 Tất cả các chuỗi cửa hàng (Mặc định)</option>
-              <option value="seven">🏪 7-Eleven (セブン-イレブン)</option>
-              <option value="lawson">🏪 Lawson (ローソン)</option>
-              <option value="familymart">🏪 FamilyMart (ファミリーマート)</option>
-              <option value="ministop">🏪 Ministop (ミニストップ)</option>
-              <option value="specialty">🃏 Cửa hàng thẻ Pokémon (Card Shop)</option>
-            </select>
-          </div>
-
-          <!-- Nguồn dữ liệu lịch sử -->
-          <div style="background: white; border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px;">
-            <label class="setting-checkbox-row" style="padding: 0;">
-              <div class="setting-checkbox-left">
-                <input type="checkbox" id="check-include-cold" checked onchange="toggleMapCold(this.checked)" />
-                <div>
-                  <b>⏳ Tải toàn bộ dữ liệu lịch sử (>24 giờ)</b>
-                  <div class="time-desc">Đảm bảo hiển thị đầy đủ mọi cửa hàng tiện lợi và card shop.</div>
-                </div>
-              </div>
-            </label>
-          </div>
-        </div>
-
-        <!-- KHU VỰC 2: LỌC TỈNH THÀNH HIỂN THỊ & THÔNG BÁO -->
-        <div class="setting-group" style="background: white; border: 1.5px solid #cbd5e1; border-radius: 12px; padding: 16px;">
-          <label class="setting-group-title" style="color: #0f172a; font-size: 0.92rem; display: flex; align-items: center; justify-content: space-between;">
-            <span>🗾 LỌC THEO TỈNH THÀNH (BẢN ĐỒ, DANH SÁCH &amp; THÔNG BÁO)</span>
-            <span style="font-size: 0.72rem; color: #16a34a; background: #dcfce7; padding: 2px 8px; border-radius: 10px; font-weight: 700;">Toàn quốc</span>
-          </label>
-          <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 10px;">
-            Chọn các tỉnh bạn muốn hiển thị trên bản đồ, danh sách và nhận thông báo:
-          </div>
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px;">
-            <label style="display: flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; background: #f8fafc; padding: 8px 10px; border-radius: 8px; border: 1px solid #e2e8f0;">
-              <input type="checkbox" class="notif-pref-check" value="osaka" onchange="togglePrefFilterUnified(this)" checked style="width:18px;height:18px;" />
-              <span>🏯 大阪府 (Osaka)</span>
-            </label>
-            <label style="display: flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; background: #f8fafc; padding: 8px 10px; border-radius: 8px; border: 1px solid #e2e8f0;">
-              <input type="checkbox" class="notif-pref-check" value="aichi" onchange="togglePrefFilterUnified(this)" checked style="width:18px;height:18px;" />
-              <span>🏯 愛知県 (Aichi)</span>
-            </label>
-            <label style="display: flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; background: #f8fafc; padding: 8px 10px; border-radius: 8px; border: 1px solid #e2e8f0;">
-              <input type="checkbox" class="notif-pref-check" value="kanagawa" onchange="togglePrefFilterUnified(this)" checked style="width:18px;height:18px;" />
-              <span>🏯 神奈川県 (Kanagawa)</span>
-            </label>
-            <label style="display: flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; background: #f8fafc; padding: 8px 10px; border-radius: 8px; border: 1px solid #e2e8f0;">
-              <input type="checkbox" class="notif-pref-check" value="gifu" onchange="togglePrefFilterUnified(this)" checked style="width:18px;height:18px;" />
-              <span>🏯 岐阜県 (Gifu)</span>
-            </label>
-            <label style="display: flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; background: #f8fafc; padding: 8px 10px; border-radius: 8px; border: 1px solid #e2e8f0;">
-              <input type="checkbox" class="notif-pref-check" value="mie" onchange="togglePrefFilterUnified(this)" checked style="width:18px;height:18px;" />
-              <span>🏯 三重県 (Mie)</span>
-            </label>
-          </div>
-        </div>
-
-        <!-- KHU VỰC 3: CÀI ĐẶT THÔNG BÁO & ÂM THANH -->
-        <div class="setting-group" style="background: white; border: 1.5px solid #cbd5e1; border-radius: 12px; padding: 16px;">
-          <label class="setting-group-title" style="color: #0f172a; font-size: 0.92rem; display: flex; align-items: center; justify-content: space-between;">
-            <span>🔔 CÀI ĐẶT THÔNG BÁO &amp; ÂM THANH</span>
-            <span style="font-size: 0.72rem; color: #f59e0b; background: #fef3c7; padding: 2px 8px; border-radius: 10px; font-weight: 700;">Cảnh báo</span>
-          </label>
-
-          <!-- Âm thanh & Web push -->
-          <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px;">
-            <label class="setting-checkbox-row">
-              <div class="setting-checkbox-left">
-                <input type="checkbox" id="notif-check-sound" checked onchange="updateNotifSetting('soundEnabled', this.checked)" />
-                <div>
-                  <b>🔔 Chuông âm thanh cảnh báo</b>
-                  <div class="time-desc">Phát chuông báo tức thì khi có cửa hàng vừa có hàng.</div>
-                </div>
-              </div>
-              <button type="button" class="btn-test-action" onclick="testNotifSound()">🔊 Nghe thử</button>
-            </label>
-
-            <label class="setting-checkbox-row">
-              <div class="setting-checkbox-left">
-                <input type="checkbox" id="notif-check-push" checked onchange="updateNotifSetting('pushEnabled', this.checked)" />
-                <div>
-                  <b>🌐 Thông báo nổi máy tính &amp; điện thoại (Web Push)</b>
-                  <div class="time-desc">Hiện thông báo góc màn hình ngay cả khi thu nhỏ trình duyệt.</div>
-                </div>
-              </div>
-              <div style="display:flex;align-items:center;gap:6px;">
-                <span id="notif-perm-status" class="notif-badge-state notif-badge-default">Kiểm tra...</span>
-                <button type="button" class="btn-test-action" id="btn-request-perm" onclick="requestPushPermission()">Cấp quyền</button>
-              </div>
-            </label>
-          </div>
-
-          <!-- Tình trạng nhận thông báo -->
-          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-              <span style="font-size: 0.8rem; font-weight: 700; color: #0f172a;">🎯 Loại tin nhận thông báo:</span>
-              <div style="display:flex;gap:6px;">
-                <button type="button" class="btn-preset active" id="notif-preset-only-in" onclick="applyNotifPreset('only_in')" style="padding:2px 8px;font-size:0.72rem;font-weight:700;">
-                  🟢 Chỉ có hàng
-                </button>
-                <button type="button" class="btn-preset" id="notif-preset-all" onclick="applyNotifPreset('all')" style="padding:2px 8px;font-size:0.72rem;font-weight:700;">
-                  🏢 Báo tất cả
-                </button>
-              </div>
-            </div>
-            <div style="display: flex; flex-direction: column; gap: 8px;">
-              <label class="setting-checkbox-row" style="padding: 2px 0;">
-                <div class="setting-checkbox-left">
-                  <input type="checkbox" id="notif-check-instock" checked onchange="updateNotifSetting('notifyInStock', this.checked)" />
-                  <div>
-                    <b style="color:#16a34a;">🟢 Thông báo khi CÓ HÀNG (In Stock)</b>
-                  </div>
-                </div>
-                <span class="status-count-pill in">Khuyên dùng</span>
-              </label>
-              <label class="setting-checkbox-row" style="padding: 2px 0;">
-                <div class="setting-checkbox-left">
-                  <input type="checkbox" id="notif-check-outofstock" onchange="updateNotifSetting('notifyOutOfStock', this.checked)" />
-                  <div>
-                    <b style="color:#dc2626;">🔴 Thông báo khi HẾT HÀNG (Out of Stock)</b>
-                  </div>
-                </div>
-                <span class="status-count-pill out">Tùy chọn</span>
-              </label>
-              <label class="setting-checkbox-row" style="padding: 2px 0;">
-                <div class="setting-checkbox-left">
-                  <input type="checkbox" id="notif-check-nothandled" onchange="updateNotifSetting('notifyNotHandled', this.checked)" />
-                  <div>
-                    <b style="color:#64748b;">⚪ Thông báo khi KHÔNG BÁN THẺ (Not Handled)</b>
-                  </div>
-                </div>
-                <span class="status-count-pill none">Tùy chọn</span>
-              </label>
-              <label class="setting-checkbox-row" style="padding: 2px 0;">
-                <div class="setting-checkbox-left">
-                  <input type="checkbox" id="notif-check-lottery" checked onchange="updateNotifSetting('notifyLottery', this.checked)" />
-                  <div>
-                    <b style="color:#2563eb;">📅 Thông báo LỊCH BỐC THĂM MỚI (Admin Push)</b>
-                  </div>
-                </div>
-                <span class="status-count-pill" style="background:#dbeafe;color:#1e40af;">Admin</span>
-              </label>
-            </div>
-          </div>
-
-          <!-- Lọc thời gian tin báo -->
-          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
-            <div style="font-size:0.78rem; font-weight:700; color:#0f172a; margin-bottom:6px;">⏰ Độ mới tin báo có hàng:</div>
-            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap:6px;">
-              <label style="display:flex;align-items:center;gap:4px;font-size:0.75rem;cursor:pointer;">
-                <input type="radio" name="notif-max-age" value="1" id="notif-age-1" onchange="setNotifMaxAge(1)" />
-                <span>🔥 1 giờ qua</span>
-              </label>
-              <label style="display:flex;align-items:center;gap:4px;font-size:0.75rem;cursor:pointer;">
-                <input type="radio" name="notif-max-age" value="3" id="notif-age-3" onchange="setNotifMaxAge(3)" />
-                <span>⚡ 3 giờ qua</span>
-              </label>
-              <label style="display:flex;align-items:center;gap:4px;font-size:0.75rem;cursor:pointer;">
-                <input type="radio" name="notif-max-age" value="6" id="notif-age-6" onchange="setNotifMaxAge(6)" />
-                <span>🕐 6 giờ qua</span>
-              </label>
-              <label style="display:flex;align-items:center;gap:4px;font-size:0.75rem;cursor:pointer;">
-                <input type="radio" name="notif-max-age" value="24" id="notif-age-24" checked onchange="setNotifMaxAge(24)" />
-                <span>📅 24 giờ</span>
-              </label>
-            </div>
-          </div>
-
-          <!-- Lọc chuỗi & độ tin cậy -->
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px;">
-              <div style="font-size: 0.75rem; font-weight: 700; color: #0f172a; margin-bottom: 4px;">🏪 Lọc chuỗi thông báo:</div>
-              <select id="notif-chain-select" class="control-dropdown" onchange="updateNotifSetting('notifyChain', this.value)" style="height:34px; width:100%; font-size:0.75rem;">
-                <option value="" selected>Tất cả chuỗi</option>
-                <option value="seven">7-Eleven</option>
-                <option value="lawson">Lawson</option>
-                <option value="familymart">FamilyMart</option>
-                <option value="ministop">Ministop</option>
-                <option value="specialty">Card Shop</option>
-              </select>
-            </div>
-            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; display:flex; align-items:center;">
-              <label style="display:flex;align-items:center;gap:6px;font-size:0.75rem;font-weight:600;cursor:pointer;">
-                <input type="checkbox" id="notif-check-onsite" onchange="updateNotifSetting('onlyOnsiteGps', this.checked)" />
-                <span>📍 Chỉ báo khi có xác nhận tại quán (GPS onsite)</span>
-              </label>
-            </div>
-          </div>
-        </div>
-
-        <!-- KHU VỰC 4: KẾT NỐI TELEGRAM BOT & DISCORD -->
-        <div class="setting-group" style="background: white; border: 1.5px solid #cbd5e1; border-radius: 12px; padding: 16px;">
-          <label class="setting-group-title" style="color: #0f172a; font-size: 0.92rem; display: flex; align-items: center; justify-content: space-between;">
-            <span>🤖 KẾT NỐI TELEGRAM BOT &amp; DISCORD</span>
-            <span style="font-size: 0.72rem; color: #0284c7; background: #e0f2fe; padding: 2px 8px; border-radius: 10px; font-weight: 700;">Webhooks</span>
-          </label>
-          <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 12px;">
-            Nhận tin báo tức thì về Telegram cá nhân/nhóm và Discord kèm khoảng cách &amp; link mở app.
-          </div>
-
-          <!-- TELEGRAM CONFIG -->
-          <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-              <label style="font-size: 0.85rem; font-weight: 700; color: #0284c7; display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                <input type="checkbox" id="notif-check-telegram" onchange="updateNotifSetting('telegramEnabled', this.checked)" style="width:16px;height:16px;" />
-                <span>✈️ Bật gửi tin nhắn về Telegram</span>
-              </label>
-              <button type="button" class="btn-test-action" onclick="testWebhookNotification('telegram')" style="font-size:0.72rem; padding: 4px 10px;">
-                📨 Test Telegram
-              </button>
-            </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 6px;">
-              <input type="text" id="notif-input-tg-token" class="search-box" placeholder="Bot Token (vd: 8888535478:AAFtl...)" onchange="updateNotifSetting('telegramBotToken', this.value.trim())" style="height:34px; font-size:0.75rem;" />
-              <input type="text" id="notif-input-tg-chatid" class="search-box" placeholder="Chat ID (vd: 987654321 hoặc @tenkenh)" onchange="updateNotifSetting('telegramChatId', this.value.trim())" style="height:34px; font-size:0.75rem;" />
-            </div>
-            <div style="font-size: 0.68rem; color: #64748b;">* Tạo Bot qua @BotFather để nhận Token, lấy Chat ID cá nhân/nhóm qua @userinfobot</div>
-          </div>
-
-          <!-- DISCORD CONFIG -->
-          <div style="background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 8px; padding: 12px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-              <label style="font-size: 0.85rem; font-weight: 700; color: #5865F2; display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                <input type="checkbox" id="notif-check-discord" onchange="updateNotifSetting('discordEnabled', this.checked)" style="width:16px;height:16px;" />
-                <span>🎮 Bật gửi về kênh Discord</span>
-              </label>
-              <button type="button" class="btn-test-action" onclick="testWebhookNotification('discord')" style="font-size:0.72rem; padding: 4px 10px;">
-                📨 Test Discord
-              </button>
-            </div>
-            <input type="text" id="notif-input-discord-url" class="search-box" placeholder="Dán Discord Webhook URL (https://discord.com/api/webhooks/...)" onchange="updateNotifSetting('discordWebhookUrl', this.value.trim())" style="height:34px; font-size:0.75rem; width:100%;" />
-          </div>
-        </div>
-
-        <!-- KHU VỰC 5: VỊ TRÍ & ĐỊNH VỊ GPS -->
-        <div class="setting-group" style="background: white; border: 1.5px solid #cbd5e1; border-radius: 12px; padding: 16px;">
-          <label class="setting-group-title" style="color: #0f172a; font-size: 0.92rem; display: flex; align-items: center; justify-content: space-between;">
-            <span>📍 VỊ TRÍ &amp; ĐỊNH VỊ GPS</span>
-            <span style="font-size: 0.72rem; color: #0284c7; background: #e0f2fe; padding: 2px 8px; border-radius: 10px; font-weight: 700;">Realtime GPS</span>
-          </label>
-          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-            <div>
-              <div style="font-weight: 700; font-size: 0.85rem; color: #0f172a;" id="settings-gps-summary">
-                📍 Vị trí: Đang theo dõi liên tục
-              </div>
-              <div style="font-size: 0.75rem; color: #64748b; margin-top: 2px;">
-                Tọa độ tự động cập nhật khi di chuyển, dùng tính khoảng cách đến từng cửa hàng.
-              </div>
-            </div>
-            <button type="button" class="btn-test-action" onclick="requestUserLocation(true)" style="background:#2563eb; color:white; border-color:#2563eb; padding:6px 14px; font-size:0.78rem;">
-              📍 Định vị lại ngay
-            </button>
-          </div>
-        </div>
-
-        <!-- KHU VỰC 6: THAO TÁC & KHÔI PHỤC HỆ THỐNG -->
-        <div style="display: flex; flex-direction: column; gap: 10px; background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 16px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-            <div>
-              <div style="font-weight: 700; font-size: 0.85rem; color: #0f172a;">Kiểm tra chuông &amp; thông báo hoạt động</div>
-              <div style="font-size: 0.75rem; color: #64748b;">Gửi 1 thông báo mẫu kèm chuông &amp; đẩy thử về Webhook</div>
-            </div>
-            <button type="button" class="btn-test-action" onclick="testNotifPopup()" style="background:#0f172a; color:white; border-color:#0f172a; padding:6px 12px;">
-              💬 Gửi thông báo mẫu
-            </button>
-          </div>
-
-          <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 10px; border-top: 1px solid #e2e8f0; flex-wrap: wrap; gap: 8px;">
-            <button type="button" onclick="refreshAll()" style="background:#eff6ff; color:#1d4ed8; border:1px solid #93c5fd; padding:6px 12px; border-radius:6px; font-size:0.78rem; font-weight:700; cursor:pointer;">
-              🔄 Làm mới toàn bộ dữ liệu
-            </button>
-            <button type="button" onclick="resetAllSettings()" style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; padding:6px 12px; border-radius:6px; font-size:0.78rem; font-weight:700; cursor:pointer;">
-              ⚠️ Khôi phục cài đặt gốc
-            </button>
-          </div>
-
-          <div style="font-size: 0.72rem; color: #16a34a; display: flex; align-items: center; gap: 4px; margin-top: 4px;" id="unified-save-indicator">
-            💾 Đã lưu cấu hình tự động vào <b>settings.json</b>
-          </div>
-        </div>
-      </div>
-    </div>
-
-  </div>
-
-
-
-  <!-- LEGACY NOTIF MODAL (Consolidated into Unified Settings #view-notif-mode) -->
-  <div id="notif-settings-modal" style="display: none;"></div>
-
-  <!-- STORE REPORT HISTORY MODAL -->
-  <div id="store-history-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this) closeStoreHistoryModal()">
-    <div class="modal-content" style="max-width: 620px;">
-      <div class="modal-header">
-        <div style="display:flex;align-items:center;gap:10px;min-width:0;">
-          <span style="font-size:1.3rem;">📜</span>
-          <div style="min-width:0;">
-            <h3 id="hist-modal-title" style="font-size:1.02rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Lịch Sử Báo Cáo Cửa Hàng</h3>
-            <div id="hist-modal-subtitle" style="font-size:0.75rem;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Đang tải thông tin cửa hàng...</div>
-          </div>
-        </div>
-        <button class="modal-close-btn" onclick="closeStoreHistoryModal()" title="Đóng">✕</button>
-      </div>
-
-      <div class="modal-body" id="hist-modal-body" style="padding:18px 20px;max-height:75vh;overflow-y:auto;">
-        <div style="text-align:center;padding:36px;color:#64748b;">
-          <div style="font-size:1.8rem;animation:pulse 1s infinite;">⏳</div>
-          <div style="font-weight:700;margin-top:8px;">Đang tải lịch sử báo cáo...</div>
-        </div>
-      </div>
-
-      <div style="background:#f8fafc;padding:12px 20px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-        <span style="font-size:0.75rem;color:#64748b;" id="hist-modal-footer-info">Báo cáo cộng đồng từ người dùng Osaka</span>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-          <a id="hist-modal-dir-btn" href="#" target="_blank" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;background:#2563eb;color:white;text-decoration:none;border-radius:6px;font-size:0.78rem;font-weight:700;">🗺️ Google Maps ↗</a>
-          <button type="button" onclick="viewStoreOnMap()" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;background:#0284c7;color:white;border:none;border-radius:6px;font-size:0.78rem;font-weight:700;cursor:pointer;">📍 Xem trên bản đồ</button>
-          <button type="button" onclick="closeStoreHistoryModal()" style="padding:6px 14px;background:#0f172a;color:white;border:none;border-radius:6px;font-size:0.78rem;font-weight:700;cursor:pointer;">✕ Đóng</button>
-        </div>
+      <!-- ROW 3: SEARCH -->
+      <div class="search-row">
+        <span class="search-icon">🔍</span>
+        <input type="text" class="search-input" id="search-input" placeholder="Tìm tên cửa hàng, ga tàu, địa chỉ..." oninput="onSearch(this.value)" />
       </div>
     </div>
   </div>
 
-  <!-- MOBILE BOTTOM NAVIGATION BAR -->
-  <!-- MAP TOAST OVERLAY -->
-  <div id="map-toast-overlay"></div>
+  <!-- MAP -->
+  <div id="map"></div>
 
-  <nav id="mobile-bottom-nav">
-    <button class="mobile-nav-btn active" id="mob-nav-map" onclick="mobileNavTo('map')">
-      <span class="nav-btn-icon">🗺️</span>
-      <span class="nav-btn-label">Bản đồ</span>
-    </button>
-    <button class="mobile-nav-btn" id="mob-nav-list" onclick="mobileNavTo('list')">
-      <span class="nav-btn-icon">📋</span>
-      <span class="nav-btn-label">Danh sách</span>
-      <span class="nav-btn-badge" id="mob-badge-stock">0</span>
-    </button>
-    <button class="mobile-nav-btn gacha-center-btn" id="mob-nav-gacha" onclick="mobileNavTo('gacha')">
-      <span class="nav-btn-icon">⚡</span>
-      <span class="nav-btn-label">Săn thẻ</span>
-    </button>
-    <button class="mobile-nav-btn" id="mob-nav-cal" onclick="mobileNavTo('calendar')">
-      <span class="nav-btn-icon">📅</span>
-      <span class="nav-btn-label">Lịch</span>
-      <span class="nav-btn-badge cal-badge-color" id="mob-badge-cal">0</span>
-    </button>
-    <button class="mobile-nav-btn" id="mob-nav-settings" onclick="mobileNavTo('settings')">
-      <span class="nav-btn-icon">⚙️</span>
-      <span class="nav-btn-label">Cài đặt</span>
-    </button>
-  </nav>
+  <!-- GPS BUTTON -->
+  <button id="gps-btn" onclick="locateUser(true)" title="Định vị vị trí của tôi">
+    📍
+  </button>
 
   <script>
-    // 0. NOTIFICATION SETTINGS STATE (TÁCH BIỆT HOÀN TOÀN KHỎI BẢN ĐỒ)
-    let notifSettings = {
-      soundEnabled: true,
-      pushEnabled: true,
-      notifyInStock: true,
-      notifyOutOfStock: false,
-      notifyNotHandled: false,
-      notifyLottery: true,
-      notifyChain: '',
-      onlyOnsiteGps: false,
-      discordWebhookUrl: '',
-      discordEnabled: false,
-      telegramBotToken: '',
-      telegramChatId: '',
-      telegramEnabled: false,
-      notifyPrefs: ['osaka', 'aichi', 'kanagawa', 'gifu', 'mie']
-    };
-
-    if ("Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission().then(() => syncNotifUI());
-    }
-
-    function syncNotifUI() {
-      const soundCheck = document.getElementById('notif-check-sound');
-      if (soundCheck) soundCheck.checked = notifSettings.soundEnabled;
-
-      const pushCheck = document.getElementById('notif-check-push');
-      if (pushCheck) pushCheck.checked = notifSettings.pushEnabled;
-
-      const inCheck = document.getElementById('notif-check-instock');
-      if (inCheck) inCheck.checked = notifSettings.notifyInStock;
-
-      const outCheck = document.getElementById('notif-check-outofstock');
-      if (outCheck) outCheck.checked = notifSettings.notifyOutOfStock;
-
-      const notHandledCheck = document.getElementById('notif-check-nothandled');
-      if (notHandledCheck) notHandledCheck.checked = notifSettings.notifyNotHandled;
-
-      const allCheck = document.getElementById('notif-check-all');
-      if (allCheck) {
-        allCheck.checked = !!(notifSettings.notifyInStock && notifSettings.notifyOutOfStock && notifSettings.notifyNotHandled);
-      }
-
-      const presetOnlyIn = document.getElementById('notif-preset-only-in');
-      const presetAll = document.getElementById('notif-preset-all');
-      const isOnlyIn = notifSettings.notifyInStock && !notifSettings.notifyOutOfStock && !notifSettings.notifyNotHandled;
-      const isAll = notifSettings.notifyInStock && notifSettings.notifyOutOfStock && notifSettings.notifyNotHandled;
-      if (presetOnlyIn) presetOnlyIn.classList.toggle('active', isOnlyIn);
-      if (presetAll) presetAll.classList.toggle('active', isAll);
-
-      const lotCheck = document.getElementById('notif-check-lottery');
-      if (lotCheck) lotCheck.checked = notifSettings.notifyLottery;
-
-      const chainSelect = document.getElementById('notif-chain-select');
-      if (chainSelect) chainSelect.value = notifSettings.notifyChain || '';
-
-      const onsiteCheck = document.getElementById('notif-check-onsite');
-      if (onsiteCheck) onsiteCheck.checked = notifSettings.onlyOnsiteGps;
-
-      // Webhook Discord & Telegram UI sync
-      const discCheck = document.getElementById('notif-check-discord');
-      if (discCheck) discCheck.checked = !!notifSettings.discordEnabled;
-      const discUrlInput = document.getElementById('notif-input-discord-url');
-      if (discUrlInput && document.activeElement !== discUrlInput) discUrlInput.value = notifSettings.discordWebhookUrl || '';
-
-      const tgCheck = document.getElementById('notif-check-telegram');
-      if (tgCheck) tgCheck.checked = !!notifSettings.telegramEnabled;
-      const tgTokenInput = document.getElementById('notif-input-tg-token');
-      if (tgTokenInput && document.activeElement !== tgTokenInput) tgTokenInput.value = notifSettings.telegramBotToken || '';
-      const tgChatIdInput = document.getElementById('notif-input-tg-chatid');
-      if (tgChatIdInput && document.activeElement !== tgChatIdInput) tgChatIdInput.value = notifSettings.telegramChatId || '';
-
-      // Sync prefecture checkboxes for notifications
-      const curNotifyPrefs = Array.isArray(notifSettings.notifyPrefs) ? notifSettings.notifyPrefs : ['osaka', 'aichi', 'kanagawa', 'gifu', 'mie'];
-      document.querySelectorAll('.notif-pref-check').forEach(cb => {
-        cb.checked = curNotifyPrefs.includes(cb.value);
-      });
-
-      // Sync max report age radio buttons in notif modal
-      const ageRadios = document.querySelectorAll('input[name="notif-max-age"]');
-      ageRadios.forEach(r => {
-        r.checked = (parseFloat(r.value) === notifSettings.maxReportAgeHours);
-      });
-
-      if (typeof updateControlsForTab === 'function') {
-        updateControlsForTab();
-      }
-
-      // Update header button sound icon & label
-      const icon = document.getElementById('sound-icon');
-      const text = document.getElementById('sound-text');
-      if (icon && text) {
-        if (notifSettings.soundEnabled) {
-          icon.innerText = '🔔';
-          text.innerText = 'Thông báo ⚙️';
-        } else {
-          icon.innerText = '🔕';
-          text.innerText = 'Tắt chuông ⚙️';
-        }
-      }
-
-      // Update browser push permission status badge
-      const badge = document.getElementById('notif-perm-status');
-      const reqBtn = document.getElementById('btn-request-perm');
-      if (badge) {
-        if (!("Notification" in window)) {
-          badge.className = 'notif-badge-state notif-badge-denied';
-          badge.innerText = 'Không hỗ trợ';
-          if (reqBtn) reqBtn.style.display = 'none';
-        } else if (Notification.permission === 'granted') {
-          badge.className = 'notif-badge-state notif-badge-granted';
-          badge.innerText = '✅ Đã cấp quyền';
-          if (reqBtn) reqBtn.style.display = 'none';
-        } else if (Notification.permission === 'denied') {
-          badge.className = 'notif-badge-state notif-badge-denied';
-          badge.innerText = '❌ Đã chặn';
-          if (reqBtn) reqBtn.style.display = 'inline-flex';
-        } else {
-          badge.className = 'notif-badge-state notif-badge-default';
-          badge.innerText = '⚠️ Chưa cấp quyền';
-          if (reqBtn) reqBtn.style.display = 'inline-flex';
-        }
-      }
-    }
-    window.syncNotifUI = syncNotifUI;
-
-    function applyNotifPreset(preset) {
-      if (preset === 'only_in') {
-        notifSettings.notifyInStock = true;
-        notifSettings.notifyOutOfStock = false;
-        notifSettings.notifyNotHandled = false;
-      } else if (preset === 'all') {
-        notifSettings.notifyInStock = true;
-        notifSettings.notifyOutOfStock = true;
-        notifSettings.notifyNotHandled = true;
-      }
-      syncNotifUI();
-      saveSettings();
-    }
-    window.applyNotifPreset = applyNotifPreset;
-
-    function toggleSelectAllNotif(checked) {
-      notifSettings.notifyInStock = checked;
-      notifSettings.notifyOutOfStock = checked;
-      notifSettings.notifyNotHandled = checked;
-      syncNotifUI();
-      saveSettings();
-    }
-    window.toggleSelectAllNotif = toggleSelectAllNotif;
-
-    function updateNotifStatusItem(key, checked) {
-      notifSettings[key] = checked;
-      syncNotifUI();
-      saveSettings();
-    }
-    window.updateNotifStatusItem = updateNotifStatusItem;
-
-    function updateNotifSetting(key, val) {
-      notifSettings[key] = val;
-      syncNotifUI();
-      saveSettings();
-    }
-    window.updateNotifSetting = updateNotifSetting;
-
-    function updateNotifPrefSetting(cb) {
-      if (!Array.isArray(notifSettings.notifyPrefs)) {
-        notifSettings.notifyPrefs = ['osaka', 'aichi', 'kanagawa', 'gifu', 'mie'];
-      }
-      const val = cb.value;
-      if (cb.checked) {
-        if (!notifSettings.notifyPrefs.includes(val)) {
-          notifSettings.notifyPrefs.push(val);
-        }
-      } else {
-        notifSettings.notifyPrefs = notifSettings.notifyPrefs.filter(p => p !== val);
-      }
-      syncNotifUI();
-      saveSettings();
-    }
-    window.updateNotifPrefSetting = updateNotifPrefSetting;
-
-    function toggleSound() {
-      updateNotifSetting('soundEnabled', !notifSettings.soundEnabled);
-      if (notifSettings.soundEnabled) playChime(true);
-    }
-    window.toggleSound = toggleSound;
-
-    function requestPushPermission() {
-      if (!("Notification" in window)) {
-        alert("Trình duyệt này không hỗ trợ Web Notification.");
-        return;
-      }
-      Notification.requestPermission().then(() => {
-        syncNotifUI();
-      });
-    }
-    window.requestPushPermission = requestPushPermission;
-
-    function playChime(force = false) {
-      if (!force && !notifSettings.soundEnabled) return;
-      try {
-        const AudioCtx = window.AudioContext || window.webkitAudioContext;
-        if (!AudioCtx) return;
-        const ctx = new AudioCtx();
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'triangle';
-        const now = ctx.currentTime;
-        osc.frequency.setValueAtTime(1046.50, now);
-        osc.frequency.setValueAtTime(1318.51, now + 0.12);
-        osc.frequency.setValueAtTime(1567.98, now + 0.24);
-        gain.gain.setValueAtTime(0.35, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.9);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.9);
-      } catch (e) {}
-    }
-    window.playChime = playChime;
-
-    function testNotifSound() {
-      playChime(true);
-    }
-    window.testNotifSound = testNotifSound;
-
-    async function triggerWebhooks(store, info, isTest = false) {
-      if (!isTest && !notifSettings.discordEnabled && !notifSettings.telegramEnabled) return;
-      if (!isTest && Array.isArray(notifSettings.notifyPrefs) && store.pref && !notifSettings.notifyPrefs.includes(store.pref)) {
-        return;
-      }
-      try {
-        const appStoreUrl = `${window.location.origin}/?store=${encodeURIComponent(store.id)}`;
-        await fetch('/api/notify/webhook', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            store: {
-              id: store.id,
-              name: store.name,
-              chain_label: store.chain_label || store.chain,
-              address: store.address || '',
-              lat: store.lat,
-              lng: store.lng,
-              pref: store.pref || ''
-            },
-            info: {
-              label: info.label,
-              packs: info.packs || [],
-              reported_at: info.reported_at,
-              timeAgo: info.timeAgo,
-              confirms: info.confirms || 0,
-              onsite: !!info.onsite
-            },
-            app_url: appStoreUrl,
-            is_test: isTest
-          })
-        });
-      } catch (err) {
-        console.warn("Failed to dispatch webhook:", err);
-      }
-    }
-    window.triggerWebhooks = triggerWebhooks;
-
-    async function testWebhookNotification(platform) {
-      const demoStore = {
-        id: 'test_store_webhook',
-        name: '7-Eleven Ga Osaka (Tin Test Bot)',
-        chain: 'seven',
-        chain_label: '7-Eleven',
-        address: '1-1 Umeda, Kita-ku, Osaka',
-        lat: 34.7024,
-        lng: 135.4959
-      };
-      const demoInfo = {
-        code: 'i',
-        label: 'Có hàng (In Stock)',
-        packs: ['Terastal Festival ex', 'Battle Partners'],
-        timeAgo: 'Vừa xong',
-        reported_at: 'Hôm nay lúc ' + new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
-        confirms: 5,
-        onsite: true
-      };
-
-      if (platform === 'discord' && !notifSettings.discordWebhookUrl) {
-        alert('⚠️ Vui lòng dán Discord Webhook URL vào ô trước khi bấm Test!');
-        return;
-      }
-      if (platform === 'telegram' && (!notifSettings.telegramBotToken || !notifSettings.telegramChatId)) {
-        alert('⚠️ Vui lòng nhập Bot Token và Chat ID của Telegram trước khi bấm Test!');
-        return;
-      }
-
-      try {
-        const appStoreUrl = `${window.location.origin}/?store=${encodeURIComponent(demoStore.id)}`;
-        const resp = await fetch('/api/notify/webhook', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            store: { ...demoStore, pref: 'osaka' },
-            info: demoInfo,
-            app_url: appStoreUrl,
-            is_test: true
-          })
-        });
-        const res = await resp.json();
-        if (platform === 'discord') {
-          if (res.results && res.results.discord === 'ok') {
-            alert('✅ Đã gửi tin nhắn mẫu đến Discord thành công! Hãy kiểm tra kênh Discord.');
-          } else {
-            alert('❌ Gửi Discord thất bại: ' + (res.results ? res.results.discord : 'Lỗi không xác định'));
-          }
-        } else if (platform === 'telegram') {
-          if (res.results && res.results.telegram === 'ok') {
-            alert('✅ Đã gửi tin nhắn mẫu đến Telegram thành công! Hãy kiểm tra Telegram.');
-          } else {
-            alert('❌ Gửi Telegram thất bại: ' + (res.results ? res.results.telegram : 'Lỗi không xác định'));
-          }
-        }
-      } catch (e) {
-        alert('❌ Lỗi kết nối máy chủ: ' + e.message);
-      }
-    }
-    window.testWebhookNotification = testWebhookNotification;
-
-    function testNotifPopup() {
-      const demoStore = {
-        id: 'test_store_1',
-        name: '7-Eleven Ga Osaka (Thông Báo Mẫu)',
-        chain: 'seven',
-        chain_label: '7-Eleven',
-        address: '1-1 Umeda, Kita-ku, Osaka',
-        lat: 34.7024,
-        lng: 135.4959
-      };
-      const demoInfo = {
-        code: 'i',
-        label: 'Có hàng (In Stock)',
-        packs: ['Terastal Festival ex', 'Battle Partners'],
-        timeAgo: 'Vừa xong',
-        reported_at: 'Hôm nay lúc ' + new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
-        confirms: 3,
-        onsite: true
-      };
-      showToast(demoStore, demoInfo, true);
-    }
-    window.testNotifPopup = testNotifPopup;
-
-    function resetNotifSettings() {
-      if (!confirm('Khôi phục toàn bộ cài đặt thông báo về mặc định (Bật chuông, báo có hàng mới & lịch bốc thăm)?')) return;
-      notifSettings = {
-        soundEnabled: true,
-        pushEnabled: true,
-        notifyInStock: true,
-        notifyOutOfStock: false,
-        notifyNotHandled: false,
-        notifyLottery: true,
-        notifyChain: '',
-        onlyOnsiteGps: false,
-        discordWebhookUrl: '',
-        discordEnabled: false,
-        telegramBotToken: '',
-        telegramChatId: '',
-        telegramEnabled: false
-      };
-      syncNotifUI();
-      saveSettings();
-    }
-    window.resetNotifSettings = resetNotifSettings;
-
-    // 1. MAP INITIALIZATION
-    const map = L.map('map').setView([34.6937, 135.5023], 12);
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
-
-    let markersLayer = L.markerClusterGroup({
-      maxClusterRadius: 50,
-      spiderfyOnMaxZoom: true,
-      showCoverageOnHover: false,
-      zoomToBoundsOnClick: true,
-      disableClusteringAtZoom: 16,
-      chunkedLoading: true,
-      chunkInterval: 100,
-      chunkDelay: 20
-    }).addTo(map);
-    let userLocationLayer = L.layerGroup().addTo(map);
-    let markerMap = {};
-    let storesDict = {};
-    let configData = {};
+    // 1. STATE & DATA
+    let storesDict = {};         // All store metadata
+    let hotStatus = {};           // Real-time status
+    let coldStatus = {};          // Historical / cold status
+    let configData = {};          // Pack codes & Chain names
+    let currentPref = 'all';      // 'all' | 'osaka' | 'aichi' | ...
+    let currentFilter = 'all';    // 'all' | 'in' | 'out' | 'unknown'
+    let searchQuery = '';
     
-    // Status State
-    let hotStatus = {};
-    let coldStatus = {};
-    let latestMergedStatus = {};
-    let includeCold = true;
-    let coldLoaded = false;
-    let previousInStockIds = null;
-    let previousRawStatus = null;
-    let currentFocusedStoreId = null;
-    
-    // Store History Cache & Open Accordions State
-    const storeHistoryCache = {};
-    const openAccordionStoreIds = new Set();
-    
-    // 1.1 CẤU HÌNH BẢN ĐỒ (CHỈ ĐIỀU KHIỂN GHIM TRÊN BẢN ĐỒ)
-    let mapDisplay = {
-      mode: 'all',          // 'all' = 4,050 cửa hàng, 'only_in' = chỉ ghim có hàng, 'with_out' = ghim có hàng + hết hàng, 'custom'
-      chain: '',            // Lọc chuỗi trên bản đồ: '' = tất cả
-      includeCold: true,    // Nạp dữ liệu lịch sử (>24h)
-      showInStock: true,    // 🟢 Có hàng
-      showOutOfStock: true, // 🔴 Hết hàng
-      showNotHandled: true, // ⚪ Không bán thẻ
-      showUnknown: true     // 🔘 Không có thông báo gì / Chưa có tin gần đây
-    };
-
-    // 1.2 CẤU HÌNH DANH SÁCH SIDEBAR (TÁCH BIỆT HOÀN TOÀN KHỎI BẢN ĐỒ)
-    let sidebarTab = 'feed'; // 'feed' (Báo Có Hàng) | 'all' (Tra Cứu Toàn Bộ)
-
-    // Bộ lọc riêng cho Tab 1: Báo Có Hàng (Feed)
-    let feedFreshnessHours = 24.0;
-    let feedChain = '';
-    let feedSortMode = 'newest'; // 'newest' | 'nearest'
-    let feedQuery = '';
-
-    // Bộ lọc riêng cho Tab 2: Tra Cứu Toàn Bộ 4,050 Điểm (All)
-    let allStatusFilter = 'all'; // 'all' | 'i' | 'o' | 'n' | 'u'
-    let allChain = '';
-    let allSortMode = 'newest';
-    let allQuery = '';
-
-    let visibleLimit = 150;
-    let calendarEvents = [];
+    // GPS State
     let userLat = null;
     let userLng = null;
-    let userAccuracy = null;
-    let isMockLocation = false;
+    let userMarker = null;
+    let userCircle = null;
 
-    // Backward-compat aliases
-    let statusFilter = { 'i': true, 'o': true, 'n': true, 'u': true };
-    let maxReportAgeHours = 24.0;
-    let currentChain = '';
-
-    // 2. CHUYỂN ĐỔI TAB SIDEBAR: BÁO CÓ HÀNG vs TRA CỨU TOÀN BỘ
-    function setSidebarTab(tab, subFilter = null) {
-      sidebarTab = tab;
-      const btnFeed = document.getElementById('tab-btn-feed');
-      const btnAll = document.getElementById('tab-btn-all');
-      const controlsFeed = document.getElementById('controls-feed-group');
-      const controlsAll = document.getElementById('controls-all-group');
-
-      if (btnFeed) btnFeed.classList.toggle('active', tab === 'feed');
-      if (btnAll) btnAll.classList.toggle('active', tab === 'all');
-      if (controlsFeed) controlsFeed.style.display = (tab === 'feed') ? 'block' : 'none';
-      if (controlsAll) controlsAll.style.display = (tab === 'all') ? 'block' : 'none';
-
-      // Cập nhật ô input search
-      const searchInput = document.getElementById('search-input');
-      if (searchInput) {
-        searchInput.value = (tab === 'feed') ? feedQuery : allQuery;
-        searchInput.placeholder = (tab === 'feed') 
-          ? "🔍 Tìm trong các điểm có hàng (tên quán, ga, khu vực)..." 
-          : "🔍 Tìm trong toàn bộ 4,050 cửa hàng Osaka...";
-      }
-
-      if (subFilter && tab === 'all') {
-        allStatusFilter = subFilter;
-        const allStatusSel = document.getElementById('all-status-select');
-        if (allStatusSel) allStatusSel.value = subFilter;
-      }
-
-      updateFilterBanner();
-      renderSidebarListOnly();
-      saveSettings();
-    }
-    window.setSidebarTab = setSidebarTab;
-    window.switchSidebarTab = setSidebarTab; // backward-compat
-
-    // BỘ LỌC CHO TAB BÁO CÓ HÀNG (FEED)
-    function setFeedFreshness(val) {
-      feedFreshnessHours = parseFloat(val);
-      updateFilterBanner();
-      renderSidebarListOnly();
-      saveSettings();
-    }
-    window.setFeedFreshness = setFeedFreshness;
-
-    function setFeedChain(val) {
-      feedChain = val;
-      updateFilterBanner();
-      renderSidebarListOnly();
-      saveSettings();
-    }
-    window.setFeedChain = setFeedChain;
-
-    function setFeedSort(val) {
-      feedSortMode = val;
-      renderSidebarListOnly();
-      saveSettings();
-    }
-    window.setFeedSort = setFeedSort;
-
-    // ======================================
-    // POKETAN STYLE PILLS & SORT CONTROLS
-    // ======================================
-    let poketanStatus = 'i'; // 'all' | 'i' | 'o' | 'n'
-
-    function setPoketanStatusFilter(status) {
-      poketanStatus = status;
-      const selectEl = document.getElementById('poketan-status-select');
-      if (selectEl && selectEl.value !== status) {
-        selectEl.value = status;
-      }
-      renderSidebarListOnly();
-      saveSettings();
-    }
-    window.setPoketanStatusFilter = setPoketanStatusFilter;
-
-    function togglePoketanSort() {
-      feedSortMode = (feedSortMode === 'newest') ? 'nearest' : 'newest';
-      const label = document.getElementById('poketan-sort-label');
-      const icon = document.getElementById('poketan-sort-icon');
-      if (feedSortMode === 'nearest') {
-        if (label) label.textContent = '距離順 (Gần nhất)';
-        if (icon) icon.textContent = '📍';
-      } else {
-        if (label) label.textContent = '更新順 (Mới nhất)';
-        if (icon) icon.textContent = '⏱';
-      }
-      renderSidebarListOnly();
-      saveSettings();
-    }
-    window.togglePoketanSort = togglePoketanSort;
-
-    function handleSearchInput(val) {
-      feedQuery = val;
-      allQuery = val;
-      renderSidebarListOnly();
-    }
-    window.handleSearchInput = handleSearchInput;
-
-    // 3. ĐIỀU KHIỂN GHIM TRÊN BẢN ĐỒ (CHỈ TÁC ĐỘNG BẢN ĐỒ LEAFLET, KHÔNG ĐỤNG SIDEBAR)
-    function setMapMode(mode) {
-      mapDisplay.mode = mode;
-      if (mode === 'all') {
-        mapDisplay.showInStock = true;
-        mapDisplay.showOutOfStock = true;
-        mapDisplay.showNotHandled = true;
-        mapDisplay.showUnknown = true;
-      } else if (mode === 'only_in') {
-        mapDisplay.showInStock = true;
-        mapDisplay.showOutOfStock = false;
-        mapDisplay.showNotHandled = false;
-        mapDisplay.showUnknown = false;
-      } else if (mode === 'with_out') {
-        mapDisplay.showInStock = true;
-        mapDisplay.showOutOfStock = true;
-        mapDisplay.showNotHandled = false;
-        mapDisplay.showUnknown = false;
-      }
-      syncMapSettingsUI();
-      updateQuickMapModeBtn();
-      renderMapMarkersOnly(); // Chỉ vẽ lại ghim bản đồ!
-      saveSettings();
-    }
-    window.setMapMode = setMapMode;
-    window.applyMapStatusPreset = setMapMode;
-
-    function updateMapStatusItem(key, checked) {
-      mapDisplay[key] = !!checked;
-      if (mapDisplay.showInStock && mapDisplay.showOutOfStock && mapDisplay.showNotHandled && mapDisplay.showUnknown) {
-        mapDisplay.mode = 'all';
-      } else if (mapDisplay.showInStock && !mapDisplay.showOutOfStock && !mapDisplay.showNotHandled && !mapDisplay.showUnknown) {
-        mapDisplay.mode = 'only_in';
-      } else if (mapDisplay.showInStock && mapDisplay.showOutOfStock && !mapDisplay.showNotHandled && !mapDisplay.showUnknown) {
-        mapDisplay.mode = 'with_out';
-      } else {
-        mapDisplay.mode = 'custom';
-      }
-      syncMapSettingsUI();
-      updateQuickMapModeBtn();
-      renderMapMarkersOnly();
-      saveSettings();
-    }
-    window.updateMapStatusItem = updateMapStatusItem;
-
-    function setMapChain(chain) {
-      mapDisplay.chain = chain;
-      currentChain = chain;
-      syncMapSettingsUI();
-      renderMapMarkersOnly(); // Chỉ vẽ lại ghim bản đồ!
-      saveSettings();
-    }
-    window.setMapChain = setMapChain;
-
-    function toggleQuickMapMode() {
-      if (mapDisplay.mode === 'all') {
-        setMapMode('only_in');
-      } else {
-        setMapMode('all');
-      }
-    }
-    window.toggleQuickMapMode = toggleQuickMapMode;
-
-    function updateQuickMapModeBtn() {
-      const btnText = document.getElementById('quick-map-mode-text');
-      const bannerMap = document.getElementById('banner-map-status');
-      let label = '🏢 Bản đồ: Tất cả 4,050 điểm';
-      let bannerText = '🗺️ Bản đồ: Toàn cảnh 4,050 điểm';
-      if (mapDisplay.mode === 'only_in') {
-        label = '🟢 Bản đồ: Chỉ điểm có hàng';
-        bannerText = '🗺️ Bản đồ: Chỉ điểm có hàng 🟢';
-      } else if (mapDisplay.mode === 'with_out') {
-        label = '🟢🔴 Bản đồ: Có & Hết hàng';
-        bannerText = '🗺️ Bản đồ: Có hàng & Hết hàng 🟢🔴';
-      }
-      if (btnText) btnText.innerHTML = label;
-      if (bannerMap) bannerMap.innerHTML = bannerText;
-    }
-
-    function toggleMapCold(checked) {
-      mapDisplay.includeCold = checked;
-      includeCold = checked;
-      syncMapSettingsUI();
-      renderMapMarkersOnly();
-      renderSidebarListOnly();
-      saveSettings();
-    }
-    window.toggleMapCold = toggleMapCold;
-    window.toggleIncludeCold = toggleMapCold; // backward-compat
-
-    function resetMapSettings() {
-      if (!confirm('Khôi phục toàn bộ cài đặt hiển thị bản đồ về mặc định (Hiện tất cả 4,050 điểm)?')) return;
-      mapDisplay = { mode: 'all', chain: '', includeCold: true };
-      currentChain = '';
-      syncMapSettingsUI();
-      updateQuickMapModeBtn();
-      renderMapMarkersOnly();
-      saveSettings();
-    }
-    window.resetMapSettings = resetMapSettings;
-    window.resetToFactorySettings = resetMapSettings; // backward-compat
-
-    function updateFilterBanner() {
-      const banner = document.getElementById('banner-filter-text');
-      if (!banner) return;
-      if (sidebarTab === 'feed') {
-        let fText = '24 giờ qua';
-        if (feedFreshnessHours === 1) fText = '1 giờ qua 🔥';
-        else if (feedFreshnessHours === 3) fText = '3 giờ qua';
-        else if (feedFreshnessHours === 6) fText = '6 giờ qua';
-        else if (feedFreshnessHours > 9000) fText = 'Tất cả thời gian';
-
-        let cText = feedChain ? ` • Chuỗi ${feedChain}` : '';
-        banner.innerHTML = `🟢 Báo Có Hàng (${fText}${cText})`;
-      } else {
-        let sText = 'Tất cả trạng thái';
-        if (allStatusFilter === 'i') sText = 'Chỉ có hàng 🟢';
-        else if (allStatusFilter === 'o') sText = 'Chỉ hết hàng 🔴';
-        else if (allStatusFilter === 'n') sText = 'Không bán thẻ ⚪';
-
-        let cText = allChain ? ` • Chuỗi ${allChain}` : '';
-        banner.innerHTML = `🏢 Tra cứu toàn bộ 4,050 điểm (${sText}${cText})`;
-      }
-      updateQuickMapModeBtn();
-    }
-    window.updateFilterBanner = updateFilterBanner;
-
-    function syncMapSettingsUI() {
-      const chkIn = document.getElementById('map-check-instock');
-      const chkOut = document.getElementById('map-check-outofstock');
-      const chkNone = document.getElementById('map-check-nothandled');
-      const chkUnk = document.getElementById('map-check-unknown');
-      if (chkIn) chkIn.checked = mapDisplay.showInStock !== undefined ? mapDisplay.showInStock : true;
-      if (chkOut) chkOut.checked = mapDisplay.showOutOfStock !== undefined ? mapDisplay.showOutOfStock : (mapDisplay.mode !== 'only_in');
-      if (chkNone) chkNone.checked = mapDisplay.showNotHandled !== undefined ? mapDisplay.showNotHandled : (mapDisplay.mode === 'all');
-      if (chkUnk) chkUnk.checked = mapDisplay.showUnknown !== undefined ? mapDisplay.showUnknown : (mapDisplay.mode === 'all');
-
-      const pAll = document.getElementById('btn-map-preset-all');
-      const pIn = document.getElementById('btn-map-preset-in');
-      const pBoth = document.getElementById('btn-map-preset-both');
-      if (pAll) pAll.classList.toggle('active', mapDisplay.mode === 'all');
-      if (pIn) pIn.classList.toggle('active', mapDisplay.mode === 'only_in');
-      if (pBoth) pBoth.classList.toggle('active', mapDisplay.mode === 'with_out');
-
-      const modalChain = document.getElementById('map-modal-chain-select');
-      if (modalChain) modalChain.value = mapDisplay.chain || '';
-
-      const checkCold = document.getElementById('check-include-cold');
-      if (checkCold) checkCold.checked = mapDisplay.includeCold !== undefined ? mapDisplay.includeCold : true;
-
-      updateQuickMapModeBtn();
-      updateFilterBanner();
-    }
-    window.syncMapSettingsUI = syncMapSettingsUI;
-
-    // NOTIFICATION ACTIONS
-    function setNotifMaxAge(hours) {
-      notifSettings.maxReportAgeHours = hours;
-      maxReportAgeHours = hours;
-      syncNotifUI();
-      renderUI();
-      saveSettings();
-    }
-    window.setNotifMaxAge = setNotifMaxAge;
-    window.setMaxReportAge = setNotifMaxAge; // backward-compat
-
-    // Backward-compat handlers
-    function applyPreset(preset) {
-      if (preset === 'only_in') {
-        setMapMode('only_in');
-        setNotifMaxAge(24);
-      } else if (preset === 'fresh_3h') {
-        setMapMode('only_in');
-        setNotifMaxAge(3);
-      } else if (preset === 'show_all') {
-        setMapMode('all');
-      } else if (preset === 'with_out') {
-        setMapMode('with_out');
-      }
-    }
-    window.applyPreset = applyPreset;
-
-    function toggleQuickStatus(code) {
-      if (code === 'o') {
-        setMapMode(mapDisplay.mode === 'with_out' ? 'all' : 'with_out');
-      } else if (code === 'i') {
-        setMapMode(mapDisplay.mode === 'only_in' ? 'all' : 'only_in');
-      }
-    }
-    window.toggleQuickStatus = toggleQuickStatus;
-
-    function handleStatusQuickSelect(val) {
-      if (val === 'custom') {
-        toggleMapSettingsModal();
-        return;
-      }
-      applyPreset(val);
-    }
-    window.handleStatusQuickSelect = handleStatusQuickSelect;
-
-    function toggleSelectAllStatuses(checked) {
-      setMapMode(checked ? 'all' : 'only_in');
-    }
-    window.toggleSelectAllStatuses = toggleSelectAllStatuses;
-
-    function updateStatusFilter(code, checked) {
-      renderUI();
-    }
-    window.updateStatusFilter = updateStatusFilter;
-
-    function setSortMode(mode) {
-      sortMode = mode;
-      const sortSelect = document.getElementById('sort-select');
-      if (sortSelect) sortSelect.value = mode;
-      if (mode === 'nearest' && userLat === null) {
-        requestUserLocation(true);
-      } else {
-        renderUI();
-      }
-      saveSettings();
-    }
-    window.setSortMode = setSortMode;
-
-    function toggleMapSettingsModal() {
-      mobileNavTo('settings');
-    }
-    window.toggleMapSettingsModal = toggleMapSettingsModal;
-    window.toggleSettingsModal = toggleMapSettingsModal; // backward-compat
-
-    function toggleNotifSettingsModal() {
-      mobileNavTo('settings');
-    }
-    window.toggleNotifSettingsModal = toggleNotifSettingsModal;
-
-    function resetAllSettings() {
-      if (!confirm('Khôi phục toàn bộ cài đặt (Bản đồ, Thông báo, Tỉnh thành) về mặc định ban đầu?')) return;
-      mapDisplay = {
-        mode: 'all',
-        chain: '',
-        includeCold: true,
-        showInStock: true,
-        showOutOfStock: true,
-        showNotHandled: true,
-        showUnknown: true
-      };
-      notifSettings = {
-        soundEnabled: true,
-        pushEnabled: true,
-        notifyInStock: true,
-        notifyOutOfStock: false,
-        notifyNotHandled: false,
-        notifyLottery: true,
-        maxReportAgeHours: 24,
-        notifyChain: '',
-        onlyOnsiteGps: false,
-        discordEnabled: false,
-        discordWebhookUrl: '',
-        telegramEnabled: false,
-        telegramBotToken: '',
-        telegramChatId: '',
-        notifyPrefs: ['osaka', 'aichi', 'kanagawa', 'gifu', 'mie']
-      };
-      enabledPrefs.clear();
-      ['osaka', 'aichi', 'kanagawa', 'gifu', 'mie'].forEach(p => enabledPrefs.add(p));
-      try { localStorage.removeItem('pokemap_prefs'); } catch(e) {}
-      syncMapSettingsUI();
-      syncNotifUI();
-      renderUI();
-      saveSettings();
-    }
-    window.resetAllSettings = resetAllSettings;
-
-    // 2.1 SETTINGS PERSISTENCE & RESTORE
-    function saveSettings() {
-      const payload = {
-        mapDisplay,
-        notifications: notifSettings,
-        sidebarTab,
-        feedFreshnessHours,
-        feedChain,
-        feedSortMode,
-        allStatusFilter,
-        allChain,
-        allSortMode,
-        statusFilter: {
-          'i': true,
-          'o': mapDisplay.mode !== 'only_in',
-          'n': mapDisplay.mode === 'all',
-          'u': mapDisplay.mode === 'all'
-        },
-        maxReportAgeHours: notifSettings.maxReportAgeHours,
-        includeCold: mapDisplay.includeCold,
-        currentChain: mapDisplay.chain,
-        sortMode,
-        showExpired
-      };
-
-      try {
-        localStorage.setItem('bawui_user_settings', JSON.stringify(payload));
-      } catch(e) {}
-
-      const indMap = document.getElementById('map-save-indicator');
-      const indNotif = document.getElementById('notif-save-indicator');
-      const indUni = document.getElementById('unified-save-indicator');
-      if (indMap) indMap.innerHTML = '💾 Đang lưu...';
-      if (indNotif) indNotif.innerHTML = '💾 Đang lưu...';
-      if (indUni) indUni.innerHTML = '💾 Đang lưu...';
-
-      fetch('/api/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      })
-      .then(res => res.json())
-      .then(() => {
-        if (indMap) indMap.innerHTML = '💾 Đã lưu cấu hình bản đồ vào <b>settings.json</b>';
-        if (indNotif) indNotif.innerHTML = '💾 Đã lưu cấu hình thông báo vào <b>settings.json</b>';
-        if (indUni) indUni.innerHTML = '💾 Đã lưu cấu hình tự động vào <b>settings.json</b>';
-      })
-      .catch(err => {
-        console.warn('Could not save settings to server:', err);
-        if (indMap) indMap.innerHTML = '💾 Đã lưu bộ nhớ trình duyệt';
-        if (indNotif) indNotif.innerHTML = '💾 Đã lưu bộ nhớ trình duyệt';
-        if (indUni) indUni.innerHTML = '💾 Đã lưu bộ nhớ trình duyệt';
-      });
-    }
-    window.saveSettings = saveSettings;
-
-    function applyLoadedSettings(settings) {
-      if (!settings) return;
-      if (settings.mapDisplay && typeof settings.mapDisplay === 'object') {
-        mapDisplay = { ...mapDisplay, ...settings.mapDisplay };
-      } else if (settings.statusFilter) {
-        const sf = settings.statusFilter;
-        if (sf.i && sf.o && sf.n && sf.u) mapDisplay.mode = 'all';
-        else if (sf.i && sf.o) mapDisplay.mode = 'with_out';
-        else mapDisplay.mode = 'only_in';
-      }
-
-      if (mapDisplay.showInStock === undefined) {
-        mapDisplay.showInStock = true;
-        mapDisplay.showOutOfStock = mapDisplay.mode !== 'only_in';
-        mapDisplay.showNotHandled = mapDisplay.mode === 'all';
-        mapDisplay.showUnknown = mapDisplay.mode === 'all';
-      }
-
-      if (settings.notifications && typeof settings.notifications === 'object') {
-        notifSettings = { ...notifSettings, ...settings.notifications };
-      } else if (typeof settings.maxReportAgeHours === 'number') {
-        notifSettings.maxReportAgeHours = settings.maxReportAgeHours;
-      }
-
-      if (notifSettings.notifyPrefs && Array.isArray(notifSettings.notifyPrefs)) {
-        enabledPrefs.clear();
-        notifSettings.notifyPrefs.forEach(p => enabledPrefs.add(p));
-      }
-
-      if (typeof settings.sidebarTab === 'string') {
-        sidebarTab = settings.sidebarTab;
-      }
-      if (typeof settings.feedFreshnessHours === 'number') {
-        feedFreshnessHours = settings.feedFreshnessHours;
-      }
-      if (typeof settings.feedChain === 'string') {
-        feedChain = settings.feedChain;
-      }
-      if (typeof settings.feedSortMode === 'string') {
-        feedSortMode = settings.feedSortMode;
-      }
-      if (typeof settings.allStatusFilter === 'string') {
-        allStatusFilter = settings.allStatusFilter;
-      }
-      if (typeof settings.allChain === 'string') {
-        allChain = settings.allChain;
-      }
-      if (typeof settings.allSortMode === 'string') {
-        allSortMode = settings.allSortMode;
-      }
-
-      const fFreshSel = document.getElementById('feed-freshness-select');
-      if (fFreshSel) fFreshSel.value = String(feedFreshnessHours);
-      const fChainSel = document.getElementById('feed-chain-select');
-      if (fChainSel) fChainSel.value = feedChain;
-      const fSortSel = document.getElementById('feed-sort-select');
-      if (fSortSel) fSortSel.value = feedSortMode;
-      const aStatSel = document.getElementById('all-status-select');
-      if (aStatSel) aStatSel.value = allStatusFilter;
-      const aChainSel = document.getElementById('all-chain-select');
-      if (aChainSel) aChainSel.value = allChain;
-      const aSortSel = document.getElementById('all-sort-select');
-      if (aSortSel) aSortSel.value = allSortMode;
-
-      if (typeof settings.sortMode === 'string') {
-        sortMode = settings.sortMode;
-      }
-      if (typeof settings.showExpired === 'boolean') {
-        showExpired = settings.showExpired;
-      }
-
-      setSidebarTab(sidebarTab || 'feed');
-      syncMapSettingsUI();
-      syncNotifUI();
-      renderUI();
-    }
-    window.applyLoadedSettings = applyLoadedSettings;
-
-    // 3. ROUTING & MENU SYNCHRONIZATION (LINK <-> MENU)
-    function getRouteFromUrl() {
-      const path = window.location.pathname.toLowerCase();
-      const hash = window.location.hash.toLowerCase();
-      if (path.includes('/calendar') || path.includes('/events') || hash.includes('calendar') || hash.includes('events')) {
-        return 'calendar';
-      }
-      return 'map';
-    }
-
-    function syncMenuAndRoute(route, pushHistory = false) {
-      const mapLink = document.getElementById('menu-map-link');
-      const calLink = document.getElementById('menu-cal-link');
-      const viewMap = document.getElementById('view-stores-mode');
-      const viewCal = document.getElementById('view-calendar-mode');
-      const viewNotif = document.getElementById('view-notif-mode');
-
-      const targetPath = route === 'calendar' ? '/calendar' : '/map';
-
-      if (pushHistory && window.location.pathname !== targetPath) {
-        history.pushState({ route }, '', targetPath);
-      }
-
-      if (route === 'calendar') {
-        calLink.classList.add('active');
-        mapLink.classList.remove('active');
-        viewMap.classList.remove('active');
-        viewCal.classList.add('active');
-        if (viewNotif) viewNotif.classList.remove('active');
-        document.title = "Lịch Bốc Thăm & Đặt Trước | BAWUI POKE APP";
-        loadCalendar();
-      } else {
-        mapLink.classList.add('active');
-        calLink.classList.remove('active');
-        viewMap.classList.add('active');
-        viewCal.classList.remove('active');
-        if (viewNotif) viewNotif.classList.remove('active');
-        document.title = "Bản Đồ & Kho Thẻ Osaka | BAWUI POKE APP";
-        setTimeout(() => {
-          map.invalidateSize();
-        }, 100);
-      }
-    }
-
-    function navigateMenu(route) {
-      syncMenuAndRoute(route, true);
-    }
-    window.navigateMenu = navigateMenu;
-    window.switchTab = navigateMenu; // backward-compat
-
-    window.addEventListener('popstate', () => {
-      const currentRoute = getRouteFromUrl();
-      syncMenuAndRoute(currentRoute, false);
+    // 2. LEAFLET MAP INITIALIZATION
+    const map = L.map('map', {
+      center: [34.6937, 135.5023], // Osaka center
+      zoom: 12,
+      zoomControl: false,
+      preferCanvas: true
     });
 
-    window.addEventListener('hashchange', () => {
-      const currentRoute = getRouteFromUrl();
-      syncMenuAndRoute(currentRoute, false);
-    });
+    // Clean, crisp basemap tiles
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap, &copy; CARTO'
+    }).addTo(map);
 
-    function refreshAll() {
-      loadCalendar();
-      renderUI();
-    }
-    window.refreshAll = refreshAll;
+    // Zoom control at bottom left
+    L.control.zoom({ position: 'bottomleft' }).addTo(map);
 
-    // 4. HAVERSINE DISTANCE FORMULA
-    function calcDistanceKm(lat1, lon1, lat2, lon2) {
-      if (!lat1 || !lon1 || !lat2 || !lon2) return null;
-      const R = 6371;
-      const dLat = (lat2 - lat1) * Math.PI / 180;
-      const dLon = (lon2 - lon1) * Math.PI / 180;
-      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                Math.sin(dLon/2) * Math.sin(dLon/2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-      return R * c;
-    }
+    // Canvas layer for maximum 60fps rendering performance
+    const canvasRenderer = L.canvas({ padding: 0.5 });
+    const markersLayer = L.layerGroup().addTo(map);
 
-    function formatDistance(km) {
-      if (km === null || isNaN(km)) return '';
-      if (km < 1) return Math.round(km * 1000) + ' m';
-      return km.toFixed(1) + ' km';
-    }
-    window.calcDistanceKm = calcDistanceKm;
-    window.calculateDistance = calcDistanceKm;
-
-    // 5. USER LOCATION RENDERING
-    function renderUserLocation(fly = false) {
-      userLocationLayer.clearLayers();
-      if (userLat === null || userLng === null) return;
-
-      const userIcon = L.divIcon({
-        className: 'user-marker-container',
-        html: '<div class="user-pulse-marker" title="Vị trí của bạn"></div>',
-        iconSize: [18, 18],
-        iconAnchor: [9, 9]
-      });
-
-      const userMarker = L.marker([userLat, userLng], { icon: userIcon, zIndexOffset: 2000 });
-      const label = isMockLocation ? '📍 Vị trí giả lập: Ga Umeda (Osaka)' : '📍 Vị trí hiện tại của bạn';
-      userMarker.bindPopup(`<b>${label}</b><br><span style="font-size:0.8rem;color:#64748b;">Đang tính khoảng cách đến tất cả cửa hàng</span>`);
-      userLocationLayer.addLayer(userMarker);
-
-      if (userAccuracy && !isMockLocation) {
-        const accuracyCircle = L.circle([userLat, userLng], {
-          radius: Math.min(userAccuracy, 2000),
-          color: '#3b82f6',
-          fillColor: '#93c5fd',
-          fillOpacity: 0.15,
-          weight: 1
-        });
-        userLocationLayer.addLayer(accuracyCircle);
+    // 3. STATUS DECODER
+    function decodeStatus(rawVal) {
+      if (!rawVal || typeof rawVal !== 'string') {
+        return { code: 'u', label: 'Chưa có thông tin gần đây', packs: [], reported_at: '', timeAgo: '' };
       }
+      const code = rawVal[0].toLowerCase();
+      let rest = rawVal.substring(1);
 
-      if (fly) {
-        map.flyTo([userLat, userLng], 14, { duration: 1.2 });
-      }
-    }
-
-    let gpsWatchId = null;
-    let gpsFirstFix = false;
-
-    function requestUserLocation(fly = true) {
-      const headerLoc = document.getElementById('header-loc-summary');
-      if (!navigator.geolocation) {
-        if (headerLoc) headerLoc.innerText = 'Không hỗ trợ GPS';
-        return;
-      }
-
-      if (headerLoc) headerLoc.innerText = 'Đang định vị...';
-
-      // Start continuous tracking if not already watching
-      if (gpsWatchId === null) {
-        gpsFirstFix = fly; // fly on first fix only
-        gpsWatchId = navigator.geolocation.watchPosition(
-          (pos) => {
-            isMockLocation = false;
-            userLat = pos.coords.latitude;
-            userLng = pos.coords.longitude;
-            userAccuracy = pos.coords.accuracy;
-
-            // Cache position
-            try {
-              sessionStorage.setItem('bawui_last_lat', String(userLat));
-              sessionStorage.setItem('bawui_last_lng', String(userLng));
-              sessionStorage.setItem('bawui_last_acc', String(userAccuracy));
-            } catch(e) {}
-
-            const distToOsaka = calcDistanceKm(userLat, userLng, 34.6937, 135.5023);
-            let note = `(Cách Osaka ~${Math.round(distToOsaka)}km)`;
-            if (distToOsaka < 30) note = `(Tại Osaka)`;
-            if (headerLoc) headerLoc.innerText = `GPS của bạn ${note}`;
-
-            // First fix: fly to location + full render
-            if (gpsFirstFix) {
-              renderUserLocation(true);
-              gpsFirstFix = false;
-              renderUI();
-            } else {
-              // Subsequent: only move marker (lightweight, no re-render)
-              renderUserLocation(false);
-            }
-          },
-          (err) => {
-            console.warn("GPS error:", err.message);
-            if (headerLoc) headerLoc.innerText = 'Chưa bật GPS';
-          },
-          { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
-        );
-      } else if (fly && userLat !== null) {
-        // Already watching — just fly to current position
-        map.flyTo([userLat, userLng], 15, { duration: 0.8 });
-      }
-    }
-    window.requestUserLocation = requestUserLocation;
-
-    function flyToMyLocation() {
-      if (userLat !== null && userLng !== null) {
-        map.flyTo([userLat, userLng], 15, { duration: 0.8 });
-        const btn = document.getElementById('gps-locate-btn');
-        if (btn) { btn.classList.add('active'); setTimeout(() => btn.classList.remove('active'), 1500); }
-      } else {
-        requestUserLocation(true);
-      }
-    }
-    window.flyToMyLocation = flyToMyLocation;
-
-    // 6. TOAST NOTIFICATIONS & ALERT DISPATCH
-    function showToast(store, info, force = false) {
-      if (!force) {
-        if (!notifSettings.notifyInStock) return;
-        if (notifSettings.notifyChain && store.chain !== notifSettings.notifyChain) return;
-        if (notifSettings.onlyOnsiteGps && !info.onsite) return;
-        if (!storePassesPrefFilter(store)) return;
-        if (Array.isArray(notifSettings.notifyPrefs) && store.pref && !notifSettings.notifyPrefs.includes(store.pref)) return;
-      }
-
-      playChime(force);
-
-      // Show quick toast on map view
-      showMapToast(store, info);
-
-      if ((force || notifSettings.pushEnabled) && "Notification" in window && Notification.permission === "granted") {
-        try {
-          const packsDesc = info.packs.length ? info.packs.join(', ') : 'Thẻ Pokémon';
-          new Notification("🔥 CÓ HÀNG MỚI TẠI OSAKA!", {
-            body: `${store.name}\nSản phẩm: ${packsDesc}\nThời gian: ${info.reported_at}`,
-            icon: "https://poketan.jp/apple-touch-icon.png"
-          });
-        } catch(e) {}
-      }
-
-
-      // Tự động đẩy tin báo về Discord Webhook và Telegram Bot nếu được kích hoạt
-      triggerWebhooks(store, info, force);
-    }
-    window.showToast = showToast;
-
-    // MAP TOAST: Shows a quick toast on the map view when there's new stock
-    function showMapToast(store, info) {
-      // Only show when user is on map tab
-      if (currentMobileTab !== 'map') return;
-      const overlay = document.getElementById('map-toast-overlay');
-      if (!overlay) return;
-
-      const packsText = info.packs && info.packs.length ? info.packs.join(', ') : 'Thẻ Pokémon';
-      
-      // Calculate distance for toast
-      let toastDistStr = '';
-      if (store.lat && store.lng) {
-        if (userLat !== null && userLng !== null) {
-          const km = calcDistanceKm(userLat, userLng, store.lat, store.lng);
-          toastDistStr = `📍 ${formatDistance(km)}`;
-        } else {
-          const km = calcDistanceKm(34.6540, 135.4925, store.lat, store.lng);
-          toastDistStr = `🚉 ${formatDistance(km)}`;
-        }
-      }
-      
-      const toast = document.createElement('div');
-      toast.className = 'map-toast';
-      toast.innerHTML = `
-        <div class="map-toast-icon">🔥</div>
-        <div class="map-toast-content">
-          <div class="map-toast-title">${store.name} - CÓ HÀNG!</div>
-          <div class="map-toast-sub">📦 ${packsText} ${toastDistStr ? '• ' + toastDistStr : ''} • ${info.timeAgo || 'Vừa xong'}</div>
-        </div>
-        <div class="map-toast-arrow">→</div>
-      `;
-      toast.onclick = () => {
-        toast.remove();
-        mobileNavTo('list');
-        setTimeout(() => {
-          const card = document.getElementById('card-' + store.id);
-          if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }, 300);
-      };
-      overlay.appendChild(toast);
-
-      // Auto-dismiss after 5 seconds
-      setTimeout(() => {
-        toast.style.animation = 'toastFadeOut 0.3s ease forwards';
-        setTimeout(() => toast.remove(), 350);
-      }, 5000);
-    }
-    window.showMapToast = showMapToast;
-
-    function showOutOfStockToast(store, info) {
-      if (!notifSettings.notifyOutOfStock) return;
-      if (notifSettings.notifyChain && store.chain !== notifSettings.notifyChain) return;
-      if (notifSettings.onlyOnsiteGps && !info.onsite) return;
-
-      playChime();
-
-      if (notifSettings.pushEnabled && "Notification" in window && Notification.permission === "granted") {
-        try {
-          new Notification("🔴 BÁO HẾT HÀNG TẠI OSAKA", {
-            body: `${store.name}\nCửa hàng vừa được báo hết thẻ Pokémon.`,
-            icon: "https://poketan.jp/apple-touch-icon.png"
-          });
-        } catch(e) {}
-      }
-
-      const container = document.getElementById('toast-container');
-      const toast = document.createElement('div');
-      toast.className = 'toast';
-      toast.style.borderLeftColor = '#dc2626';
-      toast.innerHTML = `
-        <div class="toast-header" style="color:#dc2626;">
-          <span>🔴 VỪA BÁO HẾT HÀNG!</span>
-          <span class="toast-time">${info.timeAgo}</span>
-        </div>
-        <div class="toast-body">${store.name}</div>
-        <div style="font-size:0.75rem;color:#64748b;">Đã hết thẻ Pokémon tại điểm này</div>
-        <button class="toast-btn" style="background:#dc2626;" onclick="openStoreHistoryModal('${store.id}')">Xem lịch sử & vị trí 📜📍</button>
-      `;
-
-      container.appendChild(toast);
-      setTimeout(() => {
-        toast.style.opacity = '0';
-        toast.style.transform = 'translateX(120%)';
-        setTimeout(() => toast.remove(), 400);
-      }, 8000);
-    }
-    window.showOutOfStockToast = showOutOfStockToast;
-
-    function showNotHandledToast(store, info) {
-      if (!notifSettings.notifyNotHandled) return;
-      if (notifSettings.notifyChain && store.chain !== notifSettings.notifyChain) return;
-      if (notifSettings.onlyOnsiteGps && !info.onsite) return;
-
-      playChime();
-
-      if (notifSettings.pushEnabled && "Notification" in window && Notification.permission === "granted") {
-        try {
-          new Notification("⚪ BÁO KHÔNG CÓ HÀNG TẠI OSAKA", {
-            body: `${store.name}\nCửa hàng được báo không có hàng / không bán thẻ Pokémon.`,
-            icon: "https://poketan.jp/apple-touch-icon.png"
-          });
-        } catch(e) {}
-      }
-
-      const container = document.getElementById('toast-container');
-      const toast = document.createElement('div');
-      toast.className = 'toast';
-      toast.style.borderLeftColor = '#64748b';
-      toast.innerHTML = `
-        <div class="toast-header" style="color:#64748b;">
-          <span>⚪ BÁO KHÔNG CÓ HÀNG / KHÔNG BÁN THẺ</span>
-          <span class="toast-time">${info.timeAgo}</span>
-        </div>
-        <div class="toast-body">${store.name}</div>
-        <div style="font-size:0.75rem;color:#64748b;">Điểm này hiện không bán thẻ Pokémon</div>
-        <button class="toast-btn" style="background:#64748b;" onclick="openStoreHistoryModal('${store.id}')">Xem lịch sử & vị trí 📜📍</button>
-      `;
-
-      container.appendChild(toast);
-      setTimeout(() => {
-        toast.style.opacity = '0';
-        toast.style.transform = 'translateX(120%)';
-        setTimeout(() => toast.remove(), 400);
-      }, 8000);
-    }
-    window.showNotHandledToast = showNotHandledToast;
-
-    // 7. TIME AGO & FRESHNESS EVALUATION
-    function formatTimeAgo(timestamp) {
-      if (!timestamp || timestamp <= 0) return 'Chưa rõ';
-      const now = Math.floor(Date.now() / 1000);
-      const diff = now - timestamp;
-      if (diff < 60) return 'Vừa xong';
-      if (diff < 3600) return `${Math.floor(diff / 60)} phút trước`;
-      if (diff < 86400) {
-        const hours = Math.floor(diff / 3600);
-        const mins = Math.floor((diff % 3600) / 60);
-        return mins > 0 ? `${hours}h ${mins}p trước` : `${hours} giờ trước`;
-      }
-      const days = Math.floor(diff / 86400);
-      return `${days} ngày trước`;
-    }
-
-    function formatExactTime(timestamp) {
-      if (!timestamp || timestamp <= 0) return '';
-      const d = new Date(timestamp * 1000);
-      const timePart = d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-      const datePart = d.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' });
-      return `${timePart} (${datePart})`;
-    }
-
-    function updateAllRelativeTimes() {
-      const now = Math.floor(Date.now() / 1000);
-      const elements = document.querySelectorAll('.live-rel-time');
-      for (const el of elements) {
-        const ts = parseInt(el.getAttribute('data-live-timestamp'), 10);
-        if (!ts || ts <= 0) continue;
-        const prefix = el.getAttribute('data-live-prefix') || '';
-        const suffix = el.getAttribute('data-live-suffix') || '';
-        const relText = formatTimeAgo(ts);
-        const newText = `${prefix}${relText}${suffix}`;
-        if (el.textContent !== newText) {
-          el.textContent = newText;
-        }
-      }
-    }
-    window.updateAllRelativeTimes = updateAllRelativeTimes;
-
-    function getFreshnessInfo(code, timestamp) {
-      if (code !== 'i') return null;
-      if (!timestamp || timestamp <= 0) {
-        return {
-          level: 'stale',
-          badgeClass: 'freshness-stale',
-          tagText: '⚠️ Báo cáo đã lâu - Khả năng cao đã hết hàng',
-          popupWarning: '<div style="background:#fee2e2;color:#991b1b;padding:6px 10px;border-radius:6px;font-size:0.75rem;font-weight:700;margin:6px 0;">⚠️ Cảnh báo: Báo cáo đã lâu, khả năng cao đã hết hàng!</div>'
-        };
-      }
-      const now = Math.floor(Date.now() / 1000);
-      const diffHours = (now - timestamp) / 3600;
-      
-      if (diffHours <= 1.0) {
-        return {
-          level: 'fresh',
-          badgeClass: 'freshness-fresh',
-          tagText: '🔥 Vừa báo (<1h) - Khả năng còn hàng RẤT CAO!',
-          popupWarning: '<div style="background:#dcfce7;color:#15803d;padding:6px 10px;border-radius:6px;font-size:0.75rem;font-weight:700;margin:6px 0;">🔥 Tin siêu mới (<1h)! Khả năng còn hàng rất cao, nên đến ngay!</div>'
-        };
-      } else if (diffHours <= 3.0) {
-        return {
-          level: 'moderate',
-          badgeClass: 'freshness-moderate',
-          tagText: `⚡ Báo ${formatTimeAgo(timestamp)} - Khả năng còn hàng`,
-          popupWarning: `<div style="background:#fef9c3;color:#854d0e;padding:6px 10px;border-radius:6px;font-size:0.75rem;font-weight:700;margin:6px 0;">⚡ Báo ${formatTimeAgo(timestamp)}. Thẻ có thể sắp hết, nên đến sớm!</div>`
-        };
-      } else if (diffHours <= 6.0) {
-        return {
-          level: 'aging',
-          badgeClass: 'freshness-aging',
-          tagText: `⚠️ Báo ${formatTimeAgo(timestamp)} - Có thể đã hết hàng`,
-          popupWarning: `<div style="background:#ffedd5;color:#9a3412;padding:6px 10px;border-radius:6px;font-size:0.75rem;font-weight:700;margin:6px 0;">⚠️ Báo ${formatTimeAgo(timestamp)}. Thẻ Pokémon thường bán hết nhanh, có thể đã hết hàng!</div>`
-        };
-      } else {
-        return {
-          level: 'stale',
-          badgeClass: 'freshness-stale',
-          tagText: `⛔ Báo ${formatTimeAgo(timestamp)} - Thời gian quá lâu, có thể đã hết`,
-          popupWarning: `<div style="background:#fee2e2;color:#991b1b;padding:6px 10px;border-radius:6px;font-size:0.75rem;font-weight:700;margin:6px 0;">⛔ Cảnh báo: Báo cáo cách đây ${formatTimeAgo(timestamp)}! Thời gian quá lâu, khả năng rất cao đã hết hàng.</div>`
-        };
-      }
-    }
-
-    // 8. STATUS DECODER
-    function decodeStatus(val, conf) {
-      if (!val || typeof val !== 'string') {
-        return {
-          code: 'u',
-          label: 'Chưa có báo cáo',
-          packs: [],
-          timestamp: 0,
-          reported_at: 'Chưa rõ',
-          timeAgo: 'Chưa có báo cáo',
-          confirms: 0,
-          onsite: false,
-          freshness: null
-        };
-      }
-      const rawCode = val[0];
-      const code = rawCode.toLowerCase();
-      let rest = val.substring(1);
-
-      let onsite = false;
-      if (rest.endsWith('g')) {
-        onsite = true;
-        rest = rest.slice(0, -1);
-      }
+      if (rest.endsWith('g')) rest = rest.slice(0, -1);
 
       let packs = [];
-      let packCodes = configData.packCodes || {};
+      const packCodes = configData.packCodes || {};
       for (const [pCode, pName] of Object.entries(packCodes)) {
         if (rest.endsWith(pCode)) {
           packs.push(pName);
@@ -4773,1684 +908,359 @@ def index():
         }
       }
 
-      let dtStr = '-';
-      let timestamp = 0;
+      let dtStr = '';
+      let timeAgo = '';
       if (rest.length >= 10) {
-        const timeSub = rest.substring(0, 10);
-        const parsed = parseInt(timeSub, 10);
-        if (!isNaN(parsed)) {
-          timestamp = parsed;
+        const parsed = parseInt(rest.substring(0, 10), 10);
+        if (!isNaN(parsed) && parsed > 0) {
           const d = new Date(parsed * 1000);
           dtStr = d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) + ' ' +
                   d.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' });
+          const diffSec = Math.floor(Date.now() / 1000 - parsed);
+          if (diffSec < 60) timeAgo = 'Vừa xong';
+          else if (diffSec < 3600) timeAgo = `${Math.floor(diffSec / 60)} phút trước`;
+          else if (diffSec < 86400) timeAgo = `${Math.floor(diffSec / 3600)} giờ trước`;
+          else timeAgo = `${Math.floor(diffSec / 86400)} ngày trước`;
         }
       }
 
       const labelMap = {
-        'i': 'Có hàng (In Stock)',
-        'o': 'Hết hàng (Out of Stock)',
-        'n': 'Không bán thẻ',
-        'u': 'Chưa có báo cáo'
+        'i': '🟢 Có hàng (In Stock)',
+        'o': '🔴 Hết hàng (Out of Stock)',
+        'n': '⚪ Không bán thẻ',
+        'u': '🔘 Chưa có thông tin'
       };
-
-      const timeAgo = formatTimeAgo(timestamp);
-      const freshness = getFreshnessInfo(code, timestamp);
 
       return {
         code,
         label: labelMap[code] || 'Chưa rõ',
         packs,
-        timestamp,
         reported_at: dtStr,
-        timeAgo,
-        confirms: conf || 0,
-        onsite,
-        freshness
+        timeAgo
       };
     }
 
-    // 9. RENDER ALL STORES WITH COMPLETELY DECOUPLED MAP & NOTIFICATION FEED
-    function renderMapMarkersOnly() {
+    // 4. DISTANCE CALCULATION
+    function calcDistanceKm(lat1, lon1, lat2, lon2) {
+      const R = 6371;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+
+    function formatDist(km) {
+      if (km === null || isNaN(km)) return '';
+      if (km < 1) return `${Math.round(km * 1000)}m`;
+      return `${km.toFixed(1)}km`;
+    }
+
+    // 5. RENDER ALL STORE MARKERS
+    function renderMarkers() {
       markersLayer.clearLayers();
-      markerMap = {};
 
       const allStores = Object.values(storesDict);
-      const effectiveStatus = mapDisplay.includeCold ? latestMergedStatus : hotStatus;
+      const effectiveStatus = { ...coldStatus, ...hotStatus };
+
+      let cntIn = 0;
+      let cntOut = 0;
+      let cntUnknown = 0;
+      let cntTotal = 0;
+
+      const q = searchQuery.toLowerCase().trim();
 
       for (const store of allStores) {
         if (!store.lat || !store.lng) continue;
 
-        // Prefecture filter
-        if (!storePassesPrefFilter(store)) continue;
-
-        // Check mapDisplay chain filter
-        if (mapDisplay.chain && store.chain !== mapDisplay.chain) continue;
+        // Prefecture Filter
+        if (currentPref !== 'all' && store.pref !== currentPref) continue;
 
         const sid = store.id;
-        const rawVal = effectiveStatus[sid];
-        const info = decodeStatus(rawVal, effectiveStatus[sid + '_c']);
+        const raw = effectiveStatus[sid];
+        const info = decodeStatus(raw);
 
-        // Check mapDisplay granular status filters
-        const showIn = mapDisplay.showInStock !== undefined ? mapDisplay.showInStock : true;
-        const showOut = mapDisplay.showOutOfStock !== undefined ? mapDisplay.showOutOfStock : (mapDisplay.mode !== 'only_in');
-        const showNone = mapDisplay.showNotHandled !== undefined ? mapDisplay.showNotHandled : (mapDisplay.mode === 'all');
-        const showUnk = mapDisplay.showUnknown !== undefined ? mapDisplay.showUnknown : (mapDisplay.mode === 'all');
+        // Count totals for current prefecture
+        cntTotal++;
+        if (info.code === 'i') cntIn++;
+        else if (info.code === 'o') cntOut++;
+        else cntUnknown++;
 
-        if (info.code === 'i' && !showIn) continue;
-        if (info.code === 'o' && !showOut) continue;
-        if (info.code === 'n' && !showNone) continue;
-        if (info.code !== 'i' && info.code !== 'o' && info.code !== 'n' && !showUnk) continue;
+        // Status Filter
+        if (currentFilter === 'in' && info.code !== 'i') continue;
+        if (currentFilter === 'out' && info.code !== 'o') continue;
+        if (currentFilter === 'unknown' && info.code === 'i') continue;
 
-        let distanceKm = null;
-        if (userLat !== null && userLng !== null) {
-          distanceKm = calcDistanceKm(userLat, userLng, store.lat, store.lng);
-        }
-
-        // Accurate Google Maps Search & Directions URLs
-        const mapsDestQuery = encodeURIComponent((store.name || '') + ' ' + (store.address || ''));
-        const dirUrl = (userLat && userLng) 
-          ? `https://www.google.com/maps/dir/?api=1&origin=${userLat},${userLng}&destination=${mapsDestQuery}&destination_place_id=&travelmode=walking`
-          : `https://www.google.com/maps/search/?api=1&query=${mapsDestQuery}`;
-
-        const distHtml = distanceKm !== null ? `<div style="color:#2563eb;font-weight:700;font-size:0.8rem;margin:4px 0;">📍 Cách bạn: ${formatDistance(distanceKm)}</div>` : '';
-
-        let statusBadgeHtml = '';
-        if (info.code === 'i') statusBadgeHtml = '<div style="color:#16a34a;font-weight:800;margin:4px 0;">🟢 Đang có hàng (In Stock)</div>';
-        else if (info.code === 'o') statusBadgeHtml = '<div style="color:#dc2626;font-weight:800;margin:4px 0;">🔴 Hết hàng (Out of Stock)</div>';
-        else if (info.code === 'n') statusBadgeHtml = '<div style="color:#64748b;font-weight:700;margin:4px 0;">⚪ Không bán thẻ Pokémon</div>';
-        else statusBadgeHtml = '<div style="color:#94a3b8;font-weight:600;margin:4px 0;">🔘 Chưa có báo cáo gần đây</div>';
-
-        const packsHtml = info.packs.length ? `<div style="margin-top:6px;"><b>Packs:</b> ${info.packs.join(', ')}</div>` : '';
-        const reportTimeHtml = info.reported_at !== '-' && info.reported_at !== 'Chưa rõ' 
-          ? `<div style="font-size:0.75rem;margin-top:4px;"><b>Báo cáo:</b> ${info.reported_at} <span class="live-rel-time" data-live-timestamp="${info.timestamp || 0}" data-live-prefix="(" data-live-suffix=")" style="color:#2563eb;font-weight:700;">(${info.timeAgo})</span></div>` 
-          : '';
-
-        const freshnessWarning = info.freshness ? info.freshness.popupWarning : '';
-
-        const popupContent = `
-          <div style="font-family:'Inter',sans-serif;min-width:240px;max-width:320px;">
-            <b style="font-size:0.96rem;color:#0f172a;line-height:1.3;display:block;">${store.name}</b>
-            <div style="font-size:0.75rem;color:#0284c7;font-weight:700;margin-top:2px;">${store.chain_label || store.chain}</div>
-            ${statusBadgeHtml}
-            ${freshnessWarning}
-            ${distHtml}
-            <div style="font-size:0.75rem;color:#475569;margin-top:3px;line-height:1.35;background:#f8fafc;padding:5px 8px;border-radius:6px;border:1px solid #e2e8f0;">
-              📍 <b>Địa chỉ:</b> ${store.address || 'Khu vực Osaka'}
-            </div>
-            ${reportTimeHtml}
-            ${packsHtml}
-            <div style="margin-top:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-              <a href="${dirUrl}" target="_blank" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;background:#2563eb;color:white;text-decoration:none;border-radius:6px;font-size:0.75rem;font-weight:700;">🗺️ Chỉ đường Maps ↗</a>
-              <button type="button" id="popup-btn-${store.id}" onclick="event.stopPropagation(); togglePopupHistoryAccordion('${store.id}', event)" style="display:inline-flex;align-items:center;gap:5px;padding:6px 12px;background:#0f172a;color:white;border:none;border-radius:6px;font-size:0.75rem;font-weight:700;cursor:pointer;">
-                <span id="popup-arrow-${store.id}" style="font-weight:900;">▶</span> Lịch sử báo cáo
-              </button>
-            </div>
-            <div id="popup-accordion-${store.id}" class="popup-accordion-body" style="display:none;margin-top:8px;padding-top:8px;border-top:1px dashed #cbd5e1;max-height:250px;overflow-y:auto;">
-            </div>
-          </div>
-        `;
-
-        let marker;
-        if (info.code === 'i') {
-          const isFresh = info.freshness && info.freshness.level === 'fresh';
-          const shadowStyle = isFresh ? 'box-shadow:0 0 12px #22c55e;' : 'box-shadow:0 0 8px rgba(22,163,74,0.8);';
-          const greenIcon = L.divIcon({
-            className: 'custom-pin-in',
-            html: `<div style="background:#16a34a;width:26px;height:26px;border-radius:50%;border:2px solid white;${shadowStyle}display:flex;align-items:center;justify-content:center;color:white;font-size:13px;font-weight:bold;">🟢</div>`,
-            iconSize: [26, 26],
-            iconAnchor: [13, 13]
-          });
-          marker = L.marker([store.lat, store.lng], { icon: greenIcon, zIndexOffset: 1500 });
-        } else if (info.code === 'o') {
-          marker = L.circleMarker([store.lat, store.lng], {
-            radius: 6,
-            color: '#991b1b',
-            fillColor: '#dc2626',
-            fillOpacity: 0.85,
-            weight: 1.5
-          });
-        } else if (info.code === 'n') {
-          marker = L.circleMarker([store.lat, store.lng], {
-            radius: 5,
-            color: '#64748b',
-            fillColor: '#94a3b8',
-            fillOpacity: 0.7,
-            weight: 1
-          });
-        } else {
-          marker = L.circleMarker([store.lat, store.lng], {
-            radius: 4,
-            color: '#94a3b8',
-            fillColor: '#cbd5e1',
-            fillOpacity: 0.5,
-            weight: 1
-          });
-        }
-
-        marker.bindPopup(popupContent);
-        marker.on('click', () => {
-          currentFocusedStoreId = store.id;
-          document.querySelectorAll('.store-card').forEach(c => c.classList.remove('active-store-card'));
-          const card = document.getElementById('card-' + store.id);
-          if (card) {
-            card.classList.add('active-store-card');
-            card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-          }
-        });
-        markersLayer.addLayer(marker);
-        markerMap[sid] = marker;
-      }
-
-      updateQuickMapModeBtn();
-    }
-    window.renderMapMarkersOnly = renderMapMarkersOnly;
-
-    // RENDER SIDEBAR LIST (TÁCH BIỆT HOÀN TOÀN: BÁO CÓ HÀNG vs TRA CỨU TOÀN BỘ)
-    function renderSidebarListOnly() {
-      const storeList = document.getElementById('store-list');
-      if (!storeList) return;
-
-      const now = Math.floor(Date.now() / 1000);
-      const allStores = Object.values(storesDict);
-      const effectiveStatus = mapDisplay.includeCold ? latestMergedStatus : hotStatus;
-
-      // 1. TÍNH TOÁN CÁC CON SỐ THỐNG KÊ TOÀN CỤC
-      let countI = 0;
-      let countO = 0;
-      let countN = 0;
-      let countU = 0;
-
-      for (const store of allStores) {
-        const raw = effectiveStatus[store.id];
-        const code = (raw && typeof raw === 'string') ? raw[0].toLowerCase() : 'u';
-        if (code === 'i') countI++;
-        else if (code === 'o') countO++;
-        else if (code === 'n') countN++;
-        else countU++;
-      }
-
-      const statInEl = document.getElementById('stat-in');
-      if (statInEl) statInEl.innerText = countI;
-      const statOutEl = document.getElementById('stat-out');
-      if (statOutEl) statOutEl.innerText = countO;
-      const statTotEl = document.getElementById('stat-total');
-      if (statTotEl) statTotEl.innerText = allStores.length ? allStores.length.toLocaleString() : '4,050';
-      const menuStockEl = document.getElementById('menu-stock-count');
-      if (menuStockEl) menuStockEl.innerText = `${countI} Có hàng`;
-
-      const feedBadge = document.getElementById('feed-tab-count');
-      if (feedBadge) feedBadge.innerText = countI;
-      const allBadge = document.getElementById('all-tab-count');
-      if (allBadge) allBadge.innerText = allStores.length ? allStores.length.toLocaleString() : '4,050';
-      const mobStockBadge = document.getElementById('mob-badge-stock');
-      if (mobStockBadge) mobStockBadge.innerText = countI;
-
-      let listToRender = [];
-
-      for (const store of allStores) {
-        const sid = store.id;
-        const rawVal = effectiveStatus[sid];
-        const info = decodeStatus(rawVal, effectiveStatus[sid + '_c']);
-
-        // 0. Lọc theo tỉnh (prefecture filter)
-        if (!storePassesPrefFilter(store)) continue;
-
-        // 1. Lọc theo trạng thái PokéTan (tất cả / có hàng / hết hàng / chưa rõ)
-        if (poketanStatus !== 'all') {
-          if (poketanStatus === 'i' && info.code !== 'i') continue;
-          if (poketanStatus === 'o' && info.code !== 'o') continue;
-          if (poketanStatus === 'n' && (info.code !== 'n' && info.code !== 'u')) continue;
-        }
-
-        // 2. Lọc theo độ mới tin báo (feedFreshnessHours)
-        if (feedFreshnessHours < 9000 && info.timestamp > 0) {
-          const ageHours = (now - info.timestamp) / 3600;
-          if (ageHours > feedFreshnessHours) continue;
-        }
-
-        // 3. Lọc theo chuỗi
-        if (feedChain && store.chain !== feedChain) continue;
-
-        // 4. Tính khoảng cách GPS
-        let distanceKm = null;
-        if (userLat !== null && userLng !== null && store.lat && store.lng) {
-          distanceKm = calcDistanceKm(userLat, userLng, store.lat, store.lng);
-        }
-
-        // 5. Lọc theo từ khóa tìm kiếm
-        if (feedQuery) {
-          const q = feedQuery.toLowerCase();
+        // Search Filter
+        if (q) {
           const matchName = (store.name || '').toLowerCase().includes(q);
           const matchAddr = (store.address || '').toLowerCase().includes(q);
           if (!matchName && !matchAddr) continue;
         }
 
-        listToRender.push({ store, info, distanceKm });
-      }
+        // Marker Style by Status
+        let radius = 4.5;
+        let fillColor = '#94a3b8';
+        let strokeColor = '#64748b';
+        let weight = 1;
+        let fillOpacity = 0.65;
 
-      // Sắp xếp danh sách
-      if (feedSortMode === 'nearest') {
-        listToRender.sort((a, b) => {
-          if (a.distanceKm === null) return 1;
-          if (b.distanceKm === null) return -1;
-          return a.distanceKm - b.distanceKm;
-        });
-      } else {
-        // Cập nhật mới nhất trước (hoặc ưu tiên có hàng)
-        listToRender.sort((a, b) => {
-          const timeA = a.info.timestamp || 0;
-          const timeB = b.info.timestamp || 0;
-          return timeB - timeA;
-        });
-      }
-
-      const subInfoEl = document.getElementById('poketan-sub-info');
-      if (subInfoEl) {
-        subInfoEl.textContent = `大阪府 ${listToRender.length.toLocaleString()}店舗から探せます`;
-      }
-
-      if (listToRender.length === 0) {
-        storeList.innerHTML = `
-          <div style="text-align:center;color:#64748b;padding:36px 16px;">
-            <div style="font-size:2.2rem;margin-bottom:8px;">🔍</div>
-            <b style="font-size:0.95rem;color:#0f172a;">Không có báo cáo nào phù hợp.</b>
-            <div style="font-size:0.8rem;margin-top:6px;color:#64748b;">Hãy thử đổi bộ lọc trạng thái sang 'すべて' hoặc mở rộng mốc thời gian.</div>
-          </div>
-        `;
-        return;
-      }
-
-      const renderSlice = listToRender.slice(0, visibleLimit);
-      let html = '';
-      for (const item of renderSlice) {
-        html += renderSingleStoreCard(item);
-      }
-
-      if (listToRender.length > renderSlice.length) {
-        html += `
-          <div style="text-align:center;padding:12px 0;">
-            <button type="button" onclick="loadMoreStores()" style="width:100%;padding:10px;font-size:0.82rem;font-weight:700;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:6px;cursor:pointer;">
-              ⬇️ Tải thêm 150 báo cáo tiếp theo (Đang xem ${renderSlice.length} / ${listToRender.length.toLocaleString()})
-            </button>
-          </div>
-        `;
-      }
-
-      storeList.innerHTML = html;
-    }
-    window.renderSidebarListOnly = renderSidebarListOnly;
-
-    function renderSingleStoreCard(item) {
-      const { store, info, distanceKm } = item;
-      
-      // Status dot and badge mapping exactly as Poketan
-      let dotClass = 'dot-in';
-      let badgeClass = 'poketan-badge-in';
-      let badgeText = '在庫あり';
-
-      if (info.code === 'o') {
-        dotClass = 'dot-out';
-        badgeClass = 'poketan-badge-out';
-        badgeText = '在庫なし';
-      } else if (info.code === 'n') {
-        dotClass = 'dot-none';
-        badgeClass = 'poketan-badge-none';
-        badgeText = '扱ってない';
-      } else if (info.code === 'u') {
-        dotClass = 'dot-u';
-        badgeClass = 'poketan-badge-u';
-        badgeText = '不明';
-      }
-
-      // Check if newly reported (< 1h)
-      const isNew = info.timestamp > 0 && ((Date.now() / 1000 - info.timestamp) < 3600);
-      const newBadge = isNew ? `<span class="poketan-new-badge">NEW</span>` : '';
-
-      // Format distance: GPS location if available, fallback to Imamiya Station
-      const IMAMIYA_LAT = 34.6540;
-      const IMAMIYA_LNG = 135.4925;
-      let locationDistStr = '';
-      if (store.lat && store.lng) {
-        if (userLat !== null && userLng !== null) {
-          // User has GPS — show distance from their position
-          const km = calcDistanceKm(userLat, userLng, store.lat, store.lng);
-          locationDistStr = `📍 ${formatDistance(km)}`;
-        } else {
-          // No GPS — fallback to Imamiya Station
-          const km = calcDistanceKm(IMAMIYA_LAT, IMAMIYA_LNG, store.lat, store.lng);
-          locationDistStr = `🚉 今宮駅から ${formatDistance(km)}`;
+        if (info.code === 'i') {
+          // 🟢 CÓ HÀNG
+          radius = 8.5;
+          fillColor = '#16a34a';
+          strokeColor = '#ffffff';
+          weight = 2.5;
+          fillOpacity = 1;
+        } else if (info.code === 'o') {
+          // 🔴 HẾT HÀNG
+          radius = 6;
+          fillColor = '#ef4444';
+          strokeColor = '#b91c1c';
+          weight = 1.5;
+          fillOpacity = 0.85;
         }
-      }
-      
-      // Format time: exact report time + relative time
-      const exactTimeStr = info.timestamp ? formatExactTime(info.timestamp) : (info.reported_at !== '-' ? info.reported_at : '');
-      const timeStr = info.timeAgo || 'Vừa xong';
-      const fullTimeDisplay = exactTimeStr ? `${exactTimeStr} • <span class="live-rel-time" data-live-timestamp="${info.timestamp || 0}" data-live-prefix="⏱ ">⏱ ${timeStr}</span>` : `<span class="live-rel-time" data-live-timestamp="${info.timestamp || 0}" data-live-prefix="⏱ ">⏱ ${timeStr}</span>`;
 
-      // Packs or note
-      const packStr = info.packs.length ? `<span class="poketan-meta-pack">📦 ${info.packs.join(', ')}</span>` : '';
-      const confirmStr = info.confirms ? `👥 ${info.confirms} người báo` : '👥 1 người báo';
+        const marker = L.circleMarker([store.lat, store.lng], {
+          renderer: canvasRenderer,
+          radius,
+          fillColor,
+          color: strokeColor,
+          weight,
+          fillOpacity
+        });
 
-      // Precise Google Maps query
-      const mapsQuery = encodeURIComponent((store.name || '') + ' ' + (store.address || ''));
-      const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${mapsQuery}`;
-
-      const isExpanded = openAccordionStoreIds.has(store.id);
-
-      return `
-        <div class="poketan-row-wrapper" id="card-${store.id}" style="border-bottom:1px solid #f1f5f9;padding:6px 0;">
-          <div class="poketan-row" onclick="focusStore('${store.id}')" title="Bấm để xem vị trí trên bản đồ">
-            <div class="poketan-row-left">
-              <div class="status-dot ${dotClass}"></div>
-              <div class="poketan-row-main">
-                <div class="poketan-store-title-line">
-                  <span class="poketan-store-name">${store.name}</span>
-                  ${newBadge}
-                </div>
-                <div class="poketan-row-subline">
-                  <span class="poketan-time-block" style="display:inline-flex;align-items:center;gap:4px;color:#1e293b;font-weight:600;">
-                    ${exactTimeStr ? `<span style="color:#0f172a;font-weight:700;">🕒 ${exactTimeStr}</span> • ` : ''}
-                    <span class="live-rel-time" data-live-timestamp="${info.timestamp || 0}" data-live-prefix="⏱ " style="color:#2563eb;font-weight:700;">⏱ ${timeStr}</span>
-                  </span>
-                  ${locationDistStr ? `<span>• ${locationDistStr}</span>` : ''}
-                  <span>• ${confirmStr}</span>
-                  ${packStr ? `<span>• ${packStr}</span>` : ''}
-                </div>
-                ${store.address ? `
-                  <div class="poketan-row-addr" title="${store.address}">
-                    <span style="font-size:0.7rem;">📍</span>
-                    <span class="poketan-row-addr-text">${store.address}</span>
-                  </div>
-                ` : ''}
-                <div class="poketan-card-actions">
-                  <button type="button" class="poketan-btn-hist" id="toggle-btn-${store.id}" onclick="event.stopPropagation(); toggleStoreHistoryAccordion('${store.id}')">
-                    <span id="arrow-${store.id}">${isExpanded ? '▼' : '▶'}</span>
-                    <span id="toggle-label-${store.id}">${isExpanded ? 'Thu gọn' : 'Lịch sử báo cáo'}</span>
-                  </button>
-                  <a href="${mapsUrl}" target="_blank" class="poketan-btn-maps" onclick="event.stopPropagation();" title="Mở địa chỉ chuẩn xác trên Google Maps">
-                    🗺️ Google Maps ↗
-                  </a>
-                </div>
-              </div>
-            </div>
-            <div class="poketan-status-badge ${badgeClass}">
-              ${badgeText}
-            </div>
-          </div>
-          <div id="accordion-${store.id}" class="store-accordion-body" style="display:${isExpanded ? 'block' : 'none'};margin:6px 8px 4px 8px;">
-          </div>
-        </div>
-      `;
-    }
-
-    let _renderUITimer = null;
-    function renderUI() {
-      if (_renderUITimer) clearTimeout(_renderUITimer);
-      _renderUITimer = setTimeout(() => {
-        _renderUITimer = null;
-        renderMapMarkersOnly();
-        renderSidebarListOnly();
-      }, 100);
-    }
-    window.renderUI = renderUI;
-
-    function loadMoreStores() {
-      visibleLimit += 150;
-      renderSidebarListOnly();
-    }
-    window.loadMoreStores = loadMoreStores;
-
-    function loadAllStores() {
-      visibleLimit = 5000;
-      renderSidebarListOnly();
-    }
-    window.loadAllStores = loadAllStores;
-
-    function focusStore(sid, openPopup = true) {
-      if (typeof showAppView === 'function') {
-        showAppView('map');
-      } else if (typeof navigateMenu === 'function') {
-        navigateMenu('map');
-      }
-      const store = storesDict[sid];
-      if (store && store.lat && store.lng) {
-        if (markerMap[sid] && markersLayer && typeof markersLayer.zoomToShowLayer === 'function') {
-          markersLayer.zoomToShowLayer(markerMap[sid], () => {
-            if (openPopup) markerMap[sid].openPopup();
-          });
-        } else {
-          map.flyTo([store.lat, store.lng], 16, { duration: 0.8 });
-          if (openPopup && markerMap[sid]) {
-            setTimeout(() => markerMap[sid].openPopup(), 400);
+        // Popup Content
+        marker.bindPopup(() => {
+          let distHtml = '';
+          if (userLat !== null && userLng !== null) {
+            const d = calcDistanceKm(userLat, userLng, store.lat, store.lng);
+            distHtml = `<div style="font-size:0.75rem; color:#2563eb; font-weight:700; margin-top:2px;">📍 Cách bạn: ${formatDist(d)}</div>`;
           }
-        }
-      }
-    }
-    window.focusStore = focusStore;
 
-    function focusStoreOnMap(sid) {
-      currentFocusedStoreId = sid;
-      document.querySelectorAll('.store-card').forEach(c => c.classList.remove('active-store-card'));
-      const card = document.getElementById('card-' + sid);
-      if (card) {
-        card.classList.add('active-store-card');
-      }
-      focusStore(sid, true);
-    }
-    window.focusStoreOnMap = focusStoreOnMap;
-    // ----------------------------------------------------
-    // STORE REPORT HISTORY ACCORDION & TIMELINE LOGIC
-    // ----------------------------------------------------
-    function buildStoreTimelineHtml(storeId, rawHistory, currentInfo, isPopup = false) {
-      let timelineList = Array.isArray(rawHistory) ? [...rawHistory] : [];
+          let statusClass = 'status-unknown';
+          let statusText = '🔘 Chưa có thông tin gần đây';
+          if (info.code === 'i') {
+            statusClass = 'status-in';
+            statusText = '🟢 Có hàng (In Stock)';
+          } else if (info.code === 'o') {
+            statusClass = 'status-out';
+            statusText = '🔴 Hết hàng (Out of Stock)';
+          } else if (info.code === 'n') {
+            statusClass = 'status-unknown';
+            statusText = '⚪ Không bán thẻ Pokémon';
+          }
 
-      // Merge current realtime info if not present
-      if (currentInfo && (currentInfo.code === 'i' || currentInfo.code === 'o' || currentInfo.timestamp > 0)) {
-        const exists = timelineList.some(item => (currentInfo.timestamp > 0 && Math.abs((item.timestamp || 0) - currentInfo.timestamp) < 300));
-        if (!exists) {
-          timelineList.unshift({
-            id: 'current_realtime',
-            status: currentInfo.code === 'i' ? 'in-stock' : (currentInfo.code === 'o' ? 'out-of-stock' : 'not-handled'),
-            status_code: currentInfo.code,
-            status_label: currentInfo.code === 'i' ? '🟢 Có hàng (Trạng thái hiện tại)' : (currentInfo.code === 'o' ? '🔴 Hết hàng' : '⚪ Không bán'),
-            note: currentInfo.packs.length ? currentInfo.packs.join(', ') : 'Ghi nhận trực tiếp realtime',
-            user: 'Cộng đồng Poketan Osaka',
-            who: currentInfo.confirms ? `${currentInfo.confirms} xác nhận` : '',
-            onsite: currentInfo.onsite,
-            timestamp: currentInfo.timestamp,
-            formatted_time: (currentInfo.reported_at && currentInfo.reported_at !== '-') ? currentInfo.reported_at : ''
-          });
-        }
-      }
+          const packsHtml = info.packs.length ? `<div style="font-size:0.75rem; margin-top:4px;"><b>📦 Packs:</b> ${info.packs.join(', ')}</div>` : '';
+          const timeHtml = info.timeAgo ? `<div style="font-size:0.73rem; color:#64748b; margin-top:3px;">🕒 Báo cáo: ${info.timeAgo} (${info.reported_at})</div>` : '';
 
-      if (timelineList.length === 0) {
-        return `
-          <div style="background:white;border:1px dashed #cbd5e1;border-radius:6px;padding:12px;text-align:center;color:#64748b;font-size:0.75rem;">
-            <div style="font-weight:700;color:#0f172a;margin-bottom:2px;">📋 Chưa có thêm báo cáo cũ</div>
-            <div>Trạng thái hiện tại ghi nhận từ hệ thống Poketan.</div>
-          </div>
-        `;
-      }
+          const chainLabel = (configData.chainNames && configData.chainNames[store.chain]) || store.chain || 'Cửa hàng';
+          const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent((store.name || '') + ' ' + (store.address || ''))}`;
 
-      let entriesHtml = '';
-      for (const item of timelineList) {
-        const itemTimeAgo = item.timestamp ? formatTimeAgo(item.timestamp) : 'Chưa rõ';
-        let entryClass = 'entry-none';
-        let badgeClass = 'mini-none';
-        if (item.status_code === 'i') {
-          entryClass = 'entry-in';
-          badgeClass = 'mini-in';
-        } else if (item.status_code === 'o') {
-          entryClass = 'entry-out';
-          badgeClass = 'mini-out';
-        }
-
-        let dateStr = item.formatted_time || '';
-        if (item.timestamp && !dateStr) {
-          const d = new Date(item.timestamp * 1000);
-          dateStr = d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) + ' ' +
-                    d.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' });
-        }
-
-        const onsiteBadge = item.onsite ? `<span style="background:#e0f2fe;color:#0284c7;padding:1px 5px;border-radius:4px;font-size:0.68rem;font-weight:700;">📍 Tại quán</span>` : '';
-        const userStr = item.user || 'Người dùng ẩn danh';
-        const whoStr = item.who ? `(${item.who})` : '';
-
-        entriesHtml += `
-          <div class="accordion-hist-entry ${entryClass}">
-            <div style="display:flex;justify-content:space-between;align-items:center;gap:4px;flex-wrap:wrap;">
-              <span class="hist-mini-badge ${badgeClass}">${item.status_label}</span>
-              <div style="font-size:0.72rem;display:inline-flex;align-items:center;gap:5px;">
-                ${dateStr ? `<span style="font-weight:700;color:#0f172a;">🕒 ${dateStr}</span>` : ''}
-                <span class="live-rel-time" data-live-timestamp="${item.timestamp || 0}" data-live-prefix="⏱ " style="font-weight:700;color:#2563eb;">⏱ ${itemTimeAgo}</span>
-              </div>
-            </div>
-            ${item.note ? `<div style="font-size:0.73rem;color:#1e293b;margin-top:2px;">📝 <b>Sản phẩm:</b> ${item.note}</div>` : ''}
-            <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.68rem;color:#64748b;margin-top:2px;">
-              <span>👤 ${userStr} ${whoStr} ${onsiteBadge}</span>
-              <span style="color:#94a3b8;">${dateStr}</span>
-            </div>
-          </div>
-        `;
-      }
-
-      const store = storesDict[storeId];
-      const storeMapsQuery = store ? encodeURIComponent((store.name || '') + ' ' + (store.address || '')) : '';
-      const dirUrl = (store && store.lat && store.lng) 
-        ? ((userLat && userLng) 
-            ? `https://www.google.com/maps/dir/?api=1&origin=${userLat},${userLng}&destination=${storeMapsQuery}&travelmode=walking`
-            : `https://www.google.com/maps/search/?api=1&query=${storeMapsQuery}`)
-        : '';
-
-      const actionsBar = isPopup ? '' : `
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:6px;border-top:1px solid #e2e8f0;flex-wrap:wrap;gap:6px;">
-          ${dirUrl ? `<a href="${dirUrl}" target="_blank" style="font-size:0.72rem;color:#2563eb;font-weight:700;text-decoration:none;">🗺️ Chỉ đường Google Maps ↗</a>` : ''}
-          <button type="button" onclick="openStoreHistoryModal('${storeId}')" style="background:none;border:none;color:#64748b;font-size:0.72rem;cursor:pointer;text-decoration:underline;">
-            🔍 Phóng to toàn màn hình ↗
-          </button>
-        </div>
-      `;
-
-      return `
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid #e2e8f0;">
-          <span style="font-size:0.74rem;font-weight:800;color:#0f172a;">📜 LỊCH SỬ BÁO CÁO</span>
-          <span style="font-size:0.7rem;color:#2563eb;font-weight:700;">${timelineList.length} lượt</span>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:5px;">
-          ${entriesHtml}
-        </div>
-        ${actionsBar}
-      `;
-    }
-
-    function renderAccordionContent(storeId, containerEl, historyData, isPopup = false) {
-      const effectiveStatus = (mapDisplay && mapDisplay.includeCold) ? latestMergedStatus : hotStatus;
-      const currentRaw = effectiveStatus[storeId];
-      const currentInfo = decodeStatus(currentRaw, effectiveStatus[storeId + '_c']);
-
-      const html = buildStoreTimelineHtml(storeId, historyData, currentInfo, isPopup);
-      containerEl.innerHTML = html;
-    }
-
-    async function loadAndRenderAccordion(storeId, bodyEl) {
-      if (!bodyEl) return;
-      bodyEl.innerHTML = `
-        <div style="text-align:center;padding:14px 8px;color:#64748b;font-size:0.75rem;">
-          <span style="font-size:1.1rem;display:inline-block;animation:pulse 1s infinite;">⏳</span>
-          <div style="margin-top:4px;font-weight:600;">Đang tải lịch sử báo cáo...</div>
-        </div>
-      `;
-
-      try {
-        const res = await fetch(`/api/store_history/${storeId}`);
-        const data = await res.json();
-        storeHistoryCache[storeId] = data;
-        renderAccordionContent(storeId, bodyEl, data);
-      } catch (err) {
-        bodyEl.innerHTML = `
-          <div style="color:#ef4444;font-size:0.75rem;padding:8px;text-align:center;">
-            ⚠️ Không thể tải lịch sử: ${err.message}
-          </div>
-        `;
-      }
-    }
-
-    async function toggleStoreHistoryAccordion(storeId) {
-      const bodyEl = document.getElementById(`accordion-${storeId}`);
-      const arrowEl = document.getElementById(`arrow-${storeId}`);
-      const labelEl = document.getElementById(`toggle-label-${storeId}`);
-      const btnEl = document.getElementById(`toggle-btn-${storeId}`);
-
-      if (!bodyEl) return;
-
-      const isOpen = bodyEl.style.display !== 'none';
-      if (isOpen) {
-        // Thu gọn: đổi mũi tên sang ngang ▶, card trở về kích thước ban đầu
-        bodyEl.style.display = 'none';
-        openAccordionStoreIds.delete(storeId);
-        if (arrowEl) arrowEl.innerText = '▶';
-        if (labelEl) labelEl.innerText = 'Lịch sử';
-        if (btnEl) {
-          btnEl.classList.remove('expanded');
-          btnEl.title = 'Bấm để mở lịch sử báo cáo';
-        }
-        return;
-      }
-
-      // Mở rộng: đổi mũi tên hướng xuống ▼, card cao hơn để hiển thị lịch sử
-      bodyEl.style.display = 'block';
-      openAccordionStoreIds.add(storeId);
-      if (arrowEl) arrowEl.innerText = '▼';
-      if (labelEl) labelEl.innerText = 'Thu gọn';
-      if (btnEl) {
-        btnEl.classList.add('expanded');
-        btnEl.title = 'Bấm để thu gọn lịch sử báo cáo';
-      }
-
-      if (storeHistoryCache[storeId]) {
-        renderAccordionContent(storeId, bodyEl, storeHistoryCache[storeId]);
-      } else {
-        await loadAndRenderAccordion(storeId, bodyEl);
-      }
-    }
-    window.toggleStoreHistoryAccordion = toggleStoreHistoryAccordion;
-
-    function adjustLeafletPopup(storeId) {
-      const marker = markerMap[storeId];
-      if (marker && marker.getPopup()) {
-        const pop = marker.getPopup();
-        if (pop._updateLayout) pop._updateLayout();
-        if (pop._updatePosition) pop._updatePosition();
-        if (pop._adjustPan) pop._adjustPan();
-      }
-    }
-    window.adjustLeafletPopup = adjustLeafletPopup;
-
-    async function togglePopupHistoryAccordion(storeId, ev) {
-      if (ev) {
-        try {
-          ev.stopPropagation();
-          ev.preventDefault();
-        } catch(e) {}
-      }
-      const bodyEl = document.getElementById(`popup-accordion-${storeId}`);
-      const btnEl = document.getElementById(`popup-btn-${storeId}`);
-
-      if (!bodyEl) return;
-
-      const isOpen = bodyEl.style.display !== 'none';
-      if (isOpen) {
-        bodyEl.style.display = 'none';
-        if (btnEl) btnEl.innerHTML = `<span id="popup-arrow-${storeId}" style="font-weight:900;">▶</span> Lịch sử báo cáo`;
-        adjustLeafletPopup(storeId);
-        return;
-      }
-
-      bodyEl.style.display = 'block';
-      if (btnEl) btnEl.innerHTML = `<span id="popup-arrow-${storeId}" style="font-weight:900;">▼</span> Thu gọn lịch sử`;
-      adjustLeafletPopup(storeId);
-
-      if (storeHistoryCache[storeId]) {
-        renderAccordionContent(storeId, bodyEl, storeHistoryCache[storeId], true);
-        adjustLeafletPopup(storeId);
-      } else {
-        bodyEl.innerHTML = `
-          <div style="text-align:center;padding:12px;color:#64748b;font-size:0.75rem;">
-            ⏳ Đang tải lịch sử báo cáo...
-          </div>
-        `;
-        adjustLeafletPopup(storeId);
-
-        try {
-          const res = await fetch(`/api/store_history/${storeId}`);
-          const data = await res.json();
-          storeHistoryCache[storeId] = data;
-          renderAccordionContent(storeId, bodyEl, data, true);
-          adjustLeafletPopup(storeId);
-        } catch (err) {
-          bodyEl.innerHTML = `
-            <div style="color:#ef4444;font-size:0.75rem;padding:8px;text-align:center;">
-              ⚠️ Không thể tải lịch sử: ${err.message}
-            </div>
-          `;
-          adjustLeafletPopup(storeId);
-        }
-      }
-    }
-    window.togglePopupHistoryAccordion = togglePopupHistoryAccordion;
-
-    // STORE REPORT HISTORY MODAL LOGIC
-    async function openStoreHistoryModal(storeId) {
-      currentFocusedStoreId = storeId;
-
-      const modal = document.getElementById('store-history-modal');
-      const titleEl = document.getElementById('hist-modal-title');
-      const subEl = document.getElementById('hist-modal-subtitle');
-      const bodyEl = document.getElementById('hist-modal-body');
-      const footerEl = document.getElementById('hist-modal-footer-info');
-      const dirBtn = document.getElementById('hist-modal-dir-btn');
-
-      if (!modal) return;
-
-      // Highlight active card in store list
-      document.querySelectorAll('.store-card').forEach(c => c.classList.remove('active-store-card'));
-      const activeCard = document.getElementById('card-' + storeId);
-      if (activeCard) {
-        activeCard.classList.add('active-store-card');
-      }
-
-      // Fly map to store in background without opening popup over modal
-      try {
-        focusStore(storeId, false);
-      } catch(e) {}
-
-      const store = storesDict[storeId] || { name: 'Cửa hàng ' + storeId, address: '' };
-      if (titleEl) titleEl.innerText = store.name || 'Cửa hàng Osaka';
-
-      let subText = (store.chain_label || store.chain || '');
-      if (store.address) subText += ' • ' + store.address;
-      if (userLat !== null && userLng !== null && store.lat && store.lng) {
-        try {
-          const d = (typeof calcDistanceKm === 'function') ? calcDistanceKm(userLat, userLng, store.lat, store.lng) : null;
-          if (d !== null) subText += ` • 📍 Cách bạn: ${formatDistance(d)}`;
-        } catch(e) {}
-      }
-      if (subEl) subEl.innerText = subText;
-
-      if (dirBtn && store.lat && store.lng) {
-        const storeMapsQuery = encodeURIComponent((store.name || '') + ' ' + (store.address || ''));
-        const dirUrl = (userLat && userLng) 
-          ? `https://www.google.com/maps/dir/?api=1&origin=${userLat},${userLng}&destination=${storeMapsQuery}&travelmode=walking`
-          : `https://www.google.com/maps/search/?api=1&query=${storeMapsQuery}`;
-        dirBtn.href = dirUrl;
-        dirBtn.style.display = 'inline-flex';
-      } else if (dirBtn) {
-        dirBtn.style.display = 'none';
-      }
-
-      // Open modal immediately to provide instant feedback
-      modal.style.display = 'flex';
-      if (!storeHistoryCache[storeId] && bodyEl) {
-        bodyEl.innerHTML = `
-          <div style="text-align:center;padding:36px;color:#64748b;">
-            <div style="font-size:1.8rem;animation:pulse 1s infinite;">⏳</div>
-            <div style="font-weight:700;margin-top:8px;">Đang tải lịch sử báo cáo từ Poketan Cloud...</div>
-          </div>
-        `;
-      }
-
-      try {
-        let history = storeHistoryCache[storeId];
-        if (!history) {
-          const res = await fetch(`/api/store_history/${storeId}`);
-          history = await res.json();
-          storeHistoryCache[storeId] = history;
-        }
-
-        // Get latest decoded status from cache for reference
-        const effectiveStatus = (mapDisplay && mapDisplay.includeCold) ? latestMergedStatus : hotStatus;
-        const currentRaw = effectiveStatus[storeId];
-        const currentInfo = decodeStatus(currentRaw, effectiveStatus[storeId + '_c']);
-
-        let currentStatusHtml = '';
-        if (currentInfo.code === 'i') {
-          const packDesc = currentInfo.packs.length ? currentInfo.packs.join(', ') : 'Thẻ Pokémon';
-          currentStatusHtml = `<span class="hist-status-badge hist-status-in">🟢 Có hàng: ${packDesc}</span>`;
-        } else if (currentInfo.code === 'o') {
-          currentStatusHtml = `<span class="hist-status-badge hist-status-out">🔴 Hết hàng</span>`;
-        } else if (currentInfo.code === 'n') {
-          currentStatusHtml = `<span class="hist-status-badge hist-status-none">⚪ Không bán thẻ Pokémon</span>`;
-        } else {
-          currentStatusHtml = `<span class="hist-status-badge hist-status-u">🔘 Chưa có dữ liệu gần đây</span>`;
-        }
-
-        const summaryBox = `
-          <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;padding:12px 14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:gap:8px;">
+          return `
             <div>
-              <div style="font-size:0.75rem;color:#64748b;font-weight:700;">TÌNH TRẠNG MỚI NHẤT HIỆN TẠI:</div>
-              <div style="margin-top:4px;">${currentStatusHtml}</div>
-            </div>
-            <div style="text-align:right;">
-              <div style="font-size:0.75rem;color:#64748b;font-weight:700;">THỜI GIAN BÁO CÁO:</div>
-              <div style="font-size:0.85rem;font-weight:800;color:#2563eb;margin-top:2px;">${currentInfo.timeAgo || 'Chưa rõ'}</div>
-              <div style="font-size:0.72rem;color:#94a3b8;">${currentInfo.reported_at || ''}</div>
-            </div>
-          </div>
-        `;
-
-        let timelineList = Array.isArray(history) ? [...history] : [];
-
-        // Nếu timeline từ subcollection chưa có bản ghi hiện tại nhưng cửa hàng đang có trạng thái (có hàng / hết hàng)
-        if (currentInfo && (currentInfo.code === 'i' || currentInfo.code === 'o' || currentInfo.timestamp > 0)) {
-          const exists = timelineList.some(item => (currentInfo.timestamp > 0 && Math.abs((item.timestamp || 0) - currentInfo.timestamp) < 300));
-          if (!exists) {
-            timelineList.unshift({
-              id: 'current_realtime',
-              status: currentInfo.code === 'i' ? 'in-stock' : (currentInfo.code === 'o' ? 'out-of-stock' : 'not-handled'),
-              status_code: currentInfo.code,
-              status_label: currentInfo.code === 'i' ? '🟢 Có hàng (Trạng thái hiện tại)' : (currentInfo.code === 'o' ? '🔴 Hết hàng' : '⚪ Không bán'),
-              note: currentInfo.packs.length ? currentInfo.packs.join(', ') : 'Ghi nhận trực tiếp Firestore',
-              user: 'Cộng đồng Poketan Osaka',
-              who: currentInfo.confirms ? `${currentInfo.confirms} xác nhận` : '',
-              onsite: currentInfo.onsite,
-              timestamp: currentInfo.timestamp,
-              formatted_time: (currentInfo.reported_at && currentInfo.reported_at !== '-') ? currentInfo.reported_at : ''
-            });
-          }
-        }
-
-        if (timelineList.length === 0) {
-          if (bodyEl) {
-            bodyEl.innerHTML = `
-              ${summaryBox}
-              <div style="background:white;border:1px dashed #cbd5e1;border-radius:10px;padding:24px;text-align:center;color:#475569;">
-                <div style="font-size:1.8rem;margin-bottom:6px;">📋</div>
-                <div style="font-weight:700;font-size:0.9rem;color:#0f172a;margin-bottom:4px;">Chưa có chi tiết từng lượt báo cáo cũ trên Firestore</div>
-                <div style="font-size:0.78rem;color:#64748b;line-height:1.5;">
-                  Cửa hàng này hiện được ghi nhận qua trạng thái tổng hợp mới nhất từ cộng đồng Poketan.
-                </div>
-              </div>
-            `;
-          }
-          if (footerEl) footerEl.innerText = `Dữ liệu trạng thái tổng hợp hệ thống`;
-          return;
-        }
-
-        if (footerEl) footerEl.innerText = `Tìm thấy ${timelineList.length} lượt báo cáo lịch sử từ cộng đồng`;
-
-        let html = `
-          ${summaryBox}
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #f1f5f9;">
-            <span style="font-size:0.78rem;font-weight:800;color:#475569;">TIMELINE LỊCH SỬ CÁC LƯỢT BÁO CÁO</span>
-            <span style="font-size:0.75rem;color:#2563eb;font-weight:700;">Tổng cộng: ${timelineList.length} lượt</span>
-          </div>
-          <div class="hist-timeline">
-        `;
-
-        for (const item of timelineList) {
-          const itemTimeAgo = item.timestamp ? formatTimeAgo(item.timestamp) : 'Chưa rõ';
-          let itemClass = 'hist-none';
-          let badgeClass = 'hist-status-none';
-          if (item.status_code === 'i') {
-            itemClass = 'hist-in';
-            badgeClass = 'hist-status-in';
-          } else if (item.status_code === 'o') {
-            itemClass = 'hist-out';
-            badgeClass = 'hist-status-out';
-          }
-
-          let dateStr = item.formatted_time || '';
-          if (item.timestamp && !dateStr) {
-            const d = new Date(item.timestamp * 1000);
-            dateStr = d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) + ' ' +
-                      d.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' });
-          }
-
-          const onsiteBadge = item.onsite ? `<span class="hist-badge-onsite">📍 Xác nhận tại quán (GPS)</span>` : '';
-          const userStr = item.user || 'Người dùng ẩn danh';
-          const whoStr = item.who ? `[${item.who}]` : '';
-
-          html += `
-            <div class="hist-item ${itemClass}">
-              <div class="hist-header">
-                <span class="hist-status-badge ${badgeClass}">${item.status_label}</span>
-                <span class="hist-time-ago live-rel-time" data-live-timestamp="${item.timestamp || 0}" data-live-prefix="⏱ ">⏱ ${itemTimeAgo}</span>
-              </div>
-              ${item.note ? `<div class="hist-note">📝 <b>Ghi chú / Sản phẩm:</b> ${item.note}</div>` : ''}
-              <div class="hist-meta">
-                <span style="font-weight:600;display:flex;align-items:center;gap:6px;">
-                  👤 ${userStr} <span style="color:#94a3b8;font-size:0.7rem;">${whoStr}</span>
-                  ${onsiteBadge}
-                </span>
-                <span class="hist-timestamp">${dateStr}</span>
-              </div>
+              <div class="store-popup-title">${store.name}</div>
+              <div class="store-popup-chain">${chainLabel}</div>
+              <div class="store-popup-status ${statusClass}">${statusText}</div>
+              ${distHtml}
+              ${timeHtml}
+              ${packsHtml}
+              <div class="store-popup-addr">📍 ${store.address || 'Khu vực Nhật Bản'}</div>
+              <a href="${mapsUrl}" target="_blank" class="btn-maps-dir">🗺️ Chỉ đường Google Maps ↗</a>
             </div>
           `;
+        }, { maxWidth: 320 });
+
+        markersLayer.addLayer(marker);
+      }
+
+      // Update counters in top bar
+      document.getElementById('cnt-all').innerText = cntTotal.toLocaleString();
+      document.getElementById('cnt-in').innerText = cntIn.toLocaleString();
+      document.getElementById('cnt-out').innerText = cntOut.toLocaleString();
+      document.getElementById('cnt-unknown').innerText = cntUnknown.toLocaleString();
+    }
+
+    // 6. FILTER CONTROLS
+    function setStatusFilter(filter) {
+      currentFilter = filter;
+      document.querySelectorAll('.pill-btn').forEach(btn => btn.classList.remove('active'));
+      const activeBtn = document.getElementById(`btn-filter-${filter}`);
+      if (activeBtn) activeBtn.classList.add('active');
+      renderMarkers();
+    }
+    window.setStatusFilter = setStatusFilter;
+
+    function changePrefecture(pref) {
+      currentPref = pref;
+      renderMarkers();
+
+      // Pan map to center of selected prefecture
+      const prefCenters = {
+        'osaka': [34.6937, 135.5023],
+        'aichi': [35.1815, 136.9066],
+        'kanagawa': [35.4437, 139.6380],
+        'gifu': [35.4233, 136.7607],
+        'mie': [34.7303, 136.5086]
+      };
+      if (prefCenters[pref]) {
+        map.flyTo(prefCenters[pref], 12, { duration: 1.0 });
+      }
+    }
+    window.changePrefecture = changePrefecture;
+
+    let searchTimer = null;
+    function onSearch(val) {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => {
+        searchQuery = val;
+        renderMarkers();
+      }, 150);
+    }
+    window.onSearch = onSearch;
+
+    // 7. GPS USER LOCATION TRACKING
+    function locateUser(fly = true) {
+      if (!navigator.geolocation) {
+        alert('Trình duyệt của bạn không hỗ trợ GPS.');
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          userLat = pos.coords.latitude;
+          userLng = pos.coords.longitude;
+          const accuracy = pos.coords.accuracy;
+
+          if (!userMarker) {
+            const icon = L.divIcon({
+              className: 'user-location-marker',
+              iconSize: [18, 18],
+              iconAnchor: [9, 9]
+            });
+            userMarker = L.marker([userLat, userLng], { icon, zIndexOffset: 2000 }).addTo(map);
+            userMarker.bindPopup('📍 Vị trí hiện tại của bạn');
+            userCircle = L.circle([userLat, userLng], {
+              radius: accuracy,
+              color: '#3b82f6',
+              fillColor: '#93c5fd',
+              fillOpacity: 0.15,
+              weight: 1
+            }).addTo(map);
+          } else {
+            userMarker.setLatLng([userLat, userLng]);
+            userCircle.setLatLng([userLat, userLng]);
+            userCircle.setRadius(accuracy);
+          }
+
+          if (fly) {
+            map.flyTo([userLat, userLng], 14, { duration: 1.2 });
+          }
+        },
+        (err) => {
+          console.warn('GPS error:', err.message);
+          if (fly) alert('Không thể lấy vị trí GPS. Hãy kiểm tra quyền truy cập vị trí trên trình duyệt.');
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 10000 }
+      );
+    }
+    window.locateUser = locateUser;
+
+    // Watch position continuously
+    if (navigator.geolocation) {
+      navigator.geolocation.watchPosition(
+        (pos) => {
+          userLat = pos.coords.latitude;
+          userLng = pos.coords.longitude;
+          if (userMarker) {
+            userMarker.setLatLng([userLat, userLng]);
+            if (userCircle) userCircle.setLatLng([userLat, userLng]);
+          }
+        },
+        null,
+        { enableHighAccuracy: true, maximumAge: 10000 }
+      );
+    }
+
+    // 8. DATA INITIALIZATION & REAL-TIME FIRESTORE LISTENER
+    async function initData() {
+      try {
+        const loadingText = document.getElementById('loading-text');
+
+        // Step 1: Config
+        const cfgRes = await fetch('/api/config');
+        configData = await cfgRes.json();
+
+        // Step 2: Stores Metadata
+        if (loadingText) loadingText.innerText = 'Đang tải 11,968 cửa hàng...';
+        const storesRes = await fetch('/api/stores_data');
+        storesDict = await storesRes.json();
+
+        // Step 3: Statuses
+        if (loadingText) loadingText.innerText = 'Đang nạp trạng thái hàng thực tế...';
+        const [hotRes, coldRes] = await Promise.all([
+          fetch('/api/hot_status'),
+          fetch('/api/cold_status')
+        ]);
+        hotStatus = await hotRes.json();
+        coldStatus = await coldRes.json();
+
+        // Render markers
+        renderMarkers();
+
+        // Hide loading screen
+        const overlay = document.getElementById('loading-overlay');
+        if (overlay) {
+          overlay.style.opacity = '0';
+          setTimeout(() => overlay.remove(), 350);
         }
 
-        html += `</div>`;
-        if (bodyEl) bodyEl.innerHTML = html;
+        // Auto locate once on startup (quietly)
+        locateUser(false);
+
+        // Step 4: Real-time listener via Firebase SDK
+        setupFirebaseRealtime();
 
       } catch (err) {
-        console.error("Error loading store history:", err);
-        if (bodyEl) {
-          bodyEl.innerHTML = `
-            <div style="text-align:center;padding:30px;color:#ef4444;">
-              <div style="font-size:1.8rem;margin-bottom:8px;">⚠️</div>
-              <b>Lỗi kết nối khi tải lịch sử cửa hàng</b>
-              <div style="font-size:0.8rem;color:#64748b;margin-top:6px;">${err.message}</div>
-            </div>
-          `;
-        }
+        console.error('Initialization error:', err);
+        const overlay = document.getElementById('loading-overlay');
+        if (overlay) overlay.innerHTML = `<div style="color:#ef4444; font-weight:700;">Lỗi tải dữ liệu: ${err.message}</div>`;
       }
     }
-    window.openStoreHistoryModal = openStoreHistoryModal;
 
-    function viewStoreOnMap() {
-      closeStoreHistoryModal();
-      if (currentFocusedStoreId) {
-        focusStore(currentFocusedStoreId, true);
-      }
-    }
-    window.viewStoreOnMap = viewStoreOnMap;
-
-    function closeStoreHistoryModal() {
-      const modal = document.getElementById('store-history-modal');
-      if (modal) modal.style.display = 'none';
-    }
-    window.closeStoreHistoryModal = closeStoreHistoryModal;
-
-    // Handle ESC key to close open modals
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        const histModal = document.getElementById('store-history-modal');
-        if (histModal && histModal.style.display !== 'none') {
-          closeStoreHistoryModal();
-          return;
-        }
-        const mapModal = document.getElementById('map-settings-modal');
-        if (mapModal && mapModal.style.display !== 'none') {
-          toggleMapSettingsModal();
-          return;
-        }
-        const notifModal = document.getElementById('notif-settings-modal');
-        if (notifModal && notifModal.style.display !== 'none') {
-          toggleNotifSettingsModal();
-          return;
-        }
-      }
-    });
-
-    function handleStatusQuickSelect(val) {
-      if (val === 'custom') {
-        toggleMapSettingsModal();
-        return;
-      }
-      applyPreset(val);
-    }
-    window.handleStatusQuickSelect = handleStatusQuickSelect;
-
-    function setChain(chain) {
-      currentChain = chain;
-      const chainSelect = document.getElementById('chain-select');
-      if (chainSelect) chainSelect.value = chain;
-      renderUI();
-      saveSettings();
-    }
-    window.setChain = setChain;
-
-    function setSortMode(mode) {
-      sortMode = mode;
-      const sortSelect = document.getElementById('sort-select');
-      if (sortSelect) sortSelect.value = mode;
-      if (mode === 'nearest' && userLat === null) {
-        requestUserLocation(true);
-      } else {
-        renderUI();
-      }
-      saveSettings();
-    }
-    window.setSortMode = setSortMode;
-
-    document.getElementById('search-input').addEventListener('input', (e) => {
-      currentQuery = e.target.value;
-      renderUI();
-    });
-
-    // 10. DEDICATED CALENDAR LOGIC
-    let showExpired = false;
-    let knownCalendarEventIds = null;
-    let calSearchQuery = '';
-    let calTypeFilter = '';
-    let calStatusFilter = 'active';
-
-    async function loadCalendar() {
+    function setupFirebaseRealtime() {
+      if (!window.FirebaseInit || !configData.apiKey || !configData.projectId) return;
       try {
-        const res = await fetch('/api/calendar?include_expired=true');
-        calendarEvents = await res.json();
-        
-        const activeEvents = calendarEvents.filter(e => !e.is_expired);
-        const expiredEvents = calendarEvents.filter(e => e.is_expired);
-        const openEvents = calendarEvents.filter(e => e.category === 'OPEN');
-        const upcomingEvents = calendarEvents.filter(e => e.category === 'UPCOMING');
+        const { initializeApp, initializeFirestore, doc, onSnapshot } = window.FirebaseInit;
+        const fbApp = initializeApp({
+          apiKey: configData.apiKey,
+          projectId: configData.projectId
+        });
+        const db = initializeFirestore(fbApp, {});
 
-        document.getElementById('menu-cal-count').innerText = `${activeEvents.length} Đang mở`;
-        document.getElementById('cal-stat-open').innerText = `🟢 ${openEvents.length} Đang nhận đơn`;
-        document.getElementById('cal-stat-upcoming').innerText = `🟡 ${upcomingEvents.length} Sắp mở`;
-        document.getElementById('cal-stat-expired').innerText = `⏳ ${expiredEvents.length} Đã quá hạn`;
-        document.getElementById('expired-divider-label').innerText = `── CÁC ĐỢT ĐÃ HẾT HẠN ĐĂNG KÝ (${expiredEvents.length}) ──`;
-
-        if (knownCalendarEventIds !== null) {
-          const newEvents = calendarEvents.filter(e => !knownCalendarEventIds.has(e.id));
-          if (newEvents.length > 0) {
-            newEvents.forEach(e => {
-              showCalendarToast(e);
-            });
-          }
-        }
-        knownCalendarEventIds = new Set(calendarEvents.map(e => e.id));
-
-        renderCalendar();
-      } catch (e) {
-        console.error("Calendar Load Error:", e);
-      }
-    }
-
-    function showCalendarToast(event) {
-      if (!notifSettings.notifyLottery) return;
-
-      playChime();
-
-      if (notifSettings.pushEnabled && "Notification" in window && Notification.permission === "granted") {
-        try {
-          new Notification("🎉 QUẢN TRỊ VIÊN VỪA ĐĂNG ĐỢT BỐC THĂM MỚI!", {
-            body: `${event.title} (${event.type_label})\nSản phẩm: ${event.products.join(', ')}\n${event.category_label}`,
-            icon: "https://poketan.jp/apple-touch-icon.png"
+        const prefs = ['osaka', 'aichi', 'kanagawa', 'gifu', 'mie'];
+        prefs.forEach(p => {
+          const docRef = doc(db, 'status', p);
+          onSnapshot(docRef, (snapshot) => {
+            if (snapshot.exists()) {
+              const data = snapshot.data();
+              Object.assign(hotStatus, data);
+              renderMarkers();
+            }
+          }, (err) => {
+            console.warn('Realtime listener notice:', err.message);
           });
-        } catch(e) {}
-      }
-
-      const container = document.getElementById('toast-container');
-      const toast = document.createElement('div');
-      toast.className = 'toast';
-      toast.style.borderLeftColor = '#2563eb';
-      toast.innerHTML = `
-        <div class="toast-header" style="color:#2563eb;">
-          <span>🎉 LỊCH BỐC THĂM MỚI TỪ QUẢN TRỊ!</span>
-          <span class="toast-time">Vừa đăng</span>
-        </div>
-        <div class="toast-body">${event.title}</div>
-        <div style="font-size:0.78rem;color:#0284c7;font-weight:700;">${event.type_label}</div>
-        <div class="toast-pack" style="background:#dbeafe;color:#1e40af;">🎁 ${event.products.join(', ')}</div>
-        <div style="font-size:0.75rem;color:#64748b;">${event.category_label}</div>
-        <button class="toast-btn" style="background:#2563eb;" onclick="navigateMenu('calendar')">Xem lịch ngay 📅</button>
-      `;
-
-      container.appendChild(toast);
-      setTimeout(() => {
-        toast.style.opacity = '0';
-        toast.style.transform = 'translateX(120%)';
-        setTimeout(() => toast.remove(), 400);
-      }, 12000);
-    }
-
-    function handleCalSearch(val) {
-      calSearchQuery = val.trim().toLowerCase();
-      renderCalendar();
-    }
-    window.handleCalSearch = handleCalSearch;
-
-    function setCalTypeFilter(type) {
-      calTypeFilter = type;
-      document.querySelectorAll('#cal-type-chips .cal-chip').forEach(c => c.classList.remove('active'));
-      event.target.classList.add('active');
-      renderCalendar();
-    }
-    window.setCalTypeFilter = setCalTypeFilter;
-
-    function setCalStatusFilter(status) {
-      calStatusFilter = status;
-      document.querySelectorAll('#cal-status-chips .cal-chip').forEach(c => c.classList.remove('active'));
-      event.target.classList.add('active');
-      if (status === 'all') {
-        showExpired = true;
-      }
-      renderCalendar();
-    }
-    window.setCalStatusFilter = setCalStatusFilter;
-
-    function toggleExpiredSection() {
-      showExpired = !showExpired;
-      renderCalendar();
-      saveSettings();
-    }
-    window.toggleExpiredSection = toggleExpiredSection;
-
-    setInterval(loadCalendar, 30000);
-
-    function renderEventCard(e) {
-      let badgeClass = 'cal-open';
-      if (e.category === 'UPCOMING') badgeClass = 'cal-upcoming';
-      else if (e.is_expired) badgeClass = 'cal-closed';
-
-      const isChecked = localStorage.getItem('applied_' + e.id) === '1';
-
-      const linkHtml = e.url 
-        ? `<a href="${e.url}" target="_blank" class="cal-link-btn">Đăng ký tham gia ↗</a>` 
-        : `<span style="font-size:0.75rem;color:#94a3b8;">Đăng ký tại cửa hàng / App riêng</span>`;
-
-      const cardStyle = e.is_expired ? 'opacity: 0.65; background: #f8fafc; border-style: dashed;' : '';
-
-      return `
-        <div class="cal-card" style="${cardStyle}">
-          <div class="cal-top">
-            <span class="cal-status-badge ${badgeClass}">${e.category_label}</span>
-            <span class="cal-type">${e.type_label}</span>
-          </div>
-          <div class="cal-title">${e.title}</div>
-          <div style="display:flex;flex-wrap:wrap;gap:4px;">
-            ${e.products.map(p => `<span class="pack-tag" style="background:#e0f2fe;color:#0369a1;border-color:#bae6fd;">📦 ${p}</span>`).join('')}
-          </div>
-          ${e.note ? `<div class="cal-note">${e.note}</div>` : ''}
-          <div class="cal-actions">
-            ${linkHtml}
-            <label class="cal-checkbox-label">
-              <input type="checkbox" onchange="toggleApplied('${e.id}', this.checked)" ${isChecked ? 'checked' : ''} />
-              <span>Đã nộp đơn</span>
-            </label>
-          </div>
-        </div>
-      `;
-    }
-
-    function renderCalendar() {
-      const grid = document.getElementById('calendar-cards-grid');
-      const expiredGrid = document.getElementById('calendar-expired-grid');
-      const expiredWrapper = document.getElementById('calendar-expired-wrapper');
-      const toggleBtn = document.getElementById('cal-header-toggle-expired');
-
-      if (!calendarEvents.length) {
-        grid.innerHTML = '<div style="padding:40px;text-align:center;grid-column:1/-1;">Không có sự kiện nào.</div>';
-        return;
-      }
-
-      let filtered = calendarEvents.filter(e => {
-        if (calTypeFilter && e.type !== calTypeFilter) return false;
-        if (calSearchQuery) {
-          const matchTitle = (e.title || '').toLowerCase().includes(calSearchQuery);
-          const matchProd = (e.products || []).some(p => p.toLowerCase().includes(calSearchQuery));
-          const matchNote = (e.note || '').toLowerCase().includes(calSearchQuery);
-          if (!matchTitle && !matchProd && !matchNote) return false;
-        }
-        return true;
-      });
-
-      const activeEvents = filtered.filter(e => !e.is_expired);
-      const expiredEvents = filtered.filter(e => e.is_expired);
-
-      if (activeEvents.length > 0) {
-        grid.innerHTML = activeEvents.map(renderEventCard).join('');
-      } else {
-        grid.innerHTML = '<div style="padding:40px;text-align:center;color:#94a3b8;grid-column:1/-1;">Không có đợt bốc thăm nào đang mở phù hợp bộ lọc.</div>';
-      }
-
-      if (expiredEvents.length > 0 && showExpired) {
-        expiredWrapper.style.display = 'block';
-        expiredGrid.innerHTML = expiredEvents.map(renderEventCard).join('');
-        toggleBtn.innerText = `👆 Ẩn ${expiredEvents.length} sự kiện quá hạn`;
-      } else {
-        expiredWrapper.style.display = 'none';
-        toggleBtn.innerText = `👁️ Xem ${expiredEvents.length} sự kiện quá hạn`;
-      }
-    }
-
-    function toggleApplied(id, checked) {
-      if (checked) {
-        localStorage.setItem('applied_' + id, '1');
-      } else {
-        localStorage.removeItem('applied_' + id);
-      }
-    }
-    window.toggleApplied = toggleApplied;
-
-    // 11. ENGINE INITIALIZATION
-    async function startRealtimeEngine() {
-      // Khôi phục vị trí cache gần nhất để không bị nhảy bản đồ sang nơi khác
-      try {
-        const cachedLat = sessionStorage.getItem('bawui_last_lat');
-        const cachedLng = sessionStorage.getItem('bawui_last_lng');
-        const cachedAcc = sessionStorage.getItem('bawui_last_acc');
-        if (cachedLat && cachedLng) {
-          userLat = parseFloat(cachedLat);
-          userLng = parseFloat(cachedLng);
-          userAccuracy = cachedAcc ? parseFloat(cachedAcc) : 50;
-          renderUserLocation(false);
-        }
-      } catch(e) {}
-
-      requestUserLocation(true);
-      loadCalendar();
-
-      // Immediately apply saved settings from localStorage (if any) to prevent layout shift
-      try {
-        const localSettings = JSON.parse(localStorage.getItem('bawui_user_settings') || 'null');
-        if (localSettings) applyLoadedSettings(localSettings);
-      } catch (e) {}
-
-      // Immediately synchronize menu with the current browser URL on page load
-      const startRoute = getRouteFromUrl();
-      syncMenuAndRoute(startRoute, false);
-
-      // Fetch store metadata, config, cold status, hot status, and persistent settings.json concurrently
-      const [storesRes, configRes, coldRes, hotRes, settingsRes] = await Promise.all([
-        fetch('/api/stores_data'),
-        fetch('/api/config'),
-        fetch('/api/cold_status').catch(() => ({ json: () => ({}) })),
-        fetch('/api/hot_status').catch(() => ({ json: () => ({}) })),
-        fetch('/api/settings').catch(() => ({ json: () => ({}) }))
-      ]);
-      storesDict = await storesRes.json();
-      configData = await configRes.json();
-      try {
-        const serverSettings = await settingsRes.json();
-        if (serverSettings && typeof serverSettings === 'object') {
-          applyLoadedSettings(serverSettings);
-        }
-      } catch (e) {}
-      try {
-        coldStatus = await coldRes.json();
-        coldLoaded = true;
-      } catch(e) {
-        coldStatus = {};
-      }
-      try {
-        hotStatus = await hotRes.json();
-        previousRawStatus = { ...hotStatus };
-      } catch(e) {
-        hotStatus = {};
-        previousRawStatus = {};
-      }
-
-      latestMergedStatus = { ...coldStatus, ...hotStatus };
-      renderUI();
-
-      // Kiểm tra tham số ?store= trên URL (khi bấm link từ Telegram / thông báo)
-      try {
-        const urlParams = new URLSearchParams(window.location.search);
-        const targetStoreId = urlParams.get('store');
-        if (targetStoreId) {
-          setTimeout(() => {
-            const targetStore = storesDict[targetStoreId];
-            if (targetStore) {
-              focusStore(targetStoreId, true);
-              const rawVal = latestMergedStatus[targetStoreId];
-              const info = decodeStatus(rawVal, latestMergedStatus[targetStoreId + '_c']);
-              if (info) {
-                showMapToast(targetStore, info);
-              }
-            }
-          }, 800);
-        }
-      } catch (e) {}
-
-      // Cập nhật phút/giờ liên tục mỗi 15 giây theo thời gian thực (không cần bấm reload/reset)
-      setInterval(() => {
-        try {
-          updateAllRelativeTimes();
-        } catch (e) {}
-      }, 15000);
-
-      const checkSdk = setInterval(() => {
-        if (window.FirebaseInit) {
-          clearInterval(checkSdk);
-          setupFirestoreListener();
-        }
-      }, 50);
-    }
-
-    function setupFirestoreListener() {
-      const { initializeApp, initializeFirestore, doc, onSnapshot } = window.FirebaseInit;
-      
-      const app = initializeApp({
-        apiKey: configData.apiKey,
-        projectId: configData.projectId
-      });
-      const db = initializeFirestore(app, {});
-
-      const ALL_PREFS = ['osaka', 'aichi', 'kanagawa', 'gifu', 'mie'];
-      const prefHotData = {};
-      
-      ALL_PREFS.forEach(pref => {
-        prefHotData[pref] = {};
-        
-        onSnapshot(doc(db, 'status', pref), (docSnap) => {
-          if (!docSnap.exists()) return;
-          const nextData = docSnap.data();
-          prefHotData[pref] = nextData;
-
-          // Merge all pref hot data
-          const mergedHot = {};
-          for (const p of ALL_PREFS) {
-            Object.assign(mergedHot, prefHotData[p]);
-          }
-
-          const currentInStockIds = new Set();
-          for (const [k, v] of Object.entries(mergedHot)) {
-            if (typeof v === 'string' && v.length > 0 && v[0].toLowerCase() === 'i') {
-              currentInStockIds.add(k);
-            }
-          }
-
-          if (previousRawStatus !== null) {
-            for (const [k, v] of Object.entries(nextData)) {
-              if (k.endsWith('_c')) continue;
-              const prevV = previousRawStatus[k];
-              if (prevV !== v) {
-                const store = storesDict[k] || { id: k, name: 'Cửa hàng', chain: 'other', address: '', lat: null, lng: null };
-                if (!store.pref) store.pref = pref;
-                const info = decodeStatus(v, nextData[k + '_c']);
-                if (info) {
-                  if (info.code === 'i') {
-                    showToast(store, info);
-                    setTimeout(() => {
-                      const card = document.getElementById('card-' + k);
-                      if (card) card.classList.add('just-updated');
-                    }, 300);
-                  } else if (info.code === 'o') {
-                    showOutOfStockToast(store, info);
-                  } else if (info.code === 'n') {
-                    showNotHandledToast(store, info);
-                  }
-                }
-              }
-            }
-          }
-
-          previousRawStatus = { ...previousRawStatus, ...nextData };
-          previousInStockIds = currentInStockIds;
-          hotStatus = mergedHot;
-          latestMergedStatus = { ...coldStatus, ...hotStatus };
-          renderUI();
-        }, (err) => {
-          console.error(`Firestore Listen Error (${pref}):`, err);
         });
-      });
-
-      // Tự động đồng bộ kiểm tra trạng thái từ Firestore mỗi 45 giây đề phòng mạng chập chờn
-      setInterval(async () => {
-        try {
-          const res = await fetch('/api/hot_status');
-          const data = await res.json();
-          if (data && typeof data === 'object') {
-            hotStatus = data;
-            latestMergedStatus = { ...coldStatus, ...hotStatus };
-            renderUI();
-          }
-        } catch (e) {}
-      }, 45000);
-    }
-
-    // ======================================
-    // MOBILE UI: Bottom Nav, Swipe, Sidebar Toggle
-    // ======================================
-    const isMobileViewport = () => window.innerWidth <= 768;
-    let currentMobileTab = 'map'; // 'map' | 'list' | 'calendar' | 'gacha' | 'settings'
-
-    function showAppView(viewName) {
-      const sidebar = document.getElementById('sidebar');
-      const viewMap = document.getElementById('view-stores-mode');
-      const viewCal = document.getElementById('view-calendar-mode');
-      const viewNotif = document.getElementById('view-notif-mode');
-
-      // Hide all views
-      viewMap.classList.remove('active');
-      viewCal.classList.remove('active');
-      viewNotif.classList.remove('active');
-      sidebar.classList.remove('view-active');
-
-      if (viewName === 'map') {
-        viewMap.classList.add('active');
-        setTimeout(() => map.invalidateSize(), 150);
-      } else if (viewName === 'list') {
-        viewMap.classList.add('active');
-        sidebar.classList.add('view-active');
-      } else if (viewName === 'calendar') {
-        viewCal.classList.add('active');
-        loadCalendar();
-      } else if (viewName === 'notif' || viewName === 'settings') {
-        viewNotif.classList.add('active');
-        syncMapSettingsUI();
-        syncNotifUI();
+      } catch (e) {
+        console.warn('Realtime setup error:', e);
       }
     }
 
-    function mobileNavTo(tab) {
-      const btns = document.querySelectorAll('.mobile-nav-btn');
-      btns.forEach(b => b.classList.remove('active'));
-
-      if (tab === 'map') {
-        currentMobileTab = 'map';
-        showAppView('map');
-        document.getElementById('mob-nav-map').classList.add('active');
-      } else if (tab === 'list') {
-        currentMobileTab = 'list';
-        showAppView('list');
-        document.getElementById('mob-nav-list').classList.add('active');
-      } else if (tab === 'gacha') {
-        currentMobileTab = 'map';
-        applyMapStatusPreset('only_in');
-        showAppView('map');
-        document.getElementById('mob-nav-map').classList.add('active');
-      } else if (tab === 'calendar') {
-        currentMobileTab = 'calendar';
-        showAppView('calendar');
-        document.getElementById('mob-nav-cal').classList.add('active');
-      } else if (tab === 'settings' || tab === 'notif') {
-        currentMobileTab = 'settings';
-        showAppView('notif');
-        document.getElementById('mob-nav-settings').classList.add('active');
-      }
-    }
-    window.mobileNavTo = mobileNavTo;
-
-    // SIDE DRAWER
-    function openSideDrawer() {
-      const overlay = document.getElementById('side-drawer-overlay');
-      if (overlay) overlay.classList.add('open');
-    }
-    window.openSideDrawer = openSideDrawer;
-
-    function closeSideDrawer() {
-      const overlay = document.getElementById('side-drawer-overlay');
-      if (overlay) overlay.classList.remove('open');
-    }
-    window.closeSideDrawer = closeSideDrawer;
-
-    // Sync drawer location text with header
-    function syncDrawerLocation() {
-      const headerLoc = document.getElementById('header-loc-main');
-      const drawerLoc = document.getElementById('drawer-loc-summary');
-      if (headerLoc && drawerLoc) {
-        drawerLoc.textContent = headerLoc.textContent || '◎ 大阪エリア';
-      }
-    }
-
-    // PREFECTURE FILTER
-    const enabledPrefs = new Set(['osaka', 'aichi', 'kanagawa', 'gifu', 'mie']);
-
-    function togglePrefFilter(checkbox) {
-      togglePrefFilterUnified(checkbox);
-    }
-    window.togglePrefFilter = togglePrefFilter;
-
-    function togglePrefFilterUnified(checkbox) {
-      const pref = checkbox.value;
-      const checked = checkbox.checked;
-      if (checked) {
-        enabledPrefs.add(pref);
-      } else {
-        enabledPrefs.delete(pref);
-      }
-      // Also sync to notifSettings.notifyPrefs
-      if (!Array.isArray(notifSettings.notifyPrefs)) {
-        notifSettings.notifyPrefs = ['osaka', 'aichi', 'kanagawa', 'gifu', 'mie'];
-      }
-      if (checked) {
-        if (!notifSettings.notifyPrefs.includes(pref)) notifSettings.notifyPrefs.push(pref);
-      } else {
-        notifSettings.notifyPrefs = notifSettings.notifyPrefs.filter(p => p !== pref);
-      }
-
-      // Sync all pref checkboxes across the entire document
-      document.querySelectorAll(`input[value="${pref}"]`).forEach(cb => {
-        if (cb !== checkbox && (cb.classList.contains('notif-pref-check') || cb.closest('.drawer-menu-item'))) {
-          cb.checked = checked;
-        }
-      });
-
-      // Save to localStorage
-      try { localStorage.setItem('pokemap_prefs', JSON.stringify([...enabledPrefs])); } catch(e) {}
-      saveSettings();
-      renderUI();
-    }
-    window.togglePrefFilterUnified = togglePrefFilterUnified;
-
-    // Restore saved pref filter from localStorage
-    try {
-      const saved = localStorage.getItem('pokemap_prefs');
-      if (saved) {
-        const arr = JSON.parse(saved);
-        enabledPrefs.clear();
-        arr.forEach(p => enabledPrefs.add(p));
-        // Sync checkboxes
-        document.querySelectorAll('#side-drawer input[type=checkbox][value]').forEach(cb => {
-          cb.checked = enabledPrefs.has(cb.value);
-        });
-      }
-    } catch(e) {}
-
-    // Helper: check if store passes pref filter
-    function storePassesPrefFilter(store) {
-      if (!store.pref) return true; // no pref info = show
-      return enabledPrefs.has(store.pref);
-    }
-
-    // Sync mobile bottom nav badges with stock counts
-    function syncMobileBadges() {
-      const mobStock = document.getElementById('mob-badge-stock');
-      const mobCal = document.getElementById('mob-badge-cal');
-      const desktopStock = document.getElementById('menu-stock-count');
-      const desktopCal = document.getElementById('menu-cal-count');
-      if (mobStock && desktopStock) {
-        const match = desktopStock.textContent.match(/(\d+)/);
-        if (match) mobStock.textContent = match[1];
-      }
-      if (mobCal && desktopCal) {
-        const match = desktopCal.textContent.match(/(\d+)/);
-        if (match) mobCal.textContent = match[1];
-      }
-    }
-
-    // Patch existing syncMenuAndRoute to also sync mobile nav state
-    const _origSyncMenuAndRoute = syncMenuAndRoute;
-    // Override will be applied after syncMenuAndRoute is available (it's already defined above)
-
-    // Observe DOM changes on desktop badge to sync mobile badges
-    const stockBadgeEl = document.getElementById('menu-stock-count');
-    if (stockBadgeEl) {
-      const observer = new MutationObserver(syncMobileBadges);
-      observer.observe(stockBadgeEl, { childList: true, characterData: true, subtree: true });
-    }
-    const calBadgeEl = document.getElementById('menu-cal-count');
-    if (calBadgeEl) {
-      const observer = new MutationObserver(syncMobileBadges);
-      observer.observe(calBadgeEl, { childList: true, characterData: true, subtree: true });
-    }
-    // Initial sync
-    syncMobileBadges();
-
-    // ======================================
-    // TOUCH SWIPE GESTURES
-    // ======================================
-    let touchStartX = 0;
-    let touchStartY = 0;
-    let touchStartTime = 0;
-    const SWIPE_THRESHOLD = 60;
-    const SWIPE_MAX_TIME = 400;
-    const SWIPE_MAX_VERTICAL = 80;
-
-    // Sidebar swipe: swipe left on sidebar to close, swipe right on map edge to open
-    document.addEventListener('touchstart', (e) => {
-      if (!isMobileViewport()) return;
-      touchStartX = e.touches[0].clientX;
-      touchStartY = e.touches[0].clientY;
-      touchStartTime = Date.now();
-    }, { passive: true });
-
-    document.addEventListener('touchend', (e) => {
-      if (!isMobileViewport()) return;
-      const touchEndX = e.changedTouches[0].clientX;
-      const touchEndY = e.changedTouches[0].clientY;
-      const deltaX = touchEndX - touchStartX;
-      const deltaY = touchEndY - touchStartY;
-      const elapsed = Date.now() - touchStartTime;
-
-      // Only process horizontal swipes
-      if (elapsed > SWIPE_MAX_TIME) return;
-      if (Math.abs(deltaY) > SWIPE_MAX_VERTICAL) return;
-      if (Math.abs(deltaX) < SWIPE_THRESHOLD) return;
-
-      const sidebar = document.getElementById('sidebar');
-      // Check if we're in map/list view (not calendar)
-      const viewStores = document.getElementById('view-stores-mode');
-      if (!viewStores || !viewStores.classList.contains('active')) return;
-
-      if (deltaX < -SWIPE_THRESHOLD && sidebar.classList.contains('mobile-visible')) {
-        // Swipe left → hide sidebar (show map)
-        mobileNavTo('map');
-      } else if (deltaX > SWIPE_THRESHOLD && !sidebar.classList.contains('mobile-visible')) {
-        // Swipe right from left edge → show sidebar (store list)
-        if (touchStartX < 40) {
-          mobileNavTo('list');
-        }
-      }
-    }, { passive: true });
-
-    // Modal swipe-down to close
-    document.addEventListener('touchstart', function(e) {
-      if (!isMobileViewport()) return;
-      const modal = e.target.closest('.modal-overlay');
-      if (!modal) return;
-      modal._swipeStartY = e.touches[0].clientY;
-    }, { passive: true });
-
-    document.addEventListener('touchend', function(e) {
-      if (!isMobileViewport()) return;
-      const modal = e.target.closest('.modal-overlay');
-      if (!modal || !modal._swipeStartY) return;
-      const deltaY = e.changedTouches[0].clientY - modal._swipeStartY;
-      if (deltaY > 100) {
-        // Swipe down → close modal
-        modal.style.display = 'none';
-      }
-      modal._swipeStartY = null;
-    }, { passive: true });
-
-    // On resize: clean up mobile state if switching to desktop
-    window.addEventListener('resize', () => {
-      const sidebar = document.getElementById('sidebar');
-      if (!isMobileViewport()) {
-        sidebar.classList.remove('mobile-visible');
-      } else {
-        // Ensure map is properly sized
-        setTimeout(() => map.invalidateSize(), 200);
-      }
-    });
-
-    // ======================================
-    // DESKTOP SIDEBAR COLLAPSE / EXPAND TOGGLE
-    // ======================================
-    let isDesktopSidebarCollapsed = false;
-
-    function toggleDesktopSidebar() {
-      if (isMobileViewport()) {
-        mobileNavTo(currentMobileTab === 'list' ? 'map' : 'list');
-        return;
-      }
-      isDesktopSidebarCollapsed = !isDesktopSidebarCollapsed;
-      const sidebar = document.getElementById('sidebar');
-      const view = document.getElementById('view-stores-mode');
-      const edgeBtn = document.getElementById('sidebar-toggle-edge');
-      const mapBtnText = document.getElementById('btn-toggle-sidebar-map-text');
-      const headerBtn = document.getElementById('btn-hide-sidebar-header');
-
-      if (isDesktopSidebarCollapsed) {
-        sidebar.classList.add('desktop-collapsed');
-        view.classList.add('sidebar-hidden');
-        if (edgeBtn) {
-          edgeBtn.innerHTML = '▶';
-          edgeBtn.title = 'Hiện danh sách cửa hàng';
-        }
-        if (headerBtn) headerBtn.textContent = '▶';
-      } else {
-        sidebar.classList.remove('desktop-collapsed');
-        view.classList.remove('sidebar-hidden');
-        if (edgeBtn) {
-          edgeBtn.innerHTML = '◀';
-          edgeBtn.title = 'Ẩn danh sách cửa hàng';
-        }
-        if (headerBtn) headerBtn.textContent = '◀ Ẩn';
-      }
-
-      // Smoothly trigger Leaflet map resize
-      setTimeout(() => {
-        if (map) map.invalidateSize();
-      }, 300);
-    }
-    window.toggleDesktopSidebar = toggleDesktopSidebar;
-
-    // Keyboard shortcut: Press '[' or ']' to toggle sidebar
-    document.addEventListener('keydown', (e) => {
-      // Don't trigger if user is typing in an input
-      if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return;
-      if (e.key === '[' || e.key === ']') {
-        toggleDesktopSidebar();
-      }
-    });
-
-    // On initial load: set state
-    {
-      const sidebar = document.getElementById('sidebar');
-      sidebar.classList.remove('mobile-visible');
-      currentMobileTab = 'map';
-      setTimeout(() => { if (map) map.invalidateSize(); }, 300);
-    }
-
-    startRealtimeEngine();
+    window.addEventListener('DOMContentLoaded', initData);
   </script>
 </body>
-</html>
-    """
+</html>"""
 
 
 def main():
