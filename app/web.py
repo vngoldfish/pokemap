@@ -690,10 +690,12 @@ def index():
       padding: 0 4px;
     }
 
-    /* 3. MAIN MAP AREA */
+    /* 3. MAIN MAP AREA (Full viewport coverage, zero gray cutoffs) */
     #app-main {
       flex: 1;
+      min-height: 0;
       width: 100%;
+      height: 100%;
       position: relative;
       overflow: hidden;
     }
@@ -704,6 +706,8 @@ def index():
       position: absolute;
       top: 0;
       left: 0;
+      right: 0;
+      bottom: 0;
       z-index: 1;
     }
 
@@ -1822,17 +1826,26 @@ def index():
       markerZoomAnimation: true
     });
 
-    // High performance Google Maps Streets Tiles with pre-buffering
-    L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+    // High performance Google Maps Streets Tiles with pre-buffering across subdomains
+    L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+      subdomains: ['0', '1', '2', '3'],
       maxZoom: 20,
       attribution: '&copy; Google Maps',
-      updateWhenIdle: true,
-      keepBuffer: 3
+      updateWhenIdle: false,
+      keepBuffer: 6
     }).addTo(map);
 
-    L.control.zoom({ position: 'bottomleft' }).addTo(map);
     map.on('popupclose', () => {
       openPopupHistStoreIds.clear();
+    });
+
+    let prevZoomGroup = map.getZoom() >= 12;
+    map.on('zoomend', () => {
+      const isClose = map.getZoom() >= 12;
+      if (isClose !== prevZoomGroup) {
+        prevZoomGroup = isClose;
+        renderMapMarkers();
+      }
     });
 
     // 3. MARKER CLUSTERING (Matching PokéTan Image 3: Blue bordered count circles ②, ③)
@@ -1971,16 +1984,16 @@ def index():
 
       for (const store of allStores) {
         if (!store.lat || !store.lng) continue;
-        if (currentPref !== 'all' && store.pref !== currentPref) continue;
 
         const sid = store.id;
         const raw = effectiveStatus[sid] || effectiveStatus[sid + '_c'];
         const info = decodeStatus(raw);
 
-        // Find the absolute newest in-stock report in the selected prefecture
+        // Find the newest in-stock report (prioritizing the currently selected area)
         if (info.code === 'i') {
+          const isPrefMatch = (currentPref === 'all' || store.pref === currentPref);
           const ts = info.timestamp || 0;
-          if (ts > maxTimestamp) {
+          if (isPrefMatch && ts > maxTimestamp) {
             maxTimestamp = ts;
             newestInStore = store;
             newestInfo = info;
@@ -1993,13 +2006,24 @@ def index():
         if (activeFilter === 'recent' && (info.code !== 'i' && (now - info.timestamp > 86400))) continue;
         if (activeFilter === 'hidenone' && info.code === 'n') continue;
 
+        const currentZoom = map ? map.getZoom() : 13;
         if (info.code === 'i') {
-          // In-Stock Store gets a prominent bouncing green pin on stockLayer (always unclustered & on top)
-          const m = L.marker([store.lat, store.lng], { icon: stockPinIcon, zIndexOffset: 2000 });
-          m.bindPopup(() => createPopupHtml(store, info), { maxWidth: 300 });
-          stockLayer.addLayer(m);
+          // If close zoom (>= 12) or filter "Chỉ có hàng", show bouncing green pin
+          if (currentZoom >= 12 || activeFilter === 'in') {
+            const m = L.marker([store.lat, store.lng], { icon: stockPinIcon, zIndexOffset: 2000 });
+            m.bindPopup(() => createPopupHtml(store, info), { maxWidth: 300 });
+            stockLayer.addLayer(m);
+          } else {
+            // When zoomed out, cluster cleanly with hasStock: true so the cluster ring glows green
+            const cm = L.marker([store.lat, store.lng], {
+              icon: stockPinIcon,
+              hasStock: true
+            });
+            cm.bindPopup(() => createPopupHtml(store, info), { maxWidth: 300 });
+            clusterBatch.push(cm);
+          }
         } else {
-          // Normal stores get added to clusterBatch with L.marker (NOT L.circleMarker)
+          // Normal stores get added to clusterBatch with L.marker
           const dotIcon = info.code === 'o' ? redDotIcon : grayDotIcon;
           const cm = L.marker([store.lat, store.lng], {
             icon: dotIcon,
@@ -3059,6 +3083,11 @@ def index():
           overlay.style.opacity = '0';
           setTimeout(() => overlay.remove(), 150);
         }
+
+        // Ensure Leaflet recalculates container size and loads all tiles
+        map.invalidateSize();
+        setTimeout(() => map.invalidateSize(), 150);
+        setTimeout(() => map.invalidateSize(), 500);
 
         // Realtime Firestore sync (debounced)
         setupRealtime();
