@@ -1062,14 +1062,14 @@ MAP_PAGE_CSS = """
     /* MARKER CLUSTERS & IN-STOCK PIN */
     .poketan-cluster-wrap { background: transparent; border: none; }
     .poketan-cluster {
-      width: 32px;
-      height: 32px;
+      width: 34px;
+      height: 34px;
       border-radius: 50%;
       background: #ffffff;
       border: 2px solid #2563eb;
       color: #0f172a;
       font-weight: 800;
-      font-size: 0.82rem;
+      font-size: 0.78rem;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -1078,6 +1078,8 @@ MAP_PAGE_CSS = """
     .poketan-cluster.has-stock {
       border-color: #16a34a;
       box-shadow: 0 0 12px rgba(22, 163, 74, 0.7);
+      background: #f0fdf4;
+      color: #15803d;
     }
 
     .poketan-pin-wrapper {
@@ -1087,27 +1089,31 @@ MAP_PAGE_CSS = """
       pointer-events: auto;
     }
     .poketan-stock-pin {
-      width: 28px;
       height: 28px;
-      border-radius: 50%;
+      padding: 0 8px;
+      border-radius: 14px;
       background: #16a34a;
-      border: 2.5px solid #ffffff;
+      border: 2px solid #ffffff;
       box-shadow: 0 0 10px rgba(22, 163, 74, 0.8), 0 3px 6px rgba(0,0,0,0.25);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 0.95rem;
+      gap: 3px;
+      font-size: 0.74rem;
+      font-weight: 800;
+      color: #ffffff;
       cursor: pointer;
       animation: bouncePin 1.6s infinite;
       flex-shrink: 0;
+      white-space: nowrap;
     }
     .poketan-pin-time-pill {
       background: rgba(15, 23, 42, 0.92);
       color: #4ade80;
-      font-size: 0.65rem;
+      font-size: 0.68rem;
       font-weight: 800;
-      padding: 2px 7px;
-      border-radius: 10px;
+      padding: 2px 8px;
+      border-radius: 99px;
       border: 1px solid rgba(74, 222, 128, 0.45);
       white-space: nowrap;
       box-shadow: 0 2px 8px rgba(0,0,0,0.3);
@@ -1116,6 +1122,67 @@ MAP_PAGE_CSS = """
     @keyframes bouncePin {
       0%, 100% { transform: translateY(0); }
       50% { transform: translateY(-4px); }
+    }
+
+    /* BRANDED STORE PINS */
+    .chain-pin-wrap {
+      background: transparent;
+      border: none;
+    }
+    .chain-pin {
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.62rem;
+      font-weight: 800;
+      box-shadow: 0 1.5px 5px rgba(0,0,0,0.28);
+      border: 1.5px solid #ffffff;
+      cursor: pointer;
+      position: relative;
+      transition: transform 0.15s ease;
+      user-select: none;
+    }
+    .chain-pin:hover {
+      transform: scale(1.25);
+      z-index: 1000 !important;
+    }
+    .chain-pin-text {
+      line-height: 1;
+      letter-spacing: -0.5px;
+    }
+    .chain-pin-status-dot {
+      position: absolute;
+      top: -3px;
+      right: -3px;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      border: 1px solid #ffffff;
+    }
+
+    /* MAP COUNTER PILL */
+    .map-counter-pill {
+      position: absolute;
+      bottom: 22px;
+      left: 14px;
+      z-index: 1000;
+      background: rgba(15, 23, 42, 0.88);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      color: #f8fafc;
+      font-size: 0.74rem;
+      font-weight: 700;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      box-shadow: 0 3px 12px rgba(0,0,0,0.3);
+      border: 1px solid rgba(255,255,255,0.18);
+      pointer-events: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
     }
 
     /* LEAFLET POPUP */
@@ -1312,7 +1379,7 @@ def render_map_page() -> str:
 
         <!-- THỜI GIAN / ĐỘ MỚI TIN BÁO -->
         <div>
-          <div class="filter-group-title">⏱️ Độ mới tin báo (報告の経過時間)</div>
+          <div class="filter-group-title">⏱️ Thời gian có hàng / Độ tươi mới (報告経過時間)</div>
           <div class="filter-options-grid" id="map-modal-time-group">
             <button class="filter-option-btn" data-val="1" onclick="selectMapModalTime('1')">
               ⚡ Trong 1 giờ qua
@@ -1323,11 +1390,14 @@ def render_map_page() -> str:
             <button class="filter-option-btn" data-val="6" onclick="selectMapModalTime('6')">
               ⏱ Trong 6 giờ qua
             </button>
+            <button class="filter-option-btn" data-val="12" onclick="selectMapModalTime('12')">
+              ⏱ Trong 12 giờ qua
+            </button>
             <button class="filter-option-btn" data-val="24" onclick="selectMapModalTime('24')">
               📅 Trong 24 giờ qua
             </button>
             <button class="filter-option-btn active" data-val="all" onclick="selectMapModalTime('all')">
-              ⏳ Toàn bộ thời gian
+              ⏳ Mọi lúc (Toàn bộ)
             </button>
           </div>
         </div>
@@ -1365,7 +1435,7 @@ def render_map_page() -> str:
         <span id="map-filter-badge" class="filter-count-pill" style="display:none;">0</span>
       </button>
 
-      <!-- Trạng thái hàng hóa trên bản đồ -->
+      <!-- Trạng thái hàng hóa trên bản đồ (7 trạng thái) -->
       <button class="poketan-chip active" id="map-chip-all" onclick="setMapStatusFilter('all')">
         🌐 Tất cả
       </button>
@@ -1373,10 +1443,19 @@ def render_map_page() -> str:
         <span class="chip-dot dot-green"></span> 🟢 Có hàng
       </button>
       <button class="poketan-chip" id="map-chip-recent" onclick="setMapStatusFilter('recent')">
-        <span style="color:#eab308;font-size:0.75rem;">★</span> Từng có hàng
+        <span style="color:#eab308;font-size:0.75rem;">★</span> Từng có
+      </button>
+      <button class="poketan-chip" id="map-chip-onsite" onclick="setMapStatusFilter('onsite')">
+        📍 Tại quán (GPS)
       </button>
       <button class="poketan-chip" id="map-chip-out" onclick="setMapStatusFilter('out')">
         <span class="chip-dot dot-red"></span> 🔴 Hết hàng
+      </button>
+      <button class="poketan-chip" id="map-chip-n" onclick="setMapStatusFilter('n')">
+        <span class="chip-dot dot-gray"></span> ⚪ Không bán
+      </button>
+      <button class="poketan-chip" id="map-chip-unknown" onclick="setMapStatusFilter('unknown')">
+        🔘 Chưa có tin
       </button>
 
       <!-- Chuỗi cửa hàng & Thương hiệu trên bản đồ -->
@@ -1387,8 +1466,18 @@ def render_map_page() -> str:
         <option value="lawson">🏪 Lawson</option>
         <option value="familymart">🏪 FamilyMart</option>
         <option value="ministop">🏪 Ministop</option>
-        <option value="specialty">🃏 Card Shop chuyên biệt</option>
-        <option value="electronics">🎮 Điện máy, GEO, Tsutaya</option>
+        <option value="specialty">🃏 Card Shop chuyên</option>
+        <option value="electronics">🎮 Điện máy, GEO</option>
+      </select>
+
+      <!-- Thời gian có sản phẩm -->
+      <select class="poketan-chip" id="map-time-select" onchange="setMapTimeFilter(this.value)" title="Thời gian có hàng">
+        <option value="all">⏳ Có hàng: Mọi lúc</option>
+        <option value="1">⚡ Có hàng: 1h qua</option>
+        <option value="3">⏱ Có hàng: 3h qua</option>
+        <option value="6">⏱ Có hàng: 6h qua</option>
+        <option value="12">⏱ Có hàng: 12h qua</option>
+        <option value="24">📅 Có hàng: 24h qua</option>
       </select>
     </div>
 
@@ -1411,6 +1500,9 @@ def render_map_page() -> str:
 
   <main id="app-main">
     <div id="map"></div>
+    <div id="map-counter-pill" class="map-counter-pill">
+      Đang tải dữ liệu...
+    </div>
     <button id="gps-btn" onclick="locateUser(true)" title="現在地を表示">
       📍
     </button>
@@ -1552,12 +1644,54 @@ def render_map_page() -> str:
       return String(str).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]);
     }
 
-    function createStockPinIcon(timeAgo) {
+    const CHAIN_META = {
+      'seven': { label: '7-Eleven', short: '7E', icon: '🏪', bg: '#00843d', border: '#ea580c', color: '#fff' },
+      'lawson': { label: 'Lawson', short: 'LAW', icon: '🏪', bg: '#0284c7', border: '#38bdf8', color: '#fff' },
+      'familymart': { label: 'FamilyMart', short: 'FM', icon: '🏪', bg: '#10b981', border: '#0284c7', color: '#fff' },
+      'ministop': { label: 'Ministop', short: 'MS', icon: '🏪', bg: '#f59e0b', border: '#1e3a8a', color: '#1e293b' },
+      'specialty': { label: 'Card Shop', short: '🃏', icon: '🃏', bg: '#8b5cf6', border: '#c084fc', color: '#fff' },
+      'geo': { label: 'GEO', short: 'GEO', icon: '🎮', bg: '#4f46e5', border: '#818cf8', color: '#fff' },
+      'joshin': { label: 'Joshin', short: 'JS', icon: '🎮', bg: '#ef4444', border: '#fca5a5', color: '#fff' },
+      'edion': { label: 'EDION', short: 'ED', icon: '🎮', bg: '#2563eb', border: '#93c5fd', color: '#fff' },
+      'aeon': { label: 'AEON', short: 'AE', icon: '🛒', bg: '#db2777', border: '#f472b6', color: '#fff' },
+      'yamada': { label: 'Yamada', short: 'YM', icon: '🎮', bg: '#dc2626', border: '#f87171', color: '#fff' },
+      'biccamera': { label: 'BicCamera', short: 'BC', icon: '🎮', bg: '#dc2626', border: '#f87171', color: '#fff' },
+      'yodobashi': { label: 'Yodobashi', short: 'YD', icon: '🎮', bg: '#0f172a', border: '#e11d48', color: '#fff' },
+      'toysrus': { label: 'Toys"R"Us', short: 'TRU', icon: '🧸', bg: '#2563eb', border: '#f59e0b', color: '#fff' },
+      'ks': { label: "K's", short: 'KS', icon: '🎮', bg: '#dc2626', border: '#f87171', color: '#fff' },
+      'other': { label: 'Store', short: '🏪', icon: '🏪', bg: '#475569', border: '#94a3b8', color: '#fff' }
+    };
+
+    function createStockPinIcon(timeAgo, meta) {
+      const tag = meta ? meta.short : '🟢';
+      const bg = meta ? meta.bg : '#16a34a';
       return L.divIcon({
-        html: `<div class="poketan-pin-wrapper"><div class="poketan-stock-pin">🟢</div><div class="poketan-pin-time-pill">${escapeHtml(timeAgo || 'たった今')}</div></div>`,
+        html: `<div class="poketan-pin-wrapper">
+                 <div class="poketan-stock-pin" style="background:${bg};" title="在庫あり">
+                   <span>🟢 ${escapeHtml(tag)}</span>
+                 </div>
+                 <div class="poketan-pin-time-pill">${escapeHtml(timeAgo || 'たった今')}</div>
+               </div>`,
         className: 'poketan-pin-wrap',
-        iconSize: [90, 28],
-        iconAnchor: [14, 14]
+        iconSize: [110, 28],
+        iconAnchor: [18, 14]
+      });
+    }
+
+    function createChainPinIcon(store, info, meta) {
+      let statusColor = '#cbd5e1';
+      let statusCls = 'status-u';
+      if (info.code === 'o') { statusColor = '#ef4444'; statusCls = 'status-o'; }
+      else if (info.code === 'n') { statusColor = '#94a3b8'; statusCls = 'status-n'; }
+
+      return L.divIcon({
+        html: `<div class="chain-pin ${statusCls}" style="background:${meta.bg}; color:${meta.color}; border-color:${meta.border};" title="${escapeHtml(store.name)}">
+                 <span class="chain-pin-text">${escapeHtml(meta.short)}</span>
+                 <span class="chain-pin-status-dot" style="background:${statusColor};"></span>
+               </div>`,
+        className: 'chain-pin-wrap',
+        iconSize: [22, 22],
+        iconAnchor: [11, 11]
       });
     }
 
@@ -1567,8 +1701,12 @@ def render_map_page() -> str:
 
     function matchesChainFilter(chain, filter) {
       if (!filter || filter === 'all') return true;
-      const c = (chain || '').toLowerCase();
+      const c = (chain || '').toLowerCase().trim();
       if (filter === 'conbini') return ['seven', 'lawson', 'familymart', 'ministop'].includes(c);
+      if (filter === 'seven') return c === 'seven';
+      if (filter === 'lawson') return c === 'lawson';
+      if (filter === 'familymart') return c === 'familymart';
+      if (filter === 'ministop') return c === 'ministop';
       if (filter === 'specialty') return c === 'specialty';
       if (filter === 'electronics') return ['geo', 'joshin', 'edion', 'aeon', 'yamada', 'ks', 'toysrus', 'biccamera', 'yodobashi'].includes(c);
       return c === filter;
@@ -1587,9 +1725,12 @@ def render_map_page() -> str:
       const now = Math.floor(Date.now() / 1000);
       const clusterBatch = [];
       let newestInStore = null, maxTimestamp = 0;
+      let visibleCount = 0, inStockVisibleCount = 0;
 
       const targetRegion = mapRegionFilter || currentRegion || 'osaka';
       const allowedPrefs = (REGIONS[targetRegion] ? REGIONS[targetRegion].prefs : [targetRegion]) || ['osaka'];
+
+      const maxSec = (mapTimeFilter !== 'all') ? parseInt(mapTimeFilter, 10) * 3600 : null;
 
       for (const store of allStores) {
         if (!store.lat || !store.lng) continue;
@@ -1601,31 +1742,44 @@ def render_map_page() -> str:
         const raw = effectiveStatus[store.id] || effectiveStatus[store.id + '_c'];
         const info = decodeStatus(raw);
 
-        if (info.code === 'i' && info.timestamp > maxTimestamp) {
-          maxTimestamp = info.timestamp;
-          newestInStore = store;
-        }
+        // Check if in-stock report is still fresh within time window
+        const isFreshStock = (info.code === 'i') && (maxSec === null || (info.timestamp > 0 && (now - info.timestamp <= maxSec)));
 
         // Status filter
-        if (mapStatusFilter === 'in' && info.code !== 'i') continue;
-        if (mapStatusFilter === 'onsite' && (!info.onsite || info.code !== 'i')) continue;
-        if (mapStatusFilter === 'out' && info.code !== 'o') continue;
-        if (mapStatusFilter === 'n' && info.code !== 'n') continue;
-        if (mapStatusFilter === 'recent' && (info.code !== 'i' && !(info.timestamp > 0 && (now - info.timestamp <= 86400 * 7) && info.code !== 'n'))) continue;
-        if (mapStatusFilter === 'unknown' && info.timestamp > 0) continue;
+        if (mapStatusFilter === 'in') {
+          if (!isFreshStock) continue;
+        } else if (mapStatusFilter === 'onsite') {
+          if (!info.onsite || !isFreshStock) continue;
+        } else if (mapStatusFilter === 'out') {
+          if (info.code !== 'o') continue;
+        } else if (mapStatusFilter === 'n') {
+          if (info.code !== 'n') continue;
+        } else if (mapStatusFilter === 'recent') {
+          const isRecentIn = isFreshStock;
+          const isRecentReport = info.timestamp > 0 && (now - info.timestamp <= 86400 * 7) && info.code !== 'n';
+          if (!isRecentIn && !isRecentReport) continue;
+        } else if (mapStatusFilter === 'unknown') {
+          if (info.code !== 'u' && info.timestamp > 0) continue;
+        }
+        // If mapStatusFilter === 'all', keep store!
 
         // Chain filter
         if (!matchesChainFilter(store.chain, mapChainFilter)) continue;
 
-        // Time filter
-        if (mapTimeFilter !== 'all') {
-          const maxSec = parseInt(mapTimeFilter, 10) * 3600;
-          if (!info.timestamp || (now - info.timestamp > maxSec)) continue;
+        visibleCount++;
+        if (isFreshStock) inStockVisibleCount++;
+
+        if (isFreshStock && info.timestamp > maxTimestamp) {
+          maxTimestamp = info.timestamp;
+          newestInStore = store;
         }
 
         const currentZoom = map.getZoom();
-        if (info.code === 'i') {
-          const pinIcon = createStockPinIcon(info.timeAgo);
+        const chainKey = (store.chain || '').toLowerCase();
+        const meta = CHAIN_META[chainKey] || CHAIN_META['other'];
+
+        if (isFreshStock) {
+          const pinIcon = createStockPinIcon(info.timeAgo, meta);
           if (currentZoom >= 12 || mapStatusFilter === 'in') {
             const m = L.marker([store.lat, store.lng], { icon: pinIcon, zIndexOffset: 2000 });
             m.bindPopup(() => createPopupHtml(store, info), { maxWidth: 300 });
@@ -1636,16 +1790,32 @@ def render_map_page() -> str:
             clusterBatch.push(cm);
           }
         } else {
-          let dotIcon = grayDotIcon;
-          if (info.code === 'o') dotIcon = redDotIcon;
-          else if (info.code === 'n') dotIcon = yellowDotIcon;
-          const cm = L.marker([store.lat, store.lng], { icon: dotIcon, hasStock: false });
+          let pin;
+          if (mapChainFilter !== 'all' || currentZoom >= 14) {
+            pin = createChainPinIcon(store, info, meta);
+          } else {
+            let dotIcon = grayDotIcon;
+            if (info.code === 'o') dotIcon = redDotIcon;
+            else if (info.code === 'n') dotIcon = yellowDotIcon;
+            pin = dotIcon;
+          }
+          const cm = L.marker([store.lat, store.lng], { icon: pin, hasStock: false });
           cm.bindPopup(() => createPopupHtml(store, info), { maxWidth: 300 });
           clusterBatch.push(cm);
         }
       }
 
       if (clusterBatch.length > 0) clusterGroup.addLayers(clusterBatch);
+
+      // Update counter pill
+      const counterEl = document.getElementById('map-counter-pill');
+      if (counterEl) {
+        let label = `Hiển thị <b>${visibleCount.toLocaleString()}</b> quán`;
+        if (inStockVisibleCount > 0) {
+          label += ` • <span style="color:#4ade80;">🟢 <b>${inStockVisibleCount}</b> có hàng</span>`;
+        }
+        counterEl.innerHTML = label;
+      }
 
       // Toast alert for newest in-stock store
       const toastEl = document.getElementById('live-stock-toast');
@@ -1734,15 +1904,26 @@ def render_map_page() -> str:
       updateMapFilterUI();
       renderMapMarkers();
     }
+    function setMapTimeFilter(tm) {
+      mapTimeFilter = tm;
+      saveMapFiltersToStorage();
+      updateMapFilterUI();
+      renderMapMarkers();
+    }
     function updateMapFilterUI() {
-      ['all', 'in', 'recent', 'out'].forEach(st => {
+      ['all', 'in', 'recent', 'onsite', 'out', 'n', 'unknown'].forEach(st => {
         const btn = document.getElementById(`map-chip-${st}`);
         if (btn) btn.classList.toggle('active', mapStatusFilter === st);
       });
-      const sel = document.getElementById('map-chain-select');
-      if (sel) {
-        sel.value = mapChainFilter;
-        sel.classList.toggle('active', mapChainFilter !== 'all');
+      const selChain = document.getElementById('map-chain-select');
+      if (selChain) {
+        selChain.value = mapChainFilter;
+        selChain.classList.toggle('active', mapChainFilter !== 'all');
+      }
+      const selTime = document.getElementById('map-time-select');
+      if (selTime) {
+        selTime.value = mapTimeFilter;
+        selTime.classList.toggle('active', mapTimeFilter !== 'all');
       }
       let count = 0;
       if (mapStatusFilter !== 'all') count++;
@@ -1754,6 +1935,15 @@ def render_map_page() -> str:
         badge.style.display = count > 0 ? 'inline-flex' : 'none';
       }
     }
+
+    let lastRenderZoom = map.getZoom();
+    map.on('zoomend', () => {
+      const z = map.getZoom();
+      if ((lastRenderZoom < 14 && z >= 14) || (lastRenderZoom >= 14 && z < 14)) {
+        lastRenderZoom = z;
+        renderMapMarkers();
+      }
+    });
 
     // Map Filter Modal
     let mapModalTempRegion = currentRegion, mapModalTempStatus = 'all', mapModalTempChain = 'all', mapModalTempTime = 'all';
@@ -2678,8 +2868,12 @@ def render_thongbao_page() -> str:
 
     function matchesChainFilter(chain, filter) {
       if (!filter || filter === 'all') return true;
-      const c = (chain || '').toLowerCase();
+      const c = (chain || '').toLowerCase().trim();
       if (filter === 'conbini') return ['seven', 'lawson', 'familymart', 'ministop'].includes(c);
+      if (filter === 'seven') return c === 'seven';
+      if (filter === 'lawson') return c === 'lawson';
+      if (filter === 'familymart') return c === 'familymart';
+      if (filter === 'ministop') return c === 'ministop';
       if (filter === 'specialty') return c === 'specialty';
       if (filter === 'electronics') return ['geo', 'joshin', 'edion', 'aeon', 'yamada', 'ks', 'toysrus', 'biccamera', 'yodobashi'].includes(c);
       return c === filter;
@@ -2733,6 +2927,8 @@ def render_thongbao_page() -> str:
         refLng = REGIONS[targetRegion].center[1];
       }
 
+      const maxSec = (listTimeFilter !== 'all') ? parseInt(listTimeFilter, 10) * 3600 : null;
+
       for (const store of allStores) {
         if (targetRegion !== 'all') {
           const storePref = (store.pref || '').toLowerCase();
@@ -2741,22 +2937,28 @@ def render_thongbao_page() -> str:
 
         const info = decodeStatus(effectiveStatus[store.id] || effectiveStatus[store.id + '_c']);
 
+        // Check if in-stock report is still fresh within time window
+        const isFreshStock = (info.code === 'i') && (maxSec === null || (info.timestamp > 0 && (now - info.timestamp <= maxSec)));
+
         // Status
-        if (listStatusFilter === 'in' && info.code !== 'i') continue;
-        if (listStatusFilter === 'onsite' && (!info.onsite || info.code !== 'i')) continue;
-        if (listStatusFilter === 'out' && info.code !== 'o') continue;
-        if (listStatusFilter === 'n' && info.code !== 'n') continue;
-        if (listStatusFilter === 'recent' && (info.code !== 'i' && !(info.timestamp > 0 && (now - info.timestamp <= 86400 * 7) && info.code !== 'n'))) continue;
-        if (listStatusFilter === 'unknown' && info.timestamp > 0) continue;
+        if (listStatusFilter === 'in') {
+          if (!isFreshStock) continue;
+        } else if (listStatusFilter === 'onsite') {
+          if (!info.onsite || !isFreshStock) continue;
+        } else if (listStatusFilter === 'out') {
+          if (info.code !== 'o') continue;
+        } else if (listStatusFilter === 'n') {
+          if (info.code !== 'n') continue;
+        } else if (listStatusFilter === 'recent') {
+          const isRecentIn = isFreshStock;
+          const isRecentReport = info.timestamp > 0 && (now - info.timestamp <= 86400 * 7) && info.code !== 'n';
+          if (!isRecentIn && !isRecentReport) continue;
+        } else if (listStatusFilter === 'unknown') {
+          if (info.code !== 'u' && info.timestamp > 0) continue;
+        }
 
         // Chain
         if (!matchesChainFilter(store.chain, listChainFilter)) continue;
-
-        // Time
-        if (listTimeFilter !== 'all') {
-          const maxSec = parseInt(listTimeFilter, 10) * 3600;
-          if (!info.timestamp || (now - info.timestamp > maxSec)) continue;
-        }
 
         // Search
         if (q) {
