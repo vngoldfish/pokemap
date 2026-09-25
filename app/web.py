@@ -769,6 +769,25 @@ def index():
       box-shadow: 0 2px 8px rgba(99, 102, 241, 0.25);
     }
 
+    select.poketan-chip {
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      padding-right: 24px;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' fill='%23475569' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: calc(100% - 8px) center;
+      cursor: pointer;
+      font-family: inherit;
+      outline: none;
+    }
+    select.poketan-chip.active {
+      background-color: #eff6ff;
+      border-color: #3b82f6;
+      color: #1d4ed8;
+      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25);
+    }
+
     .chip-dot {
       width: 8px;
       height: 8px;
@@ -1788,31 +1807,34 @@ def index():
     </button>
   </header>
 
-  <!-- 2. FLOATING SUB-HEADER FILTER BAR (Minimal Single-Row with Popup Trigger) -->
+  <!-- 2. FLOATING SUB-HEADER FILTER BAR (Bản đồ: Chỉ Trạng thái hàng hóa & Chuỗi cửa hàng) -->
   <div id="filter-bar-container">
     <div class="filter-chips-scroll">
-      <!-- Main Popup Trigger Button -->
-      <button class="poketan-chip chip-main-filter" onclick="openFilterModal()">
-        <span>⚙️ Bộ lọc & Sắp xếp</span>
-        <span id="filter-active-badge" class="filter-count-pill" style="display:none;">0</span>
-      </button>
-
-      <!-- Quick 1-tap shortcuts -->
-      <button class="poketan-chip active" id="quick-chip-all" onclick="quickSelectStatus('all')">
+      <!-- Trạng thái hàng hóa trên bản đồ -->
+      <button class="poketan-chip active" id="map-chip-all" onclick="setMapStatusFilter('all')">
         🌐 Tất cả
       </button>
-      <button class="poketan-chip" id="quick-chip-in" onclick="quickSelectStatus('in')">
+      <button class="poketan-chip" id="map-chip-in" onclick="setMapStatusFilter('in')">
         <span class="chip-dot dot-green"></span> 🟢 Có hàng
       </button>
-      <button class="poketan-chip" id="quick-chip-recent" onclick="quickSelectStatus('recent')">
+      <button class="poketan-chip" id="map-chip-recent" onclick="setMapStatusFilter('recent')">
         <span style="color:#eab308;font-size:0.75rem;">★</span> Từng có hàng
       </button>
-      <button class="poketan-chip" id="quick-chip-1h" onclick="quickToggle1Hour()">
-        ⚡ ≤ 1h
+      <button class="poketan-chip" id="map-chip-out" onclick="setMapStatusFilter('out')">
+        <span class="chip-dot dot-red"></span> 🔴 Hết hàng
       </button>
-      <button class="poketan-chip" id="quick-chip-conbini" onclick="quickToggleConbini()">
-        🏪 Conbini
-      </button>
+
+      <!-- Chuỗi cửa hàng & Thương hiệu trên bản đồ -->
+      <select class="poketan-chip select-chip" id="map-chain-select" onchange="setMapChainFilter(this.value)" title="Chuỗi cửa hàng & Thương hiệu">
+        <option value="all">🏢 Tất cả chuỗi</option>
+        <option value="conbini">🏪 Tất cả Conbini</option>
+        <option value="seven">🏪 7-Eleven</option>
+        <option value="lawson">🏪 Lawson</option>
+        <option value="familymart">🏪 FamilyMart</option>
+        <option value="ministop">🏪 Ministop</option>
+        <option value="specialty">🃏 Card Shop chuyên biệt</option>
+        <option value="electronics">🎮 Điện máy, GEO, Tsutaya</option>
+      </select>
     </div>
 
     <!-- Real-time stock alert toast -->
@@ -1847,33 +1869,39 @@ def index():
     <div class="list-header-bar">
       <div style="font-weight:800; font-size:0.92rem; color:#0f172a; display:flex; align-items:center; gap:6px;">
         <span>📋</span>
-        <span>一覧 • Cập nhật báo cáo</span>
+        <span>一覧 • Báo cáo & Điểm có hàng</span>
       </div>
-      <button style="background:none;border:none;font-weight:700;color:#4f46e5;font-size:0.85rem;cursor:pointer;" onclick="switchFooterTab('map')">
-        ✕ Đóng
-      </button>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <button onclick="openFilterModal()" class="list-sort-btn" style="display:inline-flex; align-items:center; gap:5px; font-weight:800; background:#0f172a; color:#ffffff; border:1px solid #0f172a; padding:6px 12px; border-radius:8px; cursor:pointer;">
+          <span>⚙️ Bộ lọc & Sắp xếp</span>
+          <span id="list-filter-active-badge" class="filter-count-pill" style="display:none; background:#3b82f6; color:#ffffff; border-radius:99px; padding:1px 6px; font-size:0.65rem; font-weight:800;">0</span>
+        </button>
+        <button style="background:none;border:none;font-weight:700;color:#4f46e5;font-size:0.85rem;cursor:pointer;" onclick="switchFooterTab('map')">
+          ✕ Đóng
+        </button>
+      </div>
     </div>
 
     <!-- Real-time settings synchronization banner on reports page -->
     <div id="list-active-settings-banner" style="background:#f8fafc; border-bottom:1px solid #e2e8f0; padding:6px 12px; font-size:0.72rem; color:#334155; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px;">
       <div style="display:flex; align-items:center; gap:6px;">
-        <span style="font-weight:800; color:#0f172a;">📍 Cài đặt áp dụng:</span>
+        <span style="font-weight:800; color:#0f172a;">📍 Đang lọc:</span>
         <span id="list-active-settings-text" style="color:#2563eb; font-weight:700;">Osaka • Tất cả • Toàn thời gian</span>
       </div>
       <div style="display:flex; align-items:center; gap:6px;">
         <span id="list-tg-status-tag" style="font-size:0.65rem; background:#dcfce7; color:#15803d; font-weight:800; padding:2px 7px; border-radius:6px;">✈️ Telegram: BẬT</span>
-        <button type="button" onclick="openSettingsModal()" style="background:#e2e8f0; border:none; border-radius:4px; font-size:0.68rem; font-weight:700; color:#1e293b; padding:2px 7px; cursor:pointer;">⚙️ Đổi</button>
+        <button type="button" onclick="openFilterModal()" style="background:#0f172a; border:none; border-radius:4px; font-size:0.68rem; font-weight:700; color:#ffffff; padding:2px 7px; cursor:pointer;">⚙️ Tùy chỉnh</button>
       </div>
     </div>
 
     <!-- Status tabs matching PokéTan -->
     <div class="list-tabs-row" style="padding: 8px 12px 4px 12px; display: flex; gap: 6px; overflow-x: auto; background: #ffffff; border-bottom: 1px solid #f1f5f9; scrollbar-width: none;">
-      <button class="list-tab-chip active" id="list-tab-all" onclick="setListStatusTab('all')">🌐 すべて</button>
-      <button class="list-tab-chip" id="list-tab-in" onclick="setListStatusTab('in')">🟢 在庫あり</button>
-      <button class="list-tab-chip" id="list-tab-onsite" onclick="setListStatusTab('onsite')">📸 現地確認</button>
-      <button class="list-tab-chip" id="list-tab-out" onclick="setListStatusTab('out')">🔴 在庫なし</button>
-      <button class="list-tab-chip" id="list-tab-recent" onclick="setListStatusTab('recent')">★ 実績あり</button>
-      <button class="list-tab-chip" id="list-tab-unknown" onclick="setListStatusTab('unknown')">⚪ 不明</button>
+      <button class="list-tab-chip active" id="list-tab-all" onclick="setListStatusTab('all')">🌐 Tất cả</button>
+      <button class="list-tab-chip" id="list-tab-in" onclick="setListStatusTab('in')">🟢 Có hàng</button>
+      <button class="list-tab-chip" id="list-tab-onsite" onclick="setListStatusTab('onsite')">📍 Tại quán (GPS)</button>
+      <button class="list-tab-chip" id="list-tab-out" onclick="setListStatusTab('out')">🔴 Hết hàng</button>
+      <button class="list-tab-chip" id="list-tab-recent" onclick="setListStatusTab('recent')">★ Từng có</button>
+      <button class="list-tab-chip" id="list-tab-unknown" onclick="setListStatusTab('unknown')">⚪ Chưa rõ</button>
     </div>
 
     <!-- Search and Filter Trigger -->
@@ -1884,7 +1912,7 @@ def index():
       </div>
       <button onclick="openFilterModal()" class="list-sort-btn" style="display:inline-flex; align-items:center; gap:5px; font-weight:800; background:#0f172a; color:#ffffff; border-color:#0f172a; padding:7px 11px; border-radius:8px; cursor:pointer;">
         <span>⚙️ Bộ lọc</span>
-        <span id="list-filter-active-badge" class="filter-count-pill" style="display:none;">0</span>
+        <span id="list-filter-active-badge-2" class="filter-count-pill" style="display:none; background:#3b82f6; color:#ffffff; border-radius:99px; padding:1px 6px; font-size:0.65rem; font-weight:800;">0</span>
       </button>
       <select id="list-chain-select" onchange="setListChainFilter(this.value)" style="display:none;">
         <option value="all">all</option>
@@ -2454,13 +2482,17 @@ def index():
     let hotStatus = {};
     let coldStatus = {};
     let configData = {};
-    let activeFilter = 'all'; // 'all' | 'in' | 'onsite' | 'out' | 'recent' | 'hidenone' | 'unknown'
-    let activeChain = 'all';  // 'all' | 'conbini' | 'seven' | 'lawson' | 'familymart' | 'ministop' | 'specialty' | 'electronics'
-    let activeRadius = null;  // null | 1 | 3 | 5 | 10
-    let activeTime = 'all';   // 'all' | 1 | 3 | 6 | 24 | 72 (hours)
-    let listStatusFilter = 'all'; // 'all' | 'in' | 'out' | 'recent' | 'unknown'
-    let listChainFilter = 'all';  // 'all' | 'conbini' | 'seven' | ...
-    let listTimeFilter = 'all';   // 'all' | 1 | 3 | 6 | 24 | 72 (hours)
+    let mapStatusFilter = 'all'; // 'all' | 'in' | 'recent' | 'out' (Chỉ dùng cho Bản đồ)
+    let mapChainFilter = 'all';  // 'all' | 'conbini' | 'seven' | ... (Chỉ dùng cho Bản đồ)
+    let activeFilter = 'all';    // backward compatible alias
+    let activeChain = 'all';     // backward compatible alias
+    let activeRadius = null;
+    let activeTime = 'all';
+    let listStatusFilter = 'all'; // 'all' | 'in' | 'onsite' | 'out' | 'recent' | 'unknown' (Dùng cho Báo cáo)
+    let listChainFilter = 'all';  // 'all' | 'conbini' | 'seven' | ... (Dùng cho Báo cáo)
+    let listTimeFilter = 'all';   // 'all' | '1' | '3' | '6' | '24' | '72' (Dùng cho Báo cáo)
+    let listRadiusFilter = 'all'; // 'all' | '1' | '3' | '5' | '10' (Dùng cho Báo cáo)
+    let listSortMode = 'newest';  // 'newest' | 'nearest' (Dùng cho Báo cáo)
     let latestStockStoreId = null;
     const storeHistoryCache = {};
     const openPopupHistStoreIds = new Set();
@@ -2861,34 +2893,19 @@ def index():
           }
         }
 
-        // 1. Status Filter
-        if (activeFilter === 'in' && info.code !== 'i') continue;
-        if (activeFilter === 'onsite' && (!info.onsite || info.code !== 'i')) continue;
-        if (activeFilter === 'out' && info.code !== 'o') continue;
-        if (activeFilter === 'recent' && (info.code !== 'i' && !(info.timestamp > 0 && (now - info.timestamp <= 86400 * 7) && info.code !== 'n'))) continue;
-        if (activeFilter === 'hidenone' && info.code === 'n') continue;
-        if (activeFilter === 'unknown' && info.code !== 'u' && info.code) continue;
+        // 1. Trạng thái hàng hóa trên Bản đồ (CHỈ lọc theo mapStatusFilter)
+        if (mapStatusFilter === 'in' && info.code !== 'i') continue;
+        if (mapStatusFilter === 'out' && info.code !== 'o') continue;
+        if (mapStatusFilter === 'recent' && (info.code !== 'i' && !(info.timestamp > 0 && (now - info.timestamp <= 86400 * 7) && info.code !== 'n'))) continue;
 
-        // 2. Chain / Brand Filter
-        if (!matchesChainFilter(store.chain, activeChain)) continue;
-
-        // 3. Distance Radius Filter
-        if (activeRadius && centerLat !== null && centerLng !== null) {
-          const d = calcDistanceKm(centerLat, centerLng, store.lat, store.lng);
-          if (d > activeRadius) continue;
-        }
-
-        // 4. Time Display Filter (Thời gian hiển thị báo cáo)
-        if (activeTime && activeTime !== 'all') {
-          const maxSec = parseInt(activeTime, 10) * 3600;
-          if (!info.timestamp || (now - info.timestamp > maxSec)) continue;
-        }
+        // 2. Chuỗi cửa hàng / Thương hiệu trên Bản đồ (CHỈ lọc theo mapChainFilter)
+        if (!matchesChainFilter(store.chain, mapChainFilter)) continue;
 
         const currentZoom = map ? map.getZoom() : 13;
         if (info.code === 'i') {
           // If close zoom (>= 12) or filter "Chỉ có hàng", show bouncing green pin with time badge
           const pinIcon = createStockPinIcon(info.timeAgo);
-          if (currentZoom >= 12 || activeFilter === 'in') {
+          if (currentZoom >= 12 || mapStatusFilter === 'in') {
             const m = L.marker([store.lat, store.lng], { icon: pinIcon, zIndexOffset: 2000 });
             m.bindPopup(() => createPopupHtml(store, info), { maxWidth: 300 });
             stockLayer.addLayer(m);
@@ -3069,7 +3086,7 @@ def index():
     }
     window.hideToast = hideToast;
 
-    // 8. FILTER & SORT MODAL HANDLERS + QUICK SHORTCUTS
+    // 8. FILTER & SORT MODAL HANDLERS (Dành riêng cho Trang Báo Cáo - 5 Tiêu chí)
     let modalTempFilter = 'all';
     let modalTempChain = 'all';
     let modalTempTime = 'all';
@@ -3077,10 +3094,10 @@ def index():
     let modalTempSort = 'newest';
 
     function openFilterModal() {
-      modalTempFilter = activeFilter || 'all';
-      modalTempChain = activeChain || 'all';
-      modalTempTime = String(activeTime || 'all');
-      modalTempRadius = (activeRadius !== null && activeRadius !== undefined) ? String(activeRadius) : 'all';
+      modalTempFilter = listStatusFilter || 'all';
+      modalTempChain = listChainFilter || 'all';
+      modalTempTime = String(listTimeFilter || 'all');
+      modalTempRadius = String(listRadiusFilter || 'all');
       modalTempSort = listSortMode || 'newest';
       syncFilterModalUI();
       const modal = document.getElementById('filter-modal');
@@ -3095,23 +3112,23 @@ def index():
     window.closeFilterModal = closeFilterModal;
 
     function syncFilterModalUI() {
-      // Status
+      // 1. Trạng thái hàng hóa
       document.querySelectorAll('#modal-status-group .filter-option-btn').forEach(btn => {
         btn.classList.toggle('active', btn.getAttribute('data-val') === modalTempFilter);
       });
-      // Chain
+      // 2. Chuỗi & Thương hiệu
       document.querySelectorAll('#modal-chain-group .filter-option-btn').forEach(btn => {
         btn.classList.toggle('active', btn.getAttribute('data-val') === modalTempChain);
       });
-      // Time
+      // 3. Thời gian hiển thị
       document.querySelectorAll('#modal-time-group .filter-option-btn').forEach(btn => {
         btn.classList.toggle('active', btn.getAttribute('data-val') === modalTempTime);
       });
-      // Radius
+      // 4. Bán kính khoảng cách
       document.querySelectorAll('#modal-radius-group .filter-option-btn').forEach(btn => {
         btn.classList.toggle('active', btn.getAttribute('data-val') === modalTempRadius);
       });
-      // Sort
+      // 5. Thứ tự sắp xếp
       document.querySelectorAll('#modal-sort-group .filter-option-btn').forEach(btn => {
         btn.classList.toggle('active', btn.getAttribute('data-val') === modalTempSort);
       });
@@ -3164,75 +3181,50 @@ def index():
     window.resetAllFilters = resetAllFilters;
 
     function applyAndCloseFilterModal() {
-      activeFilter = modalTempFilter;
-      listStatusFilter = (modalTempFilter === 'onsite' || modalTempFilter === 'hidenone') ? 'all' : modalTempFilter;
-      
-      activeChain = modalTempChain;
+      listStatusFilter = modalTempFilter;
       listChainFilter = modalTempChain;
-      const chainSel = document.getElementById('list-chain-select');
-      if (chainSel) chainSel.value = modalTempChain;
-
-      activeTime = (modalTempTime === 'all' || !modalTempTime) ? 'all' : parseInt(modalTempTime, 10);
       listTimeFilter = modalTempTime;
-      const timeSel = document.getElementById('list-time-select');
-      if (timeSel) timeSel.value = modalTempTime;
-
-      activeRadius = (modalTempRadius === 'all' || !modalTempRadius) ? null : parseInt(modalTempRadius, 10);
+      listRadiusFilter = modalTempRadius;
       listSortMode = modalTempSort;
+
+      const chainSel = document.getElementById('list-chain-select');
+      if (chainSel) chainSel.value = listChainFilter;
+      const timeSel = document.getElementById('list-time-select');
+      if (timeSel) timeSel.value = listTimeFilter;
 
       // Update list sort mode buttons
       document.querySelectorAll('.list-sort-btn').forEach(b => b.classList.remove('active'));
       const activeSortBtn = document.getElementById(`sort-btn-${listSortMode}`);
       if (activeSortBtn) activeSortBtn.classList.add('active');
 
-      updateActiveFilterBadges();
+      updateListFilterBadges();
       closeFilterModal();
 
-      renderMapMarkers();
+      // Chỉ lọc lại danh sách báo cáo, KHÔNG làm mất ghim trên bản đồ!
       const q = document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '';
       renderStoreList(q);
     }
     window.applyAndCloseFilterModal = applyAndCloseFilterModal;
 
-    function updateActiveFilterBadges() {
+    function updateListFilterBadges() {
       let count = 0;
-      if (activeFilter && activeFilter !== 'all') count++;
-      if (activeChain && activeChain !== 'all') count++;
-      if (activeTime && activeTime !== 'all') count++;
-      if (activeRadius !== null && activeRadius !== undefined) count++;
+      if (listStatusFilter && listStatusFilter !== 'all') count++;
+      if (listChainFilter && listChainFilter !== 'all') count++;
+      if (listTimeFilter && listTimeFilter !== 'all') count++;
+      if (listRadiusFilter && listRadiusFilter !== 'all') count++;
+      if (listSortMode && listSortMode !== 'newest') count++;
 
-      // Badges
-      const bMap = document.getElementById('filter-active-badge');
-      if (bMap) {
-        if (count > 0) {
-          bMap.innerText = count;
-          bMap.style.display = 'inline-block';
-        } else {
-          bMap.style.display = 'none';
+      ['list-filter-active-badge', 'list-filter-active-badge-2'].forEach(id => {
+        const b = document.getElementById(id);
+        if (b) {
+          if (count > 0) {
+            b.innerText = count;
+            b.style.display = 'inline-block';
+          } else {
+            b.style.display = 'none';
+          }
         }
-      }
-      const bList = document.getElementById('list-filter-active-badge');
-      if (bList) {
-        if (count > 0) {
-          bList.innerText = count;
-          bList.style.display = 'inline-block';
-        } else {
-          bList.style.display = 'none';
-        }
-      }
-
-      // Quick chips on the map floating bar
-      const qAll = document.getElementById('quick-chip-all');
-      const qIn = document.getElementById('quick-chip-in');
-      const qRecent = document.getElementById('quick-chip-recent');
-      const q1h = document.getElementById('quick-chip-1h');
-      const qConbini = document.getElementById('quick-chip-conbini');
-
-      if (qAll) qAll.classList.toggle('active', activeFilter === 'all' && activeChain === 'all' && activeTime === 'all' && activeRadius === null);
-      if (qIn) qIn.classList.toggle('active', activeFilter === 'in');
-      if (qRecent) qRecent.classList.toggle('active', activeFilter === 'recent');
-      if (q1h) q1h.classList.toggle('active', String(activeTime) === '1');
-      if (qConbini) qConbini.classList.toggle('active', activeChain === 'conbini');
+      });
 
       // Update list tabs
       const tabs = ['all', 'in', 'onsite', 'out', 'recent', 'unknown'];
@@ -3241,107 +3233,93 @@ def index():
         if (btn) btn.classList.toggle('active', listStatusFilter === t || (t === 'all' && listStatusFilter === 'hidenone'));
       });
     }
+    window.updateListFilterBadges = updateListFilterBadges;
+
+    // MAP FILTER HANDLERS (Dành riêng cho Bản đồ: Chỉ Trạng thái hàng hóa & Chuỗi cửa hàng)
+    function setMapStatusFilter(st) {
+      mapStatusFilter = st;
+      activeFilter = st;
+      updateMapFilterUI();
+      renderMapMarkers();
+    }
+    window.setMapStatusFilter = setMapStatusFilter;
+
+    function setMapChainFilter(chain) {
+      mapChainFilter = chain;
+      activeChain = chain;
+      updateMapFilterUI();
+      renderMapMarkers();
+    }
+    window.setMapChainFilter = setMapChainFilter;
+
+    function updateMapFilterUI() {
+      ['all', 'in', 'recent', 'out'].forEach(st => {
+        const btn = document.getElementById(`map-chip-${st}`);
+        if (btn) btn.classList.toggle('active', mapStatusFilter === st);
+      });
+      const sel = document.getElementById('map-chain-select');
+      if (sel) {
+        sel.value = mapChainFilter;
+        sel.classList.toggle('active', mapChainFilter !== 'all');
+      }
+    }
+    window.updateMapFilterUI = updateMapFilterUI;
+
+    function updateActiveFilterBadges() {
+      updateMapFilterUI();
+      updateListFilterBadges();
+    }
     window.updateActiveFilterBadges = updateActiveFilterBadges;
 
-    // Quick shortcuts on the slim single-row floating bar
+    // Backward-compatible individual handlers
     function quickSelectStatus(st) {
-      activeFilter = st;
-      listStatusFilter = st;
-      updateActiveFilterBadges();
-      renderMapMarkers();
-      renderStoreList(document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '');
+      setMapStatusFilter(st);
     }
     window.quickSelectStatus = quickSelectStatus;
 
-    function quickToggle1Hour() {
-      if (String(activeTime) === '1') {
-        activeTime = 'all';
-        listTimeFilter = 'all';
-      } else {
-        activeTime = 1;
-        listTimeFilter = '1';
-      }
-      const timeSel = document.getElementById('list-time-select');
-      if (timeSel) timeSel.value = String(activeTime);
-      updateActiveFilterBadges();
-      renderMapMarkers();
-      renderStoreList(document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '');
-    }
-    window.quickToggle1Hour = quickToggle1Hour;
-
-    function quickToggleConbini() {
-      if (activeChain === 'conbini') {
-        activeChain = 'all';
-        listChainFilter = 'all';
-      } else {
-        activeChain = 'conbini';
-        listChainFilter = 'conbini';
-      }
-      const chainSel = document.getElementById('list-chain-select');
-      if (chainSel) chainSel.value = activeChain;
-      updateActiveFilterBadges();
-      renderMapMarkers();
-      renderStoreList(document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '');
-    }
-    window.quickToggleConbini = quickToggleConbini;
-
-    // Backward-compatible individual handlers
     function setStatusFilter(filterName) {
-      quickSelectStatus(filterName);
+      setMapStatusFilter(filterName);
     }
     window.setStatusFilter = setStatusFilter;
 
     function setChainFilter(chain) {
-      activeChain = chain;
-      listChainFilter = chain;
-      updateActiveFilterBadges();
-      renderMapMarkers();
-      renderStoreList(document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '');
+      setMapChainFilter(chain);
     }
     window.setChainFilter = setChainFilter;
 
+    function toggleFilter(filterName) {
+      setMapStatusFilter(mapStatusFilter === filterName ? 'all' : filterName);
+    }
+    window.toggleFilter = toggleFilter;
+
     function setRadiusFilter(km) {
-      activeRadius = (activeRadius === km) ? null : km;
-      if (activeRadius !== null && userLat === null && typeof locateUser === 'function') {
-        locateUser(false);
-      }
-      updateActiveFilterBadges();
-      renderMapMarkers();
+      setListRadiusFilter(km);
     }
     window.setRadiusFilter = setRadiusFilter;
 
     function setTimeFilter(val) {
-      if (val === 'all' || val === null || val === undefined) {
-        activeTime = 'all';
-      } else {
-        const num = parseInt(val, 10);
-        activeTime = (activeTime === num) ? 'all' : num;
-      }
-      listTimeFilter = String(activeTime);
-      const settingsTimeSelect = document.getElementById('settings-time-select');
-      if (settingsTimeSelect && settingsTimeSelect.value !== String(activeTime)) {
-        settingsTimeSelect.value = String(activeTime);
-      }
-      updateActiveFilterBadges();
-      renderMapMarkers();
-      renderStoreList(document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '');
-      updateSettings('activeTime', activeTime);
+      setListTimeFilter(val);
     }
     window.setTimeFilter = setTimeFilter;
 
+    function setListRadiusFilter(val) {
+      listRadiusFilter = String(val);
+      if (listRadiusFilter !== 'all' && userLat === null && typeof locateUser === 'function') {
+        locateUser(false);
+      }
+      updateListFilterBadges();
+      const q = document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '';
+      renderStoreList(q);
+    }
+    window.setListRadiusFilter = setListRadiusFilter;
+
     function setListTimeFilter(val) {
-      setTimeFilter(val);
+      listTimeFilter = String(val);
+      updateListFilterBadges();
+      const q = document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '';
+      renderStoreList(q);
     }
     window.setListTimeFilter = setListTimeFilter;
-
-    function toggleFilter(filterName) {
-      if (activeFilter === filterName) {
-        quickSelectStatus('all');
-      } else {
-        quickSelectStatus(filterName);
-      }
-    }
-    window.toggleFilter = toggleFilter;
 
     // 9. GACHI MEGURI (⚡ Săn thẻ - Instant Quick Hunt)
     function triggerGachiMeguri() {
@@ -3425,9 +3403,7 @@ def index():
           else btn.classList.remove('active');
         }
       });
-      activeFilter = tab;
-      updateActiveFilterBadges();
-      updateSettings('activeFilter', activeFilter);
+      updateListFilterBadges();
       const q = document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '';
       renderStoreList(q);
     }
@@ -3439,7 +3415,7 @@ def index():
       if (selectEl && selectEl.value !== chain) {
         selectEl.value = chain;
       }
-      updateActiveFilterBadges();
+      updateListFilterBadges();
       const q = document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '';
       renderStoreList(q);
     }
@@ -3459,23 +3435,39 @@ def index():
       const now = Math.floor(Date.now() / 1000);
       const q = query.toLowerCase().trim();
 
-      // Update real-time synchronization banner text matching Settings
+      // Update real-time synchronization banner text matching active list filters
       const bannerTextEl = document.getElementById('list-active-settings-text');
       if (bannerTextEl) {
         const regName = REGIONS[currentRegion] ? REGIONS[currentRegion].name : 'Osaka';
-        let statusName = 'Tất cả';
+        let statusName = 'Tất cả trạng thái';
         if (listStatusFilter === 'in') statusName = '🟢 Có hàng';
-        else if (listStatusFilter === 'onsite') statusName = '📸 Tại chỗ';
+        else if (listStatusFilter === 'onsite') statusName = '📍 Tại quán (GPS)';
         else if (listStatusFilter === 'hidenone') statusName = '⚪ Ẩn quán ko bán';
         else if (listStatusFilter === 'out') statusName = '🔴 Hết hàng';
-        else if (listStatusFilter === 'recent') statusName = '★ Đã có';
-        else if (listStatusFilter === 'unknown') statusName = 'Chưa rõ';
+        else if (listStatusFilter === 'recent') statusName = '★ Từng có gần đây';
+        else if (listStatusFilter === 'unknown') statusName = '⚪ Chưa rõ';
+
+        let chainName = 'Tất cả chuỗi';
+        if (listChainFilter && listChainFilter !== 'all') {
+          const cNames = {
+            'conbini': 'Conbini', 'seven': '7-Eleven', 'lawson': 'Lawson',
+            'familymart': 'FamilyMart', 'ministop': 'Ministop',
+            'specialty': 'Card Shop', 'electronics': 'Điện máy'
+          };
+          chainName = cNames[listChainFilter] || listChainFilter;
+        }
 
         let timeName = 'Toàn thời gian';
         if (listTimeFilter && listTimeFilter !== 'all') {
-          timeName = `Trong ${listTimeFilter}h`;
+          timeName = (listTimeFilter === '72') ? '3 ngày qua' : `${listTimeFilter}h qua`;
         }
-        bannerTextEl.innerText = `${regName} • ${statusName} • ${timeName}`;
+
+        let radiusName = 'Toàn vùng';
+        if (listRadiusFilter && listRadiusFilter !== 'all') {
+          radiusName = `Bán kính ${listRadiusFilter}km`;
+        }
+
+        bannerTextEl.innerText = `${regName} • ${statusName} • ${chainName} • ${timeName} • ${radiusName}`;
       }
 
       const tgTag = document.getElementById('list-tg-status-tag');
@@ -3492,7 +3484,7 @@ def index():
         if (currentRegion !== 'all' && !listTargetPrefs.includes(store.pref) && store.pref !== currentPref) continue;
         const info = decodeStatus(effectiveStatus[store.id] || effectiveStatus[store.id + '_c']);
 
-        // List Status Tab Filter (Synchronized with Settings modal)
+        // 1. Trạng thái hàng hóa (List Status Tab / Modal Filter)
         if (listStatusFilter === 'in' && info.code !== 'i') continue;
         if (listStatusFilter === 'onsite' && (!info.onsite || info.code !== 'i')) continue;
         if (listStatusFilter === 'hidenone' && info.code === 'n') continue;
@@ -3500,10 +3492,10 @@ def index():
         if (listStatusFilter === 'recent' && (info.code !== 'i' && !(info.timestamp > 0 && (now - info.timestamp <= 86400 * 7) && info.code !== 'n'))) continue;
         if (listStatusFilter === 'unknown' && info.code !== 'u' && info.code) continue;
 
-        // List Chain Filter
+        // 2. Chuỗi cửa hàng & Thương hiệu
         if (!matchesChainFilter(store.chain, listChainFilter)) continue;
 
-        // List Time Filter (Thời gian hiển thị báo cáo)
+        // 3. Thời gian hiển thị báo cáo
         if (listTimeFilter && listTimeFilter !== 'all') {
           const maxSec = parseInt(listTimeFilter, 10) * 3600;
           if (!info.timestamp || (now - info.timestamp > maxSec)) continue;
@@ -3515,10 +3507,16 @@ def index():
           if (!mName && !mAddr) continue;
         }
 
+        // 4. Bán kính khoảng cách quanh bạn
         let dist = null;
         if (userLat !== null && userLng !== null && store.lat && store.lng) {
           dist = calcDistanceKm(userLat, userLng, store.lat, store.lng);
         }
+        if (listRadiusFilter && listRadiusFilter !== 'all') {
+          const maxKm = parseFloat(listRadiusFilter);
+          if (dist === null || dist > maxKm) continue;
+        }
+
         matched.push({ store, info, dist });
       }
 
@@ -3528,7 +3526,7 @@ def index():
         countBadge.innerText = `${matched.length.toLocaleString()} quán`;
       }
 
-      // Sort: in-stock first, then by selected sort mode (nearest or newest)
+      // 5. Thứ tự sắp xếp danh sách (Mới nhất hoặc Gần nhất)
       matched.sort((a,b) => {
         if (a.info.code === 'i' && b.info.code !== 'i') return -1;
         if (b.info.code === 'i' && a.info.code !== 'i') return 1;
@@ -3548,13 +3546,24 @@ def index():
       });
 
       if (matched.length === 0) {
-        listContainer.innerHTML = `
-          <div style="text-align:center; padding:36px 12px; color:#64748b;">
-            <div style="font-size:2rem; margin-bottom:8px;">📭</div>
-            <div style="font-weight:700; color:#334155; font-size:0.88rem;">Không tìm thấy báo cáo cửa hàng phù hợp</div>
-            <div style="font-size:0.75rem; margin-top:4px;">Thử đổi từ khóa hoặc điều chỉnh bộ lọc thời gian / chuỗi trong Cài đặt.</div>
-          </div>
-        `;
+        if (listRadiusFilter && listRadiusFilter !== 'all' && (userLat === null || userLng === null)) {
+          listContainer.innerHTML = `
+            <div style="text-align:center; padding:36px 12px; color:#64748b;">
+              <div style="font-size:2rem; margin-bottom:8px;">📍</div>
+              <div style="font-weight:700; color:#334155; font-size:0.88rem;">Chưa xác định được vị trí GPS của bạn</div>
+              <div style="font-size:0.75rem; margin-top:4px;">Bạn đang lọc theo bán kính ${listRadiusFilter} km. Vui lòng bấm nút dưới đây để lấy vị trí GPS hoặc tắt bộ lọc bán kính.</div>
+              <button onclick="locateUser(true)" style="margin-top:12px; background:#4f46e5; color:#ffffff; border:none; padding:8px 16px; border-radius:8px; font-weight:800; cursor:pointer;">📍 Xác định vị trí ngay</button>
+            </div>
+          `;
+        } else {
+          listContainer.innerHTML = `
+            <div style="text-align:center; padding:36px 12px; color:#64748b;">
+              <div style="font-size:2rem; margin-bottom:8px;">📭</div>
+              <div style="font-weight:700; color:#334155; font-size:0.88rem;">Không tìm thấy báo cáo cửa hàng phù hợp</div>
+              <div style="font-size:0.75rem; margin-top:4px;">Thử đổi từ khóa hoặc bấm [⚙️ Bộ lọc & Sắp xếp] để điều chỉnh tiêu chí.</div>
+            </div>
+          `;
+        }
         return;
       }
 
