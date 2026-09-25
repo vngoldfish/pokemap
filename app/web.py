@@ -698,28 +698,43 @@ def index():
       z-index: 1;
     }
 
-    /* FLOATING GPS BUTTON (Bottom Right) */
+    /* FLOATING GPS BUTTON (Bottom Right - High z-index to stay above all Leaflet layers) */
     #gps-btn {
       position: absolute;
-      bottom: 18px;
-      right: 18px;
-      z-index: 500;
-      width: 46px;
-      height: 46px;
+      bottom: 20px;
+      right: 20px;
+      z-index: 1500;
+      width: 48px;
+      height: 48px;
       border-radius: 50%;
       background: #ffffff;
-      border: 1.5px solid #cbd5e1;
-      box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+      border: 2px solid #4f46e5;
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.25rem;
-      transition: transform 0.15s, background 0.15s;
+      font-size: 1.35rem;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #gps-btn:hover {
+      background: #eff6ff;
+      transform: scale(1.08);
+      border-color: #3b82f6;
     }
     #gps-btn:active {
       transform: scale(0.92);
-      background: #f1f5f9;
+      background: #e0e7ff;
+    }
+    #gps-btn.locating {
+      border-color: #3b82f6;
+      animation: gpsPulseAnim 0.8s infinite alternate;
+    }
+    @keyframes gpsPulseAnim {
+      from { transform: scale(1); box-shadow: 0 0 6px rgba(59, 130, 246, 0.5); }
+      to { transform: scale(1.1); box-shadow: 0 0 18px rgba(59, 130, 246, 0.9); }
     }
 
     /* USER LOCATION MARKER */
@@ -1785,66 +1800,161 @@ def index():
     }
     window.updateSettings = updateSettings;
 
-    // 14. GPS USER LOCATION
-    function locateUser(fly = true) {
-      if (!navigator.geolocation) return;
+    // 14. ROBUST GPS USER LOCATION (Instant fly + High/Low accuracy fallback)
+    let hasCenteredOnUser = false;
 
+    // Restore cached position from storage immediately
+    try {
+      const savedLat = parseFloat(localStorage.getItem('poketan_user_lat') || sessionStorage.getItem('poketan_user_lat'));
+      const savedLng = parseFloat(localStorage.getItem('poketan_user_lng') || sessionStorage.getItem('poketan_user_lng'));
+      if (!isNaN(savedLat) && !isNaN(savedLng)) {
+        userLat = savedLat;
+        userLng = savedLng;
+      }
+    } catch(e) {}
+
+    function updateUserMarker(lat, lng, accuracy = 30) {
+      if (!userMarker) {
+        const icon = L.divIcon({
+          className: 'user-location-marker',
+          iconSize: [18, 18],
+          iconAnchor: [9, 9]
+        });
+        userMarker = L.marker([lat, lng], { icon, zIndexOffset: 2000 }).addTo(map);
+        userMarker.bindPopup('📍 <b>あなたの現在地</b><br><span style="font-size:0.75rem;color:#64748b;">(Vị trí hiện tại của bạn)</span>');
+        userCircle = L.circle([lat, lng], {
+          radius: accuracy,
+          color: '#4f46e5',
+          fillColor: '#818cf8',
+          fillOpacity: 0.15,
+          weight: 1
+        }).addTo(map);
+      } else {
+        userMarker.setLatLng([lat, lng]);
+        if (userCircle) {
+          userCircle.setLatLng([lat, lng]);
+          userCircle.setRadius(accuracy);
+        }
+      }
+    }
+
+    function onGpsSuccess(pos, fly = true) {
+      userLat = pos.coords.latitude;
+      userLng = pos.coords.longitude;
+      const accuracy = pos.coords.accuracy || 30;
+
+      // Save to storage
+      try {
+        localStorage.setItem('poketan_user_lat', String(userLat));
+        localStorage.setItem('poketan_user_lng', String(userLng));
+      } catch(e) {}
+
+      updateUserMarker(userLat, userLng, accuracy);
+
+      const btn = document.getElementById('gps-btn');
+      if (btn) {
+        btn.classList.remove('locating');
+        btn.innerHTML = '📍';
+      }
+
+      if (fly) {
+        hasCenteredOnUser = true;
+        map.flyTo([userLat, userLng], 15, { duration: 1.0 });
+      }
+
+      // Re-render list and popups with accurate distances
+      renderMapMarkers();
+    }
+
+    function locateUser(fly = true) {
+      const btn = document.getElementById('gps-btn');
+      if (btn) {
+        btn.classList.add('locating');
+        btn.innerHTML = '⏳';
+      }
+
+      if (!navigator.geolocation) {
+        if (btn) {
+          btn.classList.remove('locating');
+          btn.innerHTML = '📍';
+        }
+        if (fly) alert('お使いのブラウザはGPS位置情報に対応していません。(Trình duyệt không hỗ trợ GPS)');
+        return;
+      }
+
+      // Fast response: If we already have coordinates and user clicked, fly immediately!
+      if (fly && userLat !== null && userLng !== null) {
+        updateUserMarker(userLat, userLng, 30);
+        map.flyTo([userLat, userLng], 15, { duration: 0.8 });
+        if (btn) {
+          btn.classList.remove('locating');
+          btn.innerHTML = '📍';
+        }
+      }
+
+      // Attempt 1: High accuracy GPS
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          userLat = pos.coords.latitude;
-          userLng = pos.coords.longitude;
-          const accuracy = pos.coords.accuracy;
-
-          if (!userMarker) {
-            const icon = L.divIcon({
-              className: 'user-location-marker',
-              iconSize: [18, 18],
-              iconAnchor: [9, 9]
-            });
-            userMarker = L.marker([userLat, userLng], { icon, zIndexOffset: 2000 }).addTo(map);
-            userMarker.bindPopup('📍 あなたの現在地');
-            userCircle = L.circle([userLat, userLng], {
-              radius: accuracy,
-              color: '#4f46e5',
-              fillColor: '#818cf8',
-              fillOpacity: 0.15,
-              weight: 1
-            }).addTo(map);
-          } else {
-            userMarker.setLatLng([userLat, userLng]);
-            userCircle.setLatLng([userLat, userLng]);
-            userCircle.setRadius(accuracy);
-          }
-
-          if (fly) {
-            map.flyTo([userLat, userLng], 14, { duration: 1.0 });
-          }
+          onGpsSuccess(pos, fly);
         },
-        null,
-        { enableHighAccuracy: true, timeout: 10000 }
+        (err1) => {
+          console.warn('High-accuracy GPS failed, trying fallback:', err1.message);
+          // Attempt 2: Low accuracy fallback (Wifi/Cellular/IP)
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              onGpsSuccess(pos, fly);
+            },
+            (err2) => {
+              console.warn('All GPS attempts failed:', err2.message);
+              if (btn) {
+                btn.classList.remove('locating');
+                btn.innerHTML = '📍';
+              }
+              if (fly && (userLat === null || userLng === null)) {
+                alert('現在地を取得できませんでした。ブラウザの位置情報の権限（アクセス許可）を確認してください。\n(Không thể lấy vị trí. Vui lòng cho phép quyền vị trí trong trình duyệt.)');
+              }
+            },
+            { enableHighAccuracy: false, timeout: 12000, maximumAge: 60000 }
+          );
+        },
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
       );
     }
     window.locateUser = locateUser;
 
-    // Continuous watch
-    if (navigator.geolocation) {
+    // Continuous background watchPosition to keep position updated as user moves
+    function startContinuousGpsWatch() {
+      if (!navigator.geolocation) return;
       navigator.geolocation.watchPosition(
         (pos) => {
           userLat = pos.coords.latitude;
           userLng = pos.coords.longitude;
-          if (userMarker) {
-            userMarker.setLatLng([userLat, userLng]);
-            if (userCircle) userCircle.setLatLng([userLat, userLng]);
+          updateUserMarker(userLat, userLng, pos.coords.accuracy || 30);
+          // If first fix arrived and not yet centered, fly to user automatically!
+          if (!hasCenteredOnUser) {
+            hasCenteredOnUser = true;
+            map.flyTo([userLat, userLng], 15, { duration: 1.0 });
           }
         },
-        null,
-        { enableHighAccuracy: true }
+        (err) => console.warn('Continuous GPS watch notice:', err.message),
+        { enableHighAccuracy: true, maximumAge: 15000 }
       );
     }
 
     // 15. DATA INITIALIZATION & REALTIME FIRESTORE LISTENER
     async function initData() {
       try {
+        // If cached user location exists, show marker and center on startup immediately!
+        if (userLat !== null && userLng !== null) {
+          updateUserMarker(userLat, userLng);
+          map.setView([userLat, userLng], 14);
+          hasCenteredOnUser = true;
+        }
+
+        // AUTO-LOCATE ON STARTUP: Immediately request GPS and fly to user
+        locateUser(true);
+        startContinuousGpsWatch();
+
         const [cfgRes, storesRes, hotRes, coldRes] = await Promise.all([
           fetch('/api/config'),
           fetch('/api/stores_data'),
@@ -1866,9 +1976,6 @@ def index():
           overlay.style.opacity = '0';
           setTimeout(() => overlay.remove(), 250);
         }
-
-        // Quietly obtain initial GPS
-        locateUser(false);
 
         // Realtime sync
         setupRealtime();
