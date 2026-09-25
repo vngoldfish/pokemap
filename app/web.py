@@ -760,7 +760,7 @@ def index():
       top: 60px;
       left: 10px;
       right: 10px;
-      z-index: 500;
+      z-index: 1000;
       pointer-events: none;
       display: flex;
       flex-direction: column;
@@ -1866,9 +1866,15 @@ def index():
     </div>
   </header>
 
-  <!-- 2. FLOATING SUB-HEADER FILTER BAR (Bản đồ: Chỉ Trạng thái hàng hóa & Chuỗi cửa hàng) -->
+  <!-- 2. FLOATING SUB-HEADER FILTER BAR (Bản đồ: Bộ lọc & Phím tắt nhanh) -->
   <div id="filter-bar-container">
     <div class="filter-chips-scroll">
+      <!-- Nút mở Modal Bộ lọc Bản đồ -->
+      <button class="poketan-chip chip-main-filter" id="btn-map-filter" onclick="openMapFilterModal()" title="Mở bộ lọc bản đồ">
+        <span>⚙️ Bộ lọc</span>
+        <span id="map-filter-badge" class="filter-count-pill" style="display:none; background:#38bdf8; color:#0f172a;">0</span>
+      </button>
+
       <!-- Trạng thái hàng hóa trên bản đồ -->
       <button class="poketan-chip active" id="map-chip-all" onclick="setMapStatusFilter('all')">
         🌐 Tất cả
@@ -2046,6 +2052,146 @@ def index():
       <span class="tab-label">設定</span>
     </button>
   </footer>
+
+  <!-- 5.4 MAP FILTER MODAL (⚙️ Bộ lọc bản đồ) -->
+  <div id="map-filter-modal" class="modal-overlay" onclick="if(event.target===this) closeMapFilterModal()">
+    <div class="modal-card" style="max-height:85vh; max-height:85dvh;">
+      <div class="modal-header">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:1.15rem;">⚙️</span>
+          <div>
+            <h3 style="font-weight:800; font-size:1.02rem; color:#0f172a; margin:0;">Bộ lọc Bản đồ (地図フィルター)</h3>
+            <div style="font-size:0.7rem; color:#64748b; font-weight:600; margin-top:1px;">Tùy chỉnh hiển thị ghim và cửa hàng trên bản đồ</div>
+          </div>
+        </div>
+        <button class="modal-close-btn" onclick="closeMapFilterModal()">✕</button>
+      </div>
+
+      <div class="modal-body" style="padding:14px 16px; overflow-y:auto; display:flex; flex-direction:column; gap:16px;">
+        <!-- SECTION 0: KHU VỰC BẢN ĐỒ -->
+        <div>
+          <div class="filter-section-title">
+            <span>📍</span>
+            <span>Khu vực hiển thị (地域・エリア)</span>
+          </div>
+          <div class="filter-options-grid" id="map-modal-region-group">
+            <button class="filter-option-btn active" data-val="osaka" onclick="selectMapModalRegion('osaka')">
+              🔵 Osaka &amp; Kansai
+            </button>
+            <button class="filter-option-btn" data-val="tokyo" onclick="selectMapModalRegion('tokyo')">
+              🟣 Tokyo &amp; Kanto
+            </button>
+            <button class="filter-option-btn" data-val="nagoya" onclick="selectMapModalRegion('nagoya')">
+              🟢 Nagoya &amp; Tokai
+            </button>
+            <button class="filter-option-btn" data-val="all" onclick="selectMapModalRegion('all')">
+              🌐 Toàn quốc (~12.000 quán)
+            </button>
+          </div>
+        </div>
+
+        <!-- SECTION 1: TRẠNG THÁI HÀNG HÓA -->
+        <div>
+          <div class="filter-section-title">
+            <span>📊</span>
+            <span>Trạng thái hàng hóa (在庫状況)</span>
+          </div>
+          <div class="filter-options-grid" id="map-modal-status-group">
+            <button class="filter-option-btn active" data-val="all" onclick="selectMapModalStatus('all')">
+              🌐 Tất cả cửa hàng
+            </button>
+            <button class="filter-option-btn" data-val="in" onclick="selectMapModalStatus('in')">
+              <span class="chip-dot dot-green"></span> 🟢 Đang có hàng
+            </button>
+            <button class="filter-option-btn" data-val="recent" onclick="selectMapModalStatus('recent')">
+              <span style="color:#eab308;font-size:0.75rem;">★</span> Từng có hàng gần đây
+            </button>
+            <button class="filter-option-btn" data-val="out" onclick="selectMapModalStatus('out')">
+              <span class="chip-dot dot-red"></span> 🔴 Hết hàng
+            </button>
+            <button class="filter-option-btn" data-val="onsite" onclick="selectMapModalStatus('onsite')">
+              📍 Báo cáo tại quán (GPS)
+            </button>
+            <button class="filter-option-btn" data-val="unknown" onclick="selectMapModalStatus('unknown')">
+              ⚪ Chưa rõ trạng thái
+            </button>
+          </div>
+        </div>
+
+        <!-- SECTION 2: CHUỖI & THƯƠNG HIỆU -->
+        <div>
+          <div class="filter-section-title">
+            <span>🏢</span>
+            <span>Chuỗi cửa hàng & Thương hiệu (店舗チェーン)</span>
+          </div>
+          <div class="filter-options-grid" id="map-modal-chain-group">
+            <button class="filter-option-btn active" data-val="all" onclick="selectMapModalChain('all')">
+              🏢 Tất cả chuỗi
+            </button>
+            <button class="filter-option-btn" data-val="conbini" onclick="selectMapModalChain('conbini')">
+              🏪 Tất cả Conbini
+            </button>
+            <button class="filter-option-btn" data-val="seven" onclick="selectMapModalChain('seven')">
+              🏪 7-Eleven
+            </button>
+            <button class="filter-option-btn" data-val="lawson" onclick="selectMapModalChain('lawson')">
+              🏪 Lawson
+            </button>
+            <button class="filter-option-btn" data-val="familymart" onclick="selectMapModalChain('familymart')">
+              🏪 FamilyMart
+            </button>
+            <button class="filter-option-btn" data-val="ministop" onclick="selectMapModalChain('ministop')">
+              🏪 Ministop
+            </button>
+            <button class="filter-option-btn" data-val="specialty" onclick="selectMapModalChain('specialty')">
+              🃏 Card Shop chuyên biệt
+            </button>
+            <button class="filter-option-btn" data-val="electronics" onclick="selectMapModalChain('electronics')">
+              🎮 Điện máy, GEO, Tsutaya
+            </button>
+          </div>
+        </div>
+
+        <!-- SECTION 3: THỜI GIAN BÁO CÁO -->
+        <div>
+          <div class="filter-section-title">
+            <span>⏱️</span>
+            <span>Thời gian hiển thị báo cáo (報告時間)</span>
+          </div>
+          <div class="filter-options-grid" id="map-modal-time-group">
+            <button class="filter-option-btn active" data-val="all" onclick="selectMapModalTime('all')">
+              ⏱️ Toàn bộ thời gian
+            </button>
+            <button class="filter-option-btn" data-val="1" onclick="selectMapModalTime('1')">
+              ⚡ Trong 1 giờ qua
+            </button>
+            <button class="filter-option-btn" data-val="3" onclick="selectMapModalTime('3')">
+              ⏱️ Trong 3 giờ qua
+            </button>
+            <button class="filter-option-btn" data-val="6" onclick="selectMapModalTime('6')">
+              ⏱️ Trong 6 giờ qua
+            </button>
+            <button class="filter-option-btn" data-val="24" onclick="selectMapModalTime('24')">
+              ⏱️ Trong 24 giờ qua
+            </button>
+            <button class="filter-option-btn" data-val="72" onclick="selectMapModalTime('72')">
+              ⏱️ Trong 3 ngày qua
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- MODAL FOOTER BUTTONS -->
+      <div style="padding:12px 16px; border-top:1px solid #f1f5f9; background:#f8fafc; display:flex; gap:10px; align-items:center;">
+        <button class="btn-reset-filter" onclick="resetMapFilters()">
+          🔄 Đặt lại
+        </button>
+        <button class="btn-apply-filter" onclick="applyAndCloseMapFilterModal()">
+          ✅ Áp dụng bộ lọc bản đồ
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- 5.5 FILTER & SORT MODAL (Dedicated, Clean, Popup on Demand) -->
   <div id="filter-modal" class="modal-overlay" onclick="if(event.target===this) closeFilterModal()">
@@ -2649,8 +2795,10 @@ def index():
     let hotStatus = {};
     let coldStatus = {};
     let configData = {};
-    let mapStatusFilter = 'all'; // 'all' | 'in' | 'recent' | 'out' (Chỉ dùng cho Bản đồ)
+    let mapRegionFilter = currentRegion || 'osaka'; // 'osaka' | 'tokyo' | 'nagoya' | 'all' (Dùng cho Bản đồ)
+    let mapStatusFilter = 'all'; // 'all' | 'in' | 'recent' | 'out' | 'onsite' | 'unknown' (Chỉ dùng cho Bản đồ)
     let mapChainFilter = 'all';  // 'all' | 'conbini' | 'seven' | ... (Chỉ dùng cho Bản đồ)
+    let mapTimeFilter = 'all';   // 'all' | '1' | '3' | '6' | '24' | '72' (Chỉ dùng cho Bản đồ)
     let activeFilter = 'all';    // backward compatible alias
     let activeChain = 'all';     // backward compatible alias
     let activeRadius = null;
@@ -3042,8 +3190,17 @@ def index():
       const centerLat = userLat !== null ? userLat : (map ? map.getCenter().lat : null);
       const centerLng = userLng !== null ? userLng : (map ? map.getCenter().lng : null);
 
+      const targetMapRegion = mapRegionFilter || currentRegion || 'osaka';
+      const allowedMapPrefs = (REGIONS[targetMapRegion] ? REGIONS[targetMapRegion].prefs : [targetMapRegion]) || ['osaka'];
+
       for (const store of allStores) {
         if (!store.lat || !store.lng) continue;
+
+        // 0. Khu vực hiển thị trên Bản đồ
+        if (targetMapRegion !== 'all') {
+          const storePref = (store.pref || '').toLowerCase();
+          if (!allowedMapPrefs.includes(storePref)) continue;
+        }
 
         const sid = store.id;
         const raw = effectiveStatus[sid] || effectiveStatus[sid + '_c'];
@@ -3059,13 +3216,21 @@ def index():
           }
         }
 
-        // 1. Trạng thái hàng hóa trên Bản đồ (CHỈ lọc theo mapStatusFilter)
+        // 1. Trạng thái hàng hóa trên Bản đồ
         if (mapStatusFilter === 'in' && info.code !== 'i') continue;
+        if (mapStatusFilter === 'onsite' && (!info.onsite || info.code !== 'i')) continue;
         if (mapStatusFilter === 'out' && info.code !== 'o') continue;
         if (mapStatusFilter === 'recent' && (info.code !== 'i' && !(info.timestamp > 0 && (now - info.timestamp <= 86400 * 7) && info.code !== 'n'))) continue;
+        if (mapStatusFilter === 'unknown' && info.code !== 'u' && info.code) continue;
 
-        // 2. Chuỗi cửa hàng / Thương hiệu trên Bản đồ (CHỈ lọc theo mapChainFilter)
+        // 2. Chuỗi cửa hàng / Thương hiệu trên Bản đồ
         if (!matchesChainFilter(store.chain, mapChainFilter)) continue;
+
+        // 3. Thời gian hiển thị báo cáo trên Bản đồ
+        if (mapTimeFilter && mapTimeFilter !== 'all') {
+          const maxSec = parseInt(mapTimeFilter, 10) * 3600;
+          if (!info.timestamp || (now - info.timestamp > maxSec)) continue;
+        }
 
         const currentZoom = map ? map.getZoom() : 13;
         if (info.code === 'i') {
@@ -3416,7 +3581,96 @@ def index():
     }
     window.updateListFilterBadges = updateListFilterBadges;
 
-    // MAP FILTER HANDLERS (Dành riêng cho Bản đồ: Chỉ Trạng thái hàng hóa & Chuỗi cửa hàng)
+    // 7. MAP FILTER MODAL HANDLERS (Dành riêng cho Bản đồ: Khu vực + Trạng thái + Chuỗi + Thời gian)
+    let mapModalTempRegion = currentRegion || 'osaka';
+    let mapModalTempStatus = 'all';
+    let mapModalTempChain = 'all';
+    let mapModalTempTime = 'all';
+
+    function openMapFilterModal() {
+      mapModalTempRegion = mapRegionFilter || currentRegion || 'osaka';
+      mapModalTempStatus = mapStatusFilter || 'all';
+      mapModalTempChain = mapChainFilter || 'all';
+      mapModalTempTime = String(mapTimeFilter || 'all');
+      syncMapFilterModalUI();
+      const modal = document.getElementById('map-filter-modal');
+      if (modal) modal.classList.add('open');
+    }
+    window.openMapFilterModal = openMapFilterModal;
+
+    function closeMapFilterModal() {
+      const modal = document.getElementById('map-filter-modal');
+      if (modal) modal.classList.remove('open');
+    }
+    window.closeMapFilterModal = closeMapFilterModal;
+
+    function syncMapFilterModalUI() {
+      document.querySelectorAll('#map-modal-region-group .filter-option-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-val') === mapModalTempRegion);
+      });
+      document.querySelectorAll('#map-modal-status-group .filter-option-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-val') === mapModalTempStatus);
+      });
+      document.querySelectorAll('#map-modal-chain-group .filter-option-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-val') === mapModalTempChain);
+      });
+      document.querySelectorAll('#map-modal-time-group .filter-option-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-val') === mapModalTempTime);
+      });
+    }
+
+    function selectMapModalRegion(val) {
+      mapModalTempRegion = val;
+      syncMapFilterModalUI();
+    }
+    window.selectMapModalRegion = selectMapModalRegion;
+
+    function selectMapModalStatus(val) {
+      mapModalTempStatus = val;
+      syncMapFilterModalUI();
+    }
+    window.selectMapModalStatus = selectMapModalStatus;
+
+    function selectMapModalChain(val) {
+      mapModalTempChain = val;
+      syncMapFilterModalUI();
+    }
+    window.selectMapModalChain = selectMapModalChain;
+
+    function selectMapModalTime(val) {
+      mapModalTempTime = val;
+      syncMapFilterModalUI();
+    }
+    window.selectMapModalTime = selectMapModalTime;
+
+    function resetMapFilters() {
+      mapModalTempRegion = currentRegion || 'osaka';
+      mapModalTempStatus = 'all';
+      mapModalTempChain = 'all';
+      mapModalTempTime = 'all';
+      syncMapFilterModalUI();
+    }
+    window.resetMapFilters = resetMapFilters;
+
+    function applyAndCloseMapFilterModal() {
+      const regionChanged = (mapRegionFilter !== mapModalTempRegion);
+      mapRegionFilter = mapModalTempRegion;
+      mapStatusFilter = mapModalTempStatus;
+      mapChainFilter = mapModalTempChain;
+      mapTimeFilter = mapModalTempTime;
+
+      closeMapFilterModal();
+      updateMapFilterUI();
+
+      if (regionChanged && mapRegionFilter !== 'all') {
+        selectRegion(mapRegionFilter, true);
+      } else {
+        renderMapMarkers();
+      }
+    }
+    window.applyAndCloseMapFilterModal = applyAndCloseMapFilterModal;
+
+    // MAP FILTER HANDLERS (Dành riêng cho Bản đồ: Phím tắt chip nhanh ngoài bản đồ)
     function setMapStatusFilter(st) {
       mapStatusFilter = st;
       activeFilter = st;
@@ -3442,6 +3696,18 @@ def index():
       if (sel) {
         sel.value = mapChainFilter;
         sel.classList.toggle('active', mapChainFilter !== 'all');
+      }
+
+      // Update badge on map filter button
+      let count = 0;
+      if (mapRegionFilter && mapRegionFilter !== 'all' && mapRegionFilter !== currentRegion) count++;
+      if (mapStatusFilter && mapStatusFilter !== 'all') count++;
+      if (mapChainFilter && mapChainFilter !== 'all') count++;
+      if (mapTimeFilter && mapTimeFilter !== 'all') count++;
+      const badge = document.getElementById('map-filter-badge');
+      if (badge) {
+        badge.innerText = count;
+        badge.style.display = count > 0 ? 'inline-flex' : 'none';
       }
     }
     window.updateMapFilterUI = updateMapFilterUI;
@@ -3886,6 +4152,7 @@ def index():
 
       currentRegion = regionId;
       window.currentRegion = currentRegion;
+      mapRegionFilter = regionId;
       listRegionFilter = regionId;
       localStorage.setItem('poketan_selected_region', regionId);
       updateSettings('currentRegion', regionId);
