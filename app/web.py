@@ -520,6 +520,10 @@ def index():
       background: #f8fafc;
       display: flex;
       flex-direction: column;
+      touch-action: pan-x pan-y;
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
+      overscroll-behavior: none;
     }
 
     /* 1. TOP HEADER (White, Clean, matching PokéTan reference) */
@@ -534,6 +538,9 @@ def index():
       z-index: 1000;
       flex-shrink: 0;
       box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
     }
 
     .header-brand-group {
@@ -1042,6 +1049,9 @@ def index():
       flex-shrink: 0;
       box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
       position: relative;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
     }
 
     .footer-tab-btn {
@@ -2330,6 +2340,16 @@ def index():
     }
 
     window.addEventListener('wheel', function(e) {
+      const mapEl = document.getElementById('map');
+      const isOverMap = mapEl && (mapEl === e.target || mapEl.contains(e.target));
+
+      // If user is pinching (Ctrl key held or trackpad pinch) outside the map -> BLOCK BROWSER PAGE ZOOM!
+      if (e.ctrlKey && !isOverMap) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return;
+      }
+
       // Don't intercept wheel if inside an open modal or scrollable sheet
       if (e.target.closest('#filter-modal, #view-list-container, #settings-modal, #bulletin-modal, #store-history-modal, #pref-modal, .filter-chips-scroll')) {
         return;
@@ -2340,8 +2360,72 @@ def index():
         e.stopImmediatePropagation();
         map.panBy([e.deltaX, e.deltaY], { animate: false });
       }
-      // Traditional mouse wheel or pinch gesture -> passes through to Leaflet zoom!
+      // Traditional mouse wheel or pinch gesture over map -> passes through to Leaflet zoom!
     }, { capture: true, passive: false });
+
+    // PREVENT PAGE-LEVEL ZOOM (Only map zooms, header/footer/page stay fixed 100%)
+    // 1. Prevent iOS Safari page-level gesture zoom outside the map
+    window.addEventListener('gesturestart', function(e) {
+      const mapEl = document.getElementById('map');
+      if (!mapEl || !mapEl.contains(e.target)) {
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    window.addEventListener('gesturechange', function(e) {
+      const mapEl = document.getElementById('map');
+      if (!mapEl || !mapEl.contains(e.target)) {
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    window.addEventListener('gestureend', function(e) {
+      const mapEl = document.getElementById('map');
+      if (!mapEl || !mapEl.contains(e.target)) {
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    // 2. Prevent multi-touch pinch zoom on header, footer, and page outside the map
+    window.addEventListener('touchstart', function(e) {
+      if (e.touches && e.touches.length > 1) {
+        const mapEl = document.getElementById('map');
+        if (!mapEl || !mapEl.contains(e.target)) {
+          e.preventDefault();
+        }
+      }
+    }, { passive: false, capture: true });
+
+    window.addEventListener('touchmove', function(e) {
+      if (e.touches && e.touches.length > 1) {
+        const mapEl = document.getElementById('map');
+        if (!mapEl || !mapEl.contains(e.target)) {
+          e.preventDefault();
+        }
+      }
+    }, { passive: false, capture: true });
+
+    // 3. Prevent double-tap to zoom outside the map
+    let lastTouchEndTime = 0;
+    window.addEventListener('touchend', function(e) {
+      const now = performance.now();
+      const mapEl = document.getElementById('map');
+      if (!mapEl || !mapEl.contains(e.target)) {
+        if (now - lastTouchEndTime <= 300) {
+          e.preventDefault();
+        }
+      }
+      lastTouchEndTime = now;
+    }, { passive: false, capture: true });
+
+    // 4. Prevent Ctrl/Cmd + (+/-) keyboard zoom on entire page
+    window.addEventListener('keydown', function(e) {
+      if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '=' || e.key === '-' || e.key === '_' || e.key === '0')) {
+        if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+          e.preventDefault();
+        }
+      }
+    }, { passive: false });
 
     map.on('popupclose', () => {
       openPopupHistStoreIds.clear();
