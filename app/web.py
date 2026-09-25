@@ -1728,15 +1728,27 @@ def index():
       const now = Math.floor(Date.now() / 1000);
 
       const clusterBatch = [];
-      let firstInStore = null;
+      let newestInStore = null;
+      let newestInfo = null;
+      let maxTimestamp = 0;
 
       for (const store of allStores) {
         if (!store.lat || !store.lng) continue;
         if (currentPref !== 'all' && store.pref !== currentPref) continue;
 
         const sid = store.id;
-        const raw = effectiveStatus[sid];
+        const raw = effectiveStatus[sid] || effectiveStatus[sid + '_c'];
         const info = decodeStatus(raw);
+
+        // Find the absolute newest in-stock report in the selected prefecture
+        if (info.code === 'i') {
+          const ts = info.timestamp || 0;
+          if (ts > maxTimestamp) {
+            maxTimestamp = ts;
+            newestInStore = store;
+            newestInfo = info;
+          }
+        }
 
         // Chip Filters
         if (activeFilter === 'in' && info.code !== 'i') continue;
@@ -1745,7 +1757,6 @@ def index():
         if (activeFilter === 'hidenone' && info.code === 'n') continue;
 
         if (info.code === 'i') {
-          if (!firstInStore) firstInStore = store;
           // In-Stock Store gets a prominent bouncing green pin on stockLayer (always unclustered & on top)
           const m = L.marker([store.lat, store.lng], { icon: stockPinIcon, zIndexOffset: 2000 });
           m.bindPopup(() => createPopupHtml(store, info), { maxWidth: 300 });
@@ -1767,15 +1778,14 @@ def index():
         clusterGroup.addLayers(clusterBatch);
       }
 
-      // Show/update stock toast if there are stores in stock
+      // Show/update stock alert toast with the NEWEST report
       const toastEl = document.getElementById('live-stock-toast');
-      if (firstInStore) {
-        latestStockStoreId = firstInStore.id;
-        const info = decodeStatus(effectiveStatus[firstInStore.id]);
+      if (newestInStore && newestInStore.id !== dismissedToastStoreId) {
+        latestStockStoreId = newestInStore.id;
         const titleEl = document.getElementById('toast-store-title');
         const timeEl = document.getElementById('toast-time');
-        if (titleEl) titleEl.innerText = firstInStore.name;
-        if (timeEl) timeEl.innerText = info.timeAgo || '新着';
+        if (titleEl) titleEl.innerText = newestInStore.name;
+        if (timeEl) timeEl.innerText = newestInfo.timeAgo || 'たった今';
         if (toastEl) toastEl.style.display = 'flex';
       } else {
         if (toastEl) toastEl.style.display = 'none';
@@ -1829,15 +1839,27 @@ def index():
     }
 
     // 7. TOAST INTERACTIONS
+    let dismissedToastStoreId = null;
+
     function focusStockStore() {
       if (!latestStockStoreId || !storesDict[latestStockStoreId]) return;
       const s = storesDict[latestStockStoreId];
       map.flyTo([s.lat, s.lng], 16, { duration: 0.8 });
+      setTimeout(() => {
+        stockLayer.eachLayer(m => {
+          const ll = m.getLatLng();
+          if (Math.abs(ll.lat - s.lat) < 0.0001 && Math.abs(ll.lng - s.lng) < 0.0001) {
+            m.openPopup();
+          }
+        });
+      }, 850);
     }
     window.focusStockStore = focusStockStore;
 
     function hideToast() {
-      document.getElementById('live-stock-toast').style.display = 'none';
+      dismissedToastStoreId = latestStockStoreId;
+      const toastEl = document.getElementById('live-stock-toast');
+      if (toastEl) toastEl.style.display = 'none';
     }
     window.hideToast = hideToast;
 
@@ -2044,6 +2066,7 @@ def index():
 
     function selectPrefecture(pref, label) {
       currentPref = pref;
+      dismissedToastStoreId = null;
       document.getElementById('header-loc-name').innerText = label;
       document.querySelectorAll('.pref-item-btn').forEach(b => b.classList.remove('selected'));
       const activeBtn = document.getElementById(`pref-btn-${pref}`);
