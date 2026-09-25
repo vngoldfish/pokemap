@@ -864,6 +864,8 @@ def index():
       height: 100%;
       position: relative;
       overflow: hidden;
+      touch-action: none;
+      overscroll-behavior: none;
     }
 
     #map, .leaflet-container {
@@ -884,13 +886,6 @@ def index():
     }
     #map:active, .leaflet-container:active {
       cursor: grabbing;
-    }
-    .leaflet-pane, .leaflet-tile, .leaflet-marker-icon, .leaflet-marker-shadow,
-    .leaflet-tile-container, .leaflet-pane > svg, .leaflet-pane > canvas,
-    .leaflet-zoom-box, .leaflet-image-layer, .leaflet-layer {
-      will-change: transform;
-      transform: translateZ(0);
-      -webkit-transform: translateZ(0);
     }
     .leaflet-tile {
       image-rendering: -webkit-optimize-contrast;
@@ -2284,40 +2279,69 @@ def index():
 
       // Google Maps-like kinetic inertia & fluid momentum
       inertia: true,
-      inertiaDeceleration: 1400, // Reduced friction allows natural, smooth gliding when swiping/flicking
-      inertiaMaxSpeed: 3500,     // Allows quick flick gestures to glide across neighborhoods
-      easeLinearity: 0.12,       // Gentle natural deceleration curve matching Google Maps
+      inertiaDeceleration: 2000, // Natural fluid deceleration matching Google Maps swipe
+      inertiaMaxSpeed: 3000,
+      easeLinearity: 0.15,
 
-      // Smooth continuous zooming & gesture response
+      // Smooth zooming & gesture response
       zoomAnimation: true,
       fadeAnimation: true,
       markerZoomAnimation: true,
-      zoomAnimationThreshold: 8,
 
-      // High-precision fractional pinch-to-zoom (smooth like Google Maps)
-      zoomSnap: 0.25,            // Fractional zoom steps remove chunky integer jumping
-      zoomDelta: 0.5,            // Half-level steps for much smoother button/tap zoom
+      // Crisp zoom & snappy responsiveness
+      zoomSnap: 1,
+      zoomDelta: 1,
       wheelPxPerZoomLevel: 100,
       wheelDebounceTime: 40,
 
-      // Native mobile touch optimization
-      tap: false,                // Disables legacy 300ms tap emulator that caused touch drag lag on iOS Safari
       touchZoom: true,
       bounceAtZoomLimits: false,
       maxBoundsViscosity: 0
     });
+    window.map = map;
 
-    // High performance Google Maps Streets Tiles with GPU compositing
+    // High performance Google Maps Streets Tiles
     L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
       subdomains: ['0', '1', '2', '3'],
       maxZoom: 20,
       maxNativeZoom: 19,
       attribution: '&copy; Google Maps',
       updateWhenIdle: false,
-      updateWhenZooming: false,
-      keepBuffer: 3,
+      updateWhenZooming: true,
+      keepBuffer: 4,
       crossOrigin: true
     }).addTo(map);
+
+    // GOOGLE MAPS GESTURES: Two-finger trackpad panning & pinch-to-zoom
+    let lastTrackpadTime = 0;
+    function isTrackpadGesture(e) {
+      if (e.ctrlKey) return false; // Ctrl / trackpad pinch -> zoom
+      const now = performance.now();
+      // Trackpad events have non-zero deltaX, non-integer deltaY, or small continuous deltas
+      if (e.deltaX !== 0 || Math.abs(e.deltaY) % 1 !== 0 || Math.abs(e.deltaY) < 50) {
+        lastTrackpadTime = now;
+        return true;
+      }
+      if (now - lastTrackpadTime < 250) {
+        lastTrackpadTime = now;
+        return true;
+      }
+      return false;
+    }
+
+    window.addEventListener('wheel', function(e) {
+      // Don't intercept wheel if inside an open modal or scrollable sheet
+      if (e.target.closest('#filter-modal, #view-list-container, #settings-modal, #bulletin-modal, #store-history-modal, #pref-modal, .filter-chips-scroll')) {
+        return;
+      }
+      if (isTrackpadGesture(e)) {
+        // Trackpad 2-finger scroll -> PAN THE MAP (like Google Maps)!
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        map.panBy([e.deltaX, e.deltaY], { animate: false });
+      }
+      // Traditional mouse wheel or pinch gesture -> passes through to Leaflet zoom!
+    }, { capture: true, passive: false });
 
     map.on('popupclose', () => {
       openPopupHistStoreIds.clear();
