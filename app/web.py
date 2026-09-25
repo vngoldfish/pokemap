@@ -2304,6 +2304,8 @@ def index():
             <option value="nagoya">🟢 名古屋・東海 (Nagoya & Lân cận)</option>
           </select>
         </div>
+        <!-- In-modal save notification banner -->
+        <div id="modal-save-tg-result" style="display:none; font-size:0.75rem; padding:9px 12px; border-radius:8px; font-weight:700;"></div>
       </div>
 
       <!-- MODAL FOOTER BUTTONS -->
@@ -2311,7 +2313,7 @@ def index():
         <button type="button" class="btn-reset-filter" onclick="closeTelegramModal()">
           Đóng
         </button>
-        <button type="button" class="btn-apply-filter" onclick="saveTelegramSettings()" style="background:#0284c7; border-color:#0284c7;">
+        <button type="button" id="btn-save-tg" class="btn-apply-filter" onclick="saveTelegramSettings()" style="background:#0284c7; border-color:#0284c7;">
           💾 Lưu cấu hình Telegram
         </button>
       </div>
@@ -4199,6 +4201,16 @@ def index():
       if (regionEl) regionEl.value = configData.telegramRegion || 'all';
       if (resEl) resEl.style.display = 'none';
 
+      const saveResEl = document.getElementById('modal-save-tg-result');
+      if (saveResEl) saveResEl.style.display = 'none';
+      const saveBtn = document.getElementById('btn-save-tg');
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '<span>💾 Lưu cấu hình Telegram</span>';
+        saveBtn.style.background = '#0284c7';
+        saveBtn.style.borderColor = '#0284c7';
+      }
+
       document.getElementById('telegram-modal').classList.add('open');
     }
     window.openTelegramModal = openTelegramModal;
@@ -4300,6 +4312,8 @@ def index():
     window.testTelegramInModal = testTelegramInModal;
 
     async function saveTelegramSettings() {
+      const btn = document.getElementById('btn-save-tg');
+      const resEl = document.getElementById('modal-save-tg-result');
       const token = (document.getElementById('tg-cfg-token') ? document.getElementById('tg-cfg-token').value : '').trim();
       const chatId = (document.getElementById('tg-cfg-chatid') ? document.getElementById('tg-cfg-chatid').value : '').trim();
       const enabled = document.getElementById('tg-cfg-enabled') ? document.getElementById('tg-cfg-enabled').checked : false;
@@ -4307,6 +4321,18 @@ def index():
       const chain = document.getElementById('tg-cfg-chain') ? document.getElementById('tg-cfg-chain').value : 'all';
       const time = document.getElementById('tg-cfg-time') ? document.getElementById('tg-cfg-time').value : '24';
       const region = document.getElementById('tg-cfg-region') ? document.getElementById('tg-cfg-region').value : 'all';
+
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span>⏳ Đang lưu...</span>';
+      }
+      if (resEl) {
+        resEl.style.display = 'block';
+        resEl.style.background = '#f0f9ff';
+        resEl.style.color = '#0369a1';
+        resEl.style.border = '1px solid #bae6fd';
+        resEl.innerHTML = '⏳ Đang lưu cài đặt Telegram...';
+      }
 
       configData.telegramBotToken = token;
       configData.telegramChatId = chatId;
@@ -4317,7 +4343,7 @@ def index():
       configData.telegramRegion = region;
 
       try {
-        await fetch('/api/settings', {
+        const response = await fetch('/api/settings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -4332,11 +4358,51 @@ def index():
             }
           })
         });
-        updateTelegramUIBadge();
-        closeTelegramModal();
-        alert('✅ Đã lưu cấu hình Telegram và bộ lọc cảnh báo thành công!');
+
+        const data = await response.json();
+        if (data.status === 'ok') {
+          updateTelegramUIBadge();
+          if (btn) {
+            btn.innerHTML = '<span>✅ Đã lưu thành công!</span>';
+            btn.style.background = '#16a34a';
+            btn.style.borderColor = '#16a34a';
+          }
+          if (resEl) {
+            resEl.style.display = 'block';
+            resEl.style.background = '#dcfce7';
+            resEl.style.color = '#15803d';
+            resEl.style.border = '1px solid #86efac';
+            resEl.innerHTML = '✅ <b>Đã lưu cấu hình thành công!</b> Cài đặt Telegram & bộ lọc cảnh báo đã có hiệu lực.';
+          }
+          if (typeof showRegionToast === 'function') {
+            showRegionToast('Đã lưu cấu hình Telegram thành công! ✅', '✈️');
+            if (typeof hideRegionToast === 'function') hideRegionToast(2500);
+          }
+          setTimeout(() => {
+            closeTelegramModal();
+            if (btn) {
+              btn.disabled = false;
+              btn.innerHTML = '<span>💾 Lưu cấu hình Telegram</span>';
+              btn.style.background = '#0284c7';
+              btn.style.borderColor = '#0284c7';
+            }
+            if (resEl) resEl.style.display = 'none';
+          }, 1200);
+        } else {
+          throw new Error(data.error || 'Máy chủ phản hồi không thành công');
+        }
       } catch (err) {
-        alert(`❌ Lỗi lưu cấu hình: ${err.message}`);
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<span>💾 Thử lưu lại</span>';
+        }
+        if (resEl) {
+          resEl.style.display = 'block';
+          resEl.style.background = '#fee2e2';
+          resEl.style.color = '#b91c1c';
+          resEl.style.border = '1px solid #fca5a5';
+          resEl.innerHTML = `❌ <b>Lỗi lưu cấu hình:</b> ${err.message}`;
+        }
       }
     }
     window.saveTelegramSettings = saveTelegramSettings;
