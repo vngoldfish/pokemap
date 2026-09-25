@@ -306,8 +306,6 @@ async def send_webhook_notification(request: Request):
                     f"🔥 <b>{store_name}</b> - CÓ HÀNG!",
                     f"📦 {packs_text}{dist_part} • ⏱ {time_display}",
                 ]
-                if maps_url:
-                    msg_lines.append(f"🗺️ <a href=\"{maps_url}\">Google Maps ↗</a>")
                 
                 tg_payload = {
                     "chat_id": tg_chat_id,
