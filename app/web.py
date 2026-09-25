@@ -2414,6 +2414,7 @@ def index():
       }
 
       // 2. Search in allStores
+      const allStores = Object.values(storesDict);
       const matched = allStores.find(s => 
         (s.name && s.name.toLowerCase().includes(q)) || 
         (s.address && s.address.toLowerCase().includes(q))
@@ -2428,7 +2429,7 @@ def index():
     window.searchAreaLocation = searchAreaLocation;
 
     function voteForNewPrefecture() {
-      alert('🗳️ 投票を受け付けました！\n今後のエリア拡大リクエストありがとうございます。');
+      alert('🗳️ 投票を受け付けました！\\n今後のエリア拡大リクエストありがとうございます。');
     }
     window.voteForNewPrefecture = voteForNewPrefecture;
 
