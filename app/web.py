@@ -823,7 +823,7 @@ def index():
       50% { transform: translateY(-4px); }
     }
 
-    /* 5. FOOTER (Exact Image 2 replica: White bar with Gachi Meguri center button) */
+    /* 5. FOOTER (Exact Image 2 replica: White bar with Gachi Meguri center button + Settings) */
     #poketan-footer {
       height: calc(56px + env(safe-area-inset-bottom, 0px));
       padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -840,6 +840,7 @@ def index():
 
     .footer-tab-btn {
       flex: 1;
+      min-width: 0;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -848,21 +849,27 @@ def index():
       background: none;
       border: none;
       color: #64748b;
-      font-size: 0.64rem;
+      font-size: 0.6rem;
       font-weight: 700;
       cursor: pointer;
       position: relative;
-      padding: 6px 0;
+      padding: 4px 1px;
       transition: color 0.15s;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
     }
     .footer-tab-btn .tab-icon {
-      font-size: 1.25rem;
+      font-size: 1.15rem;
       line-height: 1;
     }
     .footer-tab-btn .tab-label {
-      font-size: 0.62rem;
+      font-size: 0.56rem;
       font-weight: 700;
-      letter-spacing: 0.01em;
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
     }
 
     /* Active blue top indicator line (Image 2) */
@@ -873,22 +880,32 @@ def index():
       content: '';
       position: absolute;
       top: 0;
-      left: 18%;
-      right: 18%;
+      left: 14%;
+      right: 14%;
       height: 3px;
       background: #4f46e5;
       border-radius: 0 0 3px 3px;
     }
 
     /* Elevated center button: Gachi Meguri (Image 2) */
+    .gachi-meguri-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      cursor: pointer;
+      flex: 0 0 52px;
+      padding-bottom: 4px;
+      -webkit-tap-highlight-color: transparent;
+    }
     .gachi-meguri-btn {
       position: relative;
-      top: -12px;
-      width: 52px;
-      height: 52px;
+      top: -10px;
+      width: 48px;
+      height: 48px;
       border-radius: 50%;
       background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-      box-shadow: 0 6px 16px rgba(99, 102, 241, 0.45);
+      box-shadow: 0 4px 14px rgba(99, 102, 241, 0.45);
       border: 3px solid #ffffff;
       display: flex;
       flex-direction: column;
@@ -904,15 +921,16 @@ def index():
       transform: scale(0.92);
     }
     .gachi-meguri-btn .btn-icon {
-      font-size: 1.45rem;
+      font-size: 1.4rem;
       line-height: 1;
       filter: drop-shadow(0 1px 2px rgba(0,0,0,0.2));
     }
     .gachi-meguri-label {
-      font-size: 0.58rem;
+      font-size: 0.56rem;
       font-weight: 800;
       color: #4f46e5;
       margin-top: 1px;
+      white-space: nowrap;
     }
 
     /* 6. LIST VIEW (Sliding Sheet / Tab) */
@@ -1257,34 +1275,39 @@ def index():
     <div class="list-cards-scroll" id="store-cards-list"></div>
   </div>
 
-  <!-- 5. FOOTER BOTTOM NAVIGATION (Exact Image 2 replica) -->
+  <!-- 5. FOOTER BOTTOM NAVIGATION (Exact Image 2 replica + Settings) -->
   <footer id="poketan-footer">
-    <button class="footer-tab-btn active" id="f-tab-map" onclick="switchFooterTab('map')">
+    <button class="footer-tab-btn active" id="f-tab-map" onclick="switchFooterTab('map')" title="地図 / Bản đồ">
       <span class="tab-icon">🗺️</span>
       <span class="tab-label">地図</span>
     </button>
 
-    <button class="footer-tab-btn" id="f-tab-list" onclick="switchFooterTab('list')">
+    <button class="footer-tab-btn" id="f-tab-list" onclick="switchFooterTab('list')" title="一覧 / Danh sách">
       <span class="tab-icon">📋</span>
       <span class="tab-label">一覧</span>
     </button>
 
     <!-- Center Elevated Button: Gachi Meguri (⚡) -->
-    <div style="display:flex; flex-direction:column; align-items:center; cursor:pointer;" onclick="triggerGachiMeguri()">
+    <div class="gachi-meguri-wrap" onclick="triggerGachiMeguri()" title="ガチ巡り (在庫あり店舗へ直行)">
       <div class="gachi-meguri-btn">
         <span class="btn-icon">⚡</span>
       </div>
       <span class="gachi-meguri-label">ガチ巡り</span>
     </div>
 
-    <button class="footer-tab-btn" id="f-tab-search" onclick="openSearchModal()">
+    <button class="footer-tab-btn" id="f-tab-search" onclick="openSearchModal()" title="さがす / Tìm kiếm">
       <span class="tab-icon">🔍</span>
       <span class="tab-label">さがす</span>
     </button>
 
-    <button class="footer-tab-btn" id="f-tab-bulletin" onclick="openSettingsModal()">
+    <button class="footer-tab-btn" id="f-tab-bulletin" onclick="openBulletinModal()" title="掲示板 / Bảng tin">
       <span class="tab-icon">💬</span>
       <span class="tab-label">掲示板</span>
+    </button>
+
+    <button class="footer-tab-btn" id="f-tab-settings" onclick="openSettingsModal()" title="設定 / Cài đặt">
+      <span class="tab-icon">⚙️</span>
+      <span class="tab-label">設定</span>
     </button>
   </footer>
 
@@ -1324,32 +1347,81 @@ def index():
     </div>
   </div>
 
-  <!-- 7. SETTINGS / BULLETIN MODAL -->
+  <!-- 7. BULLETIN MODAL (💬 掲示板) -->
+  <div id="bulletin-modal" class="modal-overlay" onclick="if(event.target===this) closeBulletinModal()">
+    <div class="modal-card" style="max-width:440px;">
+      <div class="modal-header">
+        <h3>💬 掲示板 (入荷速報・目撃情報)</h3>
+        <button class="modal-close-btn" onclick="closeBulletinModal()">✕</button>
+      </div>
+      <div class="modal-body" style="font-size:0.82rem; max-height:70vh; overflow-y:auto;" id="bulletin-list">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- 8. SETTINGS MODAL (⚙️ 設定 &amp; カスタマイズ) -->
   <div id="settings-modal" class="modal-overlay" onclick="if(event.target===this) closeSettingsModal()">
     <div class="modal-card" style="max-width:440px;">
       <div class="modal-header">
-        <h3>⚙️ 設定 &amp; 通知連携</h3>
+        <h3>⚙️ 設定 / Cài đặt tùy chỉnh</h3>
         <button class="modal-close-btn" onclick="closeSettingsModal()">✕</button>
       </div>
-      <div class="modal-body" style="font-size:0.82rem;">
-        <div style="margin-bottom:12px;">
-          <b>🔔 Telegram &amp; Webhook通知</b>
-          <div style="font-size:0.73rem;color:#64748b;margin-top:2px;">在庫あり報告をTelegramやDiscordへ自動転送します。</div>
+      <div class="modal-body" style="font-size:0.82rem; max-height:75vh; overflow-y:auto;">
+        <!-- Store Display Filter Section -->
+        <div style="margin-bottom:14px;">
+          <div style="font-weight:800; font-size:0.85rem; color:#1e293b; margin-bottom:6px;">🗺️ Cài đặt hiển thị bản đồ / 表示設定</div>
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            <label style="display:flex; align-items:center; gap:8px; padding:8px 10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; cursor:pointer; font-weight:600;">
+              <input type="radio" name="set-filter-radio" value="none" onchange="setSettingsFilter('none')">
+              <span>🌐 Hiện tất cả cửa hàng (全店舗)</span>
+            </label>
+            <label style="display:flex; align-items:center; gap:8px; padding:8px 10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; cursor:pointer; font-weight:600;">
+              <input type="radio" name="set-filter-radio" value="in" onchange="setSettingsFilter('in')">
+              <span>🟢 Chỉ hiện có hàng (在庫ありのみ)</span>
+            </label>
+            <label style="display:flex; align-items:center; gap:8px; padding:8px 10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; cursor:pointer; font-weight:600;">
+              <input type="radio" name="set-filter-radio" value="onsite" onchange="setSettingsFilter('onsite')">
+              <span>📸 Có hàng tại chỗ / 現地確認済</span>
+            </label>
+            <label style="display:flex; align-items:center; gap:8px; padding:8px 10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; cursor:pointer; font-weight:600;">
+              <input type="radio" name="set-filter-radio" value="hidenone" onchange="setSettingsFilter('hidenone')">
+              <span>⚪ Ẩn cửa hàng không có thông tin (扱無を非表示)</span>
+            </label>
+          </div>
         </div>
-        <div style="background:#f8fafc;padding:10px;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:10px;">
-          <label style="display:flex;align-items:center;gap:6px;font-weight:700;cursor:pointer;">
-            <input type="checkbox" id="set-tg-check" onchange="updateSettings('telegramEnabled', this.checked)">
-            <span>✈️ Telegram通知を有効にする</span>
-          </label>
+
+        <!-- Area / Prefecture Selection -->
+        <div style="margin-bottom:14px;">
+          <div style="font-weight:800; font-size:0.85rem; color:#1e293b; margin-bottom:6px;">🗾 Khu vực tỉnh thành / エリア</div>
+          <button onclick="closeSettingsModal(); openPrefModal();" style="width:100%; display:flex; justify-content:space-between; align-items:center; padding:9px 12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; font-weight:700; color:#334155; cursor:pointer;">
+            <span>📍 Khu vực đang chọn: <b id="settings-current-pref" style="color:#4f46e5;">大阪府</b></span>
+            <span>Thay đổi ❯</span>
+          </button>
         </div>
-        <div style="background:#f8fafc;padding:10px;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:12px;">
-          <label style="display:flex;align-items:center;gap:6px;font-weight:700;cursor:pointer;">
-            <input type="checkbox" id="set-sound-check" onchange="updateSettings('soundEnabled', this.checked)" checked>
-            <span>🔊 音声アラート (新着通知音)</span>
-          </label>
+
+        <!-- Telegram & Notifications -->
+        <div style="margin-bottom:14px;">
+          <div style="font-weight:800; font-size:0.85rem; color:#1e293b; margin-bottom:4px;">🔔 Thông báo / 通知連携</div>
+          <div style="font-size:0.73rem;color:#64748b;margin-bottom:8px;">Tự động thông báo khi có báo cáo có hàng.</div>
+
+          <div style="background:#f8fafc;padding:10px;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:8px;">
+            <label style="display:flex;align-items:center;gap:8px;font-weight:700;cursor:pointer;">
+              <input type="checkbox" id="set-tg-check" onchange="updateSettings('telegramEnabled', this.checked)">
+              <span>✈️ Bật thông báo Telegram (Telegram通知)</span>
+            </label>
+          </div>
+          <div style="background:#f8fafc;padding:10px;border-radius:8px;border:1px solid #e2e8f0;">
+            <label style="display:flex;align-items:center;gap:8px;font-weight:700;cursor:pointer;">
+              <input type="checkbox" id="set-sound-check" onchange="updateSettings('soundEnabled', this.checked)" checked>
+              <span>🔊 Âm thanh thông báo (音声アラート)</span>
+            </label>
+          </div>
         </div>
-        <button onclick="refreshData(); closeSettingsModal();" style="width:100%;padding:10px;background:#4f46e5;color:white;border:none;border-radius:8px;font-weight:800;font-size:0.82rem;cursor:pointer;">
-          🔄 データを最新に更新
+
+        <!-- Refresh Button -->
+        <button onclick="refreshData(); closeSettingsModal();" style="width:100%;padding:11px;background:#4f46e5;color:white;border:none;border-radius:8px;font-weight:800;font-size:0.84rem;cursor:pointer;box-shadow:0 2px 6px rgba(79,70,229,0.3);">
+          🔄 Cập nhật dữ liệu mới nhất (データ更新)
         </button>
       </div>
     </div>
@@ -1791,8 +1863,87 @@ def index():
     }
     window.selectPrefecture = selectPrefecture;
 
-    // 13. SETTINGS MODAL
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/[&<>"']/g, function(m) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
+      });
+    }
+
+    // 13. BULLETIN MODAL (💬 掲示板)
+    function openBulletinModal() {
+      const container = document.getElementById('bulletin-list');
+      const allStores = Object.values(storesDict);
+      const effectiveStatus = Object.assign({}, coldStatus, hotStatus);
+      
+      const inStockList = allStores.filter(s => {
+        if (currentPref !== 'all' && s.pref !== currentPref) return false;
+        const info = decodeStatus(effectiveStatus[s.id]);
+        return info.code === 'i';
+      });
+
+      if (inStockList.length === 0) {
+        container.innerHTML = `
+          <div style="text-align:center; padding:32px 12px; color:#64748b;">
+            <div style="font-size:2.2rem; margin-bottom:8px;">📭</div>
+            <div style="font-weight:700; color:#334155; font-size:0.9rem;">現在、選択エリアに入荷速報はありません</div>
+            <div style="font-size:0.75rem; margin-top:4px;">Telegramやユーザーからの新着情報を受信するとここに表示されます。</div>
+            <button onclick="refreshData();" style="margin-top:16px; padding:8px 18px; background:#4f46e5; color:white; border:none; border-radius:8px; font-weight:700; cursor:pointer;">
+              🔄 最新データを再読込
+            </button>
+          </div>
+        `;
+      } else {
+        const prefName = document.getElementById('header-loc-name') ? document.getElementById('header-loc-name').innerText : 'エリア';
+        container.innerHTML = `
+          <div style="margin-bottom:12px; font-size:0.75rem; color:#64748b; font-weight:700;">
+            🔔 ${prefName} の入荷速報 (${inStockList.length}店舗)
+          </div>
+        ` + inStockList.map(s => {
+          const info = decodeStatus(effectiveStatus[s.id]);
+          const packs = (info.packs && info.packs.length > 0) ? info.packs.join(', ') : 'ポケモンカード';
+          const safeName = escapeHtml(s.name);
+          const safePacks = escapeHtml(packs);
+          const safeAddr = escapeHtml(s.address || '');
+          const time = info.timeAgo ? escapeHtml(info.timeAgo) : '新着';
+          return `
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:12px; margin-bottom:10px; cursor:pointer; transition:transform 0.1s;"
+                 onclick="closeBulletinModal(); focusStoreFromList('${s.id}');">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+                <b style="font-size:0.85rem; color:#1e293b;">${safeName}</b>
+                <span class="badge-in" style="flex-shrink:0;">🟢 在庫あり</span>
+              </div>
+              <div style="font-size:0.75rem; color:#475569; margin-top:4px;">📦 ${safePacks}</div>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; font-size:0.7rem; color:#94a3b8;">
+                <span>📍 ${safeAddr}</span>
+                <span style="color:#4f46e5; font-weight:700;">🕒 ${time} (地図で見る →)</span>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+      document.getElementById('bulletin-modal').classList.add('open');
+    }
+    window.openBulletinModal = openBulletinModal;
+
+    function closeBulletinModal() {
+      document.getElementById('bulletin-modal').classList.remove('open');
+    }
+    window.closeBulletinModal = closeBulletinModal;
+
+    // 14. SETTINGS MODAL (⚙️ 設定 & カスタマイズ)
     function openSettingsModal() {
+      const radios = document.getElementsByName('set-filter-radio');
+      if (radios) {
+        radios.forEach(r => {
+          r.checked = (r.value === activeFilter);
+        });
+      }
+      const prefLabelEl = document.getElementById('header-loc-name');
+      const setPrefEl = document.getElementById('settings-current-pref');
+      if (prefLabelEl && setPrefEl) {
+        setPrefEl.innerText = prefLabelEl.innerText;
+      }
       document.getElementById('settings-modal').classList.add('open');
     }
     window.openSettingsModal = openSettingsModal;
@@ -1801,6 +1952,17 @@ def index():
       document.getElementById('settings-modal').classList.remove('open');
     }
     window.closeSettingsModal = closeSettingsModal;
+
+    function setSettingsFilter(filterName) {
+      activeFilter = filterName;
+      document.querySelectorAll('.poketan-chip').forEach(b => b.classList.remove('active'));
+      if (activeFilter !== 'none') {
+        const btn = document.getElementById(`chip-${activeFilter}`);
+        if (btn) btn.classList.add('active');
+      }
+      renderMapMarkers();
+    }
+    window.setSettingsFilter = setSettingsFilter;
 
     function openSearchModal() {
       switchFooterTab('list');
