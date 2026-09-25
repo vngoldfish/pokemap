@@ -60,10 +60,13 @@ DEFAULT_SETTINGS = {
         "maxReportAgeHours": 24.0,    # Độ mới tin báo (giờ, 24h mặc định)
         "onlyOnsiteGps": False,       # Chỉ thông báo tin có GPS tại quán
         "discordWebhookUrl": "",      # Webhook URL của kênh Discord
-        "discordEnabled": False,      # Bật gửi Discord khi có hàng
         "telegramBotToken": "",       # Token bot Telegram (từ @BotFather)
         "telegramChatId": "",         # ID chat hoặc nhóm Telegram
         "telegramEnabled": False,     # Bật gửi Telegram khi có hàng
+        "telegramStatus": "in",       # 'in' (chỉ có hàng), 'onsite' (tại quán), 'recent', 'all'
+        "telegramChain": "all",       # 'all', 'conbini', 'seven', ...
+        "telegramTime": "24",         # '1', '3', '6', '24', 'all'
+        "telegramRegion": "all",      # 'all', 'osaka', 'tokyo', 'nagoya'
         "notifyPrefs": ["osaka", "aichi", "kanagawa", "gifu", "mie"]  # Các tỉnh nhận thông báo
     },
 
@@ -285,38 +288,51 @@ async def send_webhook_notification(request: Request):
         if not tg_enabled:
             return JSONResponse(content={"status": "disabled", "reason": "telegram notifications disabled in settings"})
 
-        # 2. Region Check (must match user's current selected region in settings)
-        current_region = user_settings.get("currentRegion") or "osaka"
-        allowed_prefs = REGION_PREFS.get(current_region, ["osaka"])
-        if current_region == "all":
-            allowed_prefs = ALL_PREFS
-        
-        store_pref = (store.get("pref") or "").lower()
-        if not is_test and store_pref and store_pref not in allowed_prefs:
-            return JSONResponse(content={"status": "filtered", "reason": f"pref '{store_pref}' not in current region '{current_region}'"})
+        # 2. Telegram Region Check
+        tg_region = notif_cfg.get("telegramRegion", "all")
+        if not is_test and tg_region != "all":
+            allowed_prefs = REGION_PREFS.get(tg_region, ["osaka"])
+            store_pref = (store.get("pref") or "").lower()
+            if store_pref and store_pref not in allowed_prefs:
+                return JSONResponse(content={"status": "filtered", "reason": f"pref '{store_pref}' not in telegram region '{tg_region}'"})
 
-        # 3. Status Filter Check (e.g. only in-stock or onsite)
+        # 3. Telegram Status Filter Check
         status_code = info.get("status_code") or info.get("code") or "i"
-        active_filter = user_settings.get("activeFilter") or "all"
+        tg_status = notif_cfg.get("telegramStatus", "in")
         if not is_test:
-            if active_filter == "in" and status_code != "i":
-                return JSONResponse(content={"status": "filtered", "reason": f"status '{status_code}' does not match active filter '{active_filter}'"})
-            if active_filter == "onsite" and (status_code != "i" or not info.get("onsite")):
+            if tg_status == "in" and status_code != "i":
+                return JSONResponse(content={"status": "filtered", "reason": f"status '{status_code}' does not match telegramStatus '{tg_status}'"})
+            if tg_status == "onsite" and (status_code != "i" or not info.get("onsite")):
                 return JSONResponse(content={"status": "filtered", "reason": "not onsite in-stock"})
+            if tg_status == "recent" and (status_code != "i" and not (info.get("timestamp", 0) > 0 and status_code != "n")):
+                return JSONResponse(content={"status": "filtered", "reason": "not recent or in-stock"})
 
-        # 4. Time Window Check (e.g. within 1 hour, 3 hours...)
-        active_time = user_settings.get("activeTime") or "all"
-        if not is_test and active_time != "all":
+        # 4. Telegram Chain Filter Check
+        tg_chain = notif_cfg.get("telegramChain", "all")
+        store_chain = (store.get("chain") or "").lower()
+        if not is_test and tg_chain != "all":
+            if tg_chain == "conbini" and store_chain not in ["seven", "lawson", "familymart", "ministop"]:
+                return JSONResponse(content={"status": "filtered", "reason": f"chain '{store_chain}' not in conbini"})
+            elif tg_chain == "specialty" and store_chain != "specialty":
+                return JSONResponse(content={"status": "filtered", "reason": f"chain '{store_chain}' not specialty"})
+            elif tg_chain == "electronics" and store_chain not in ['geo', 'joshin', 'edion', 'aeon', 'yamada', 'ks', 'toysrus', 'biccamera', 'yodobashi']:
+                return JSONResponse(content={"status": "filtered", "reason": f"chain '{store_chain}' not electronics"})
+            elif tg_chain not in ["conbini", "specialty", "electronics"] and store_chain != tg_chain:
+                return JSONResponse(content={"status": "filtered", "reason": f"chain '{store_chain}' does not match '{tg_chain}'"})
+
+        # 5. Telegram Time Window Check
+        tg_time = notif_cfg.get("telegramTime", "24")
+        if not is_test and tg_time != "all":
             try:
-                max_seconds = int(active_time) * 3600
+                max_seconds = int(tg_time) * 3600
                 cur_now = time.time()
                 rep_ts = info.get("timestamp") or 0
                 if rep_ts > 0 and (cur_now - rep_ts > max_seconds):
-                    return JSONResponse(content={"status": "filtered", "reason": f"report age exceeds {active_time}h"})
+                    return JSONResponse(content={"status": "filtered", "reason": f"report age exceeds {tg_time}h"})
             except Exception:
                 pass
 
-        # 5. Deduplication: do not spam the exact same report within 2 hours
+        # 6. Deduplication: do not spam the exact same report within 2 hours
         global _recent_notified_keys
         now_t = time.time()
         report_key = f"{store.get('id')}_{info.get('timestamp') or int(now_t // 300)}"
@@ -326,7 +342,7 @@ async def send_webhook_notification(request: Request):
             _recent_notified_keys[report_key] = now_t
             _recent_notified_keys = {k: v for k, v in _recent_notified_keys.items() if now_t - v < 7200}
 
-        # 6. Send notification
+        # 7. Send notification
         tg_res = send_telegram_alert(store, info, notif_cfg, is_test=is_test)
         results["telegram"] = tg_res.get("status", "error")
 
@@ -336,7 +352,7 @@ async def send_webhook_notification(request: Request):
 
 
 def telegram_background_watcher():
-    """Background thread to poll Firestore for new in-stock reports matching user settings and send Telegram alerts."""
+    """Background thread to poll Firestore for new in-stock reports matching Telegram filter settings and send alerts."""
     import time
     time.sleep(8)
     print("  [TelegramDaemon] Background stock monitor daemon started (polling every 35s)")
@@ -354,14 +370,15 @@ def telegram_background_watcher():
                 time.sleep(30)
                 continue
             
-            current_reg = settings.get("currentRegion") or "osaka"
-            target_prefs = REGION_PREFS.get(current_reg, ["osaka"])
-            if current_reg == "all":
+            tg_reg = notif_cfg.get("telegramRegion", "all")
+            target_prefs = REGION_PREFS.get(tg_reg, ALL_PREFS)
+            if tg_reg == "all":
                 target_prefs = ALL_PREFS
             
-            active_filt = settings.get("activeFilter") or "all"
-            active_tm = settings.get("activeTime") or "all"
-            max_age_sec = int(active_tm) * 3600 if active_tm != "all" else 3600 * 24
+            tg_status = notif_cfg.get("telegramStatus", "in")
+            tg_chain = notif_cfg.get("telegramChain", "all")
+            tg_time = notif_cfg.get("telegramTime", "24")
+            max_age_sec = int(tg_time) * 3600 if tg_time != "all" else 3600 * 24
 
             now_sec = time.time()
             for pref in target_prefs:
@@ -370,20 +387,36 @@ def telegram_background_watcher():
                     pref_stores = get_stores_by_pref(pref)
                     for sid, raw in hot_data.items():
                         parsed = parse_store_status(str(raw))
-                        if parsed and parsed.get("status_code") == "i":
-                            ts = parsed.get("timestamp") or 0
-                            if ts > 0 and (now_sec - ts > max_age_sec):
+                        if not parsed:
+                            continue
+                        code = parsed.get("status_code")
+                        if tg_status == "in" and code != "i":
+                            continue
+                        if tg_status == "onsite" and (code != "i" or not parsed.get("onsite")):
+                            continue
+                        
+                        ts = parsed.get("timestamp") or 0
+                        if ts > 0 and (now_sec - ts > max_age_sec):
+                            continue
+
+                        st = pref_stores.get(sid) or {"id": sid, "name": sid, "pref": pref}
+                        st["pref"] = pref
+                        st_chain = (st.get("chain") or "").lower()
+                        if tg_chain != "all":
+                            if tg_chain == "conbini" and st_chain not in ["seven", "lawson", "familymart", "ministop"]:
                                 continue
-                            if active_filt == "onsite" and not parsed.get("onsite"):
+                            elif tg_chain == "specialty" and st_chain != "specialty":
+                                continue
+                            elif tg_chain == "electronics" and st_chain not in ['geo', 'joshin', 'edion', 'aeon', 'yamada', 'ks', 'toysrus', 'biccamera', 'yodobashi']:
+                                continue
+                            elif tg_chain not in ["conbini", "specialty", "electronics"] and st_chain != tg_chain:
                                 continue
 
-                            report_key = f"{sid}_{ts}"
-                            if report_key not in _recent_notified_keys:
-                                _recent_notified_keys[report_key] = now_sec
-                                st = pref_stores.get(sid) or {"id": sid, "name": sid, "pref": pref}
-                                st["pref"] = pref
-                                print(f"  [TelegramDaemon] Auto-dispatching Telegram alert for {st.get('name')}")
-                                send_telegram_alert(st, parsed, notif_cfg, is_test=False)
+                        report_key = f"{sid}_{ts}"
+                        if report_key not in _recent_notified_keys:
+                            _recent_notified_keys[report_key] = now_sec
+                            print(f"  [TelegramDaemon] Auto-dispatching Telegram alert for {st.get('name')}")
+                            send_telegram_alert(st, parsed, notif_cfg, is_test=False)
                 except Exception:
                     pass
         except Exception:
@@ -530,8 +563,14 @@ def get_config():
         "packCodes": PACK_CODES,
         "telegramEnabled": bool(notif.get("telegramEnabled", False)),
         "soundEnabled": bool(notif.get("soundEnabled", True)),
+        "telegramBotToken": notif.get("telegramBotToken", ""),
+        "telegramChatId": notif.get("telegramChatId", ""),
         "telegramBotTokenSet": bool(notif.get("telegramBotToken")),
         "telegramChatIdSet": bool(notif.get("telegramChatId")),
+        "telegramStatus": notif.get("telegramStatus", "in"),
+        "telegramChain": notif.get("telegramChain", "all"),
+        "telegramTime": str(notif.get("telegramTime", "24")),
+        "telegramRegion": notif.get("telegramRegion", "all"),
         "currentRegion": user_settings.get("currentRegion", "osaka"),
         "activeFilter": user_settings.get("activeFilter", "all"),
         "activeTime": user_settings.get("activeTime", "all")
@@ -1801,10 +1840,15 @@ def index():
       </div>
     </div>
 
-    <!-- Right Hamburger Menu Button -->
-    <button class="header-menu-btn" onclick="openSettingsModal()" title="メニュー">
-      ☰
-    </button>
+    <!-- Right Button Group -->
+    <div style="display:flex; align-items:center; gap:6px;">
+      <button class="header-menu-btn" onclick="openTelegramModal()" title="Cấu hình Telegram & Bộ lọc cảnh báo" style="background:#0284c7; color:#ffffff; font-size:0.95rem; border:none; display:flex; align-items:center; justify-content:center; box-shadow:0 1px 3px rgba(2,132,199,0.3); border-radius:8px; width:34px; height:34px; cursor:pointer;">
+        ✈️
+      </button>
+      <button class="header-menu-btn" onclick="openSettingsModal()" title="Cài đặt hệ thống">
+        ☰
+      </button>
+    </div>
   </header>
 
   <!-- 2. FLOATING SUB-HEADER FILTER BAR (Bản đồ: Chỉ Trạng thái hàng hóa & Chuỗi cửa hàng) -->
@@ -1889,8 +1933,8 @@ def index():
         <span id="list-active-settings-text" style="color:#2563eb; font-weight:700;">Osaka • Tất cả • Toàn thời gian</span>
       </div>
       <div style="display:flex; align-items:center; gap:6px;">
-        <span id="list-tg-status-tag" style="font-size:0.65rem; background:#dcfce7; color:#15803d; font-weight:800; padding:2px 7px; border-radius:6px;">✈️ Telegram: BẬT</span>
-        <button type="button" onclick="openFilterModal()" style="background:#0f172a; border:none; border-radius:4px; font-size:0.68rem; font-weight:700; color:#ffffff; padding:2px 7px; cursor:pointer;">⚙️ Tùy chỉnh</button>
+        <span id="list-tg-status-tag" onclick="openTelegramModal()" style="font-size:0.65rem; background:#dcfce7; color:#15803d; font-weight:800; padding:2px 7px; border-radius:6px; cursor:pointer;" title="Bấm để mở cài đặt Telegram">✈️ Telegram: BẬT</span>
+        <button type="button" onclick="openTelegramModal()" style="background:#0284c7; border:none; border-radius:4px; font-size:0.68rem; font-weight:700; color:#ffffff; padding:2px 8px; cursor:pointer;">✈️ Cấu hình Telegram</button>
       </div>
     </div>
 
@@ -2144,6 +2188,136 @@ def index():
     </div>
   </div>
 
+  <!-- 5.6 TELEGRAM NOTIFICATION & ALERT CONFIGURATION MODAL -->
+  <div id="telegram-modal" class="modal-overlay" onclick="if(event.target===this) closeTelegramModal()">
+    <div class="modal-card" style="max-height:88vh; max-height:88dvh; max-width:480px;">
+      <div class="modal-header" style="background:#0284c7; color:#ffffff;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:1.25rem;">✈️</span>
+          <h3 style="font-weight:800; font-size:1.02rem; color:#ffffff; margin:0;">Cấu hình Telegram & Bộ lọc cảnh báo</h3>
+        </div>
+        <button class="modal-close-btn" style="color:#ffffff;" onclick="closeTelegramModal()">✕</button>
+      </div>
+
+      <div class="modal-body" style="padding:14px 16px; overflow-y:auto; display:flex; flex-direction:column; gap:16px;">
+        <!-- SECTION 1: BẬT / TẮT & KẾT NỐI BOT -->
+        <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:10px; padding:12px;">
+          <label style="display:flex; align-items:center; gap:10px; font-weight:800; font-size:0.86rem; color:#0369a1; cursor:pointer;">
+            <input type="checkbox" id="tg-cfg-enabled" style="width:18px; height:18px; accent-color:#0284c7;" onchange="onTelegramToggleChanged(this.checked)">
+            <span>✈️ Bật gửi thông báo tới Telegram (Telegram通知)</span>
+          </label>
+          <div style="font-size:0.72rem; color:#64748b; margin-top:4px;">Khi bật, bot sẽ tự động gửi tin nhắn báo có hàng theo đúng bộ lọc riêng bên dưới.</div>
+        </div>
+
+        <!-- Credentials Input -->
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <div>
+            <label style="font-weight:800; font-size:0.78rem; color:#0f172a; display:block; margin-bottom:4px;">
+              🔑 Telegram Bot Token:
+            </label>
+            <input type="text" id="tg-cfg-token" placeholder="Ví dụ: 123456789:ABCdefGHIjklMNOpqrs..." style="width:100%; box-sizing:border-box; padding:9px 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:0.8rem; font-family:monospace; outline:none;">
+            <div style="font-size:0.68rem; color:#64748b; margin-top:3px;">
+              Nhắn tin với <b style="color:#0284c7;">@BotFather</b> trên Telegram để tạo Bot và lấy Token.
+            </div>
+          </div>
+
+          <div>
+            <label style="font-weight:800; font-size:0.78rem; color:#0f172a; display:block; margin-bottom:4px;">
+              💬 Telegram Chat ID:
+            </label>
+            <input type="text" id="tg-cfg-chatid" placeholder="Ví dụ: 987654321 hoặc -100123456789..." style="width:100%; box-sizing:border-box; padding:9px 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:0.8rem; font-family:monospace; outline:none;">
+            <div style="font-size:0.68rem; color:#64748b; margin-top:3px;">
+              Nhắn tin với <b style="color:#0284c7;">@userinfobot</b> trên Telegram để lấy ID của bạn, hoặc ID nhóm/kênh.
+            </div>
+          </div>
+
+          <!-- Test Button -->
+          <div style="margin-top:4px;">
+            <button type="button" id="btn-modal-test-tg" onclick="testTelegramInModal()" style="width:100%; padding:9px 12px; background:#0284c7; color:white; border:none; border-radius:8px; font-weight:800; font-size:0.78rem; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;">
+              <span>🧪 Gửi tin nhắn thử nghiệm (Test Bot)</span>
+            </button>
+            <div id="modal-test-tg-result" style="display:none; font-size:0.72rem; margin-top:6px; padding:7px 10px; border-radius:6px;"></div>
+          </div>
+        </div>
+
+        <hr style="border:none; border-top:1px dashed #e2e8f0; margin:2px 0;">
+
+        <!-- SECTION 2: BỘ LỌC THÔNG BÁO RIÊNG CỦA TELEGRAM -->
+        <div style="font-weight:800; font-size:0.85rem; color:#0f172a; display:flex; align-items:center; gap:6px;">
+          <span>⚙️</span>
+          <span>Bộ lọc nhận tin riêng của Telegram</span>
+        </div>
+
+        <!-- 1. Trạng thái hàng hóa Telegram -->
+        <div>
+          <label style="font-weight:700; font-size:0.78rem; color:#334155; display:block; margin-bottom:4px;">
+            📊 1. Trạng thái hàng hóa nhận tin:
+          </label>
+          <select id="tg-cfg-status" style="width:100%; padding:9px 12px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; font-weight:700; color:#1e293b; font-size:0.8rem; outline:none;">
+            <option value="in">🟢 Chỉ gửi khi có hàng (Đang có hàng) - Khuyên dùng</option>
+            <option value="onsite">📸 Chỉ gửi khi có hàng tại quán (GPS / 現地確認)</option>
+            <option value="recent">★ Gửi cả tin từng có hàng gần đây</option>
+            <option value="all">🌐 Gửi tất cả báo cáo (Có hàng & Hết hàng)</option>
+          </select>
+        </div>
+
+        <!-- 2. Chuỗi cửa hàng & Thương hiệu Telegram -->
+        <div>
+          <label style="font-weight:700; font-size:0.78rem; color:#334155; display:block; margin-bottom:4px;">
+            🏢 2. Chuỗi cửa hàng & Thương hiệu nhận tin:
+          </label>
+          <select id="tg-cfg-chain" style="width:100%; padding:9px 12px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; font-weight:700; color:#1e293b; font-size:0.8rem; outline:none;">
+            <option value="all">🏢 Tất cả chuỗi cửa hàng</option>
+            <option value="conbini">🏪 Tất cả Conbini (7-Eleven, Lawson, FamilyMart, Ministop)</option>
+            <option value="seven">🏪 7-Eleven</option>
+            <option value="lawson">🏪 Lawson</option>
+            <option value="familymart">🏪 FamilyMart</option>
+            <option value="ministop">🏪 Ministop</option>
+            <option value="specialty">🃏 Card Shop chuyên biệt</option>
+            <option value="electronics">🎮 Điện máy, GEO, Tsutaya</option>
+          </select>
+        </div>
+
+        <!-- 3. Độ mới tin báo Telegram -->
+        <div>
+          <label style="font-weight:700; font-size:0.78rem; color:#334155; display:block; margin-bottom:4px;">
+            ⏱️ 3. Thời gian / Độ mới tin báo:
+          </label>
+          <select id="tg-cfg-time" style="width:100%; padding:9px 12px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; font-weight:700; color:#1e293b; font-size:0.8rem; outline:none;">
+            <option value="1">⚡ Trong 1 giờ qua (Báo cáo tức thì)</option>
+            <option value="3">⏱️ Trong 3 giờ qua</option>
+            <option value="6">⏱️ Trong 6 giờ qua</option>
+            <option value="24">⏱️ Trong 24 giờ qua (Mặc định)</option>
+            <option value="all">⏱️ Toàn bộ thời gian</option>
+          </select>
+        </div>
+
+        <!-- 4. Khu vực nhận tin Telegram -->
+        <div>
+          <label style="font-weight:700; font-size:0.78rem; color:#334155; display:block; margin-bottom:4px;">
+            📍 4. Khu vực nhận tin (Vùng dữ liệu):
+          </label>
+          <select id="tg-cfg-region" style="width:100%; padding:9px 12px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; font-weight:700; color:#1e293b; font-size:0.8rem; outline:none;">
+            <option value="all">🌐 Toàn bộ 3 vùng / Toàn quốc (~12.000 quán)</option>
+            <option value="osaka">🔵 大阪・関西 (Osaka & Lân cận)</option>
+            <option value="tokyo">🟣 東京・神奈川 (Tokyo & Lân cận)</option>
+            <option value="nagoya">🟢 名古屋・東海 (Nagoya & Lân cận)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- MODAL FOOTER BUTTONS -->
+      <div style="padding:12px 16px; border-top:1px solid #f1f5f9; background:#f8fafc; display:flex; gap:10px; align-items:center;">
+        <button type="button" class="btn-reset-filter" onclick="closeTelegramModal()">
+          Đóng
+        </button>
+        <button type="button" class="btn-apply-filter" onclick="saveTelegramSettings()" style="background:#0284c7; border-color:#0284c7;">
+          💾 Lưu cấu hình Telegram
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- 6. PREFECTURE & AREA SELECTION MODAL (Exact PokéTan Replica) -->
   <div id="pref-modal" class="modal-overlay" onclick="if(event.target===this) closePrefModal()">
     <div class="modal-card">
@@ -2353,25 +2527,22 @@ def index():
             <span>🔔 Thông báo Telegram &amp; Âm thanh</span>
             <span id="set-tg-status-pill" style="font-size:0.65rem; background:#dcfce7; color:#15803d; font-weight:800; padding:2px 7px; border-radius:6px;">✈️ Đang bật</span>
           </div>
-          <div style="font-size:0.72rem; color:#64748b; margin-bottom:8px;">Báo cáo gửi tới Telegram sẽ tuân thủ đúng Vùng dữ liệu, Trạng thái và Thời gian bạn chọn ở trên.</div>
+          <div style="font-size:0.72rem; color:#64748b; margin-bottom:8px;">Cài đặt Token Bot, Chat ID và bộ lọc riêng (Trạng thái, Chuỗi, Thời gian, Vùng) cho Telegram.</div>
 
-          <div style="background:#f8fafc; padding:10px; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:8px;">
-            <label style="display:flex; align-items:center; gap:8px; font-weight:700; cursor:pointer;">
-              <input type="checkbox" id="set-tg-check" onchange="toggleTelegramNotification(this.checked)">
-              <span>✈️ Bật gửi báo cáo tới Telegram (Telegram通知)</span>
-            </label>
-          </div>
+          <button type="button" onclick="closeSettingsModal(); openTelegramModal();" style="width:100%; padding:10px 14px; background:#0284c7; color:white; border:none; border-radius:8px; font-weight:800; font-size:0.82rem; cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:6px; box-shadow:0 2px 6px rgba(2,132,199,0.25); margin-bottom:8px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span>✈️</span>
+              <span>Cấu hình Telegram &amp; Bộ lọc cảnh báo</span>
+            </div>
+            <span>Mở cài đặt ❯</span>
+          </button>
+
           <div style="background:#f8fafc; padding:10px; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:8px;">
             <label style="display:flex; align-items:center; gap:8px; font-weight:700; cursor:pointer;">
               <input type="checkbox" id="set-sound-check" onchange="updateSettings('soundEnabled', this.checked)" checked>
-              <span>🔊 Âm thanh thông báo (音声アラート)</span>
+              <span>🔊 Âm thanh thông báo trên web (音声アラート)</span>
             </label>
           </div>
-
-          <button type="button" id="btn-test-tg" onclick="sendTestTelegramNotification()" style="width:100%; padding:9px 12px; background:#0284c7; color:white; border:none; border-radius:8px; font-weight:800; font-size:0.78rem; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; box-shadow:0 2px 6px rgba(2,132,199,0.25);">
-            <span>🧪 Gửi thông báo thử nghiệm tới Telegram</span>
-          </button>
-          <div id="test-tg-result" style="display:none; font-size:0.72rem; margin-top:6px; padding:7px 10px; border-radius:6px;"></div>
         </div>
 
         <!-- Refresh Button -->
@@ -2881,12 +3052,10 @@ def index():
         const raw = effectiveStatus[sid] || effectiveStatus[sid + '_c'];
         const info = decodeStatus(raw);
 
-        // Find the newest in-stock report (prioritizing the currently selected area)
+        // Find the newest in-stock report
         if (info.code === 'i') {
-          const targetPrefs = REGIONS[currentRegion] ? REGIONS[currentRegion].prefs : ['osaka'];
-          const isPrefMatch = (currentRegion === 'all' || targetPrefs.includes(store.pref) || store.pref === currentPref);
           const ts = info.timestamp || 0;
-          if (isPrefMatch && ts > maxTimestamp) {
+          if (ts > maxTimestamp) {
             maxTimestamp = ts;
             newestInStore = store;
             newestInfo = info;
@@ -3374,7 +3543,6 @@ def index():
     window.switchFooterTab = switchFooterTab;
 
     let listOnlyInStock = false;
-    let listSortMode = 'newest'; // 'newest' | 'nearest'
 
     function setListSortMode(mode) {
       listSortMode = mode;
@@ -3462,12 +3630,12 @@ def index():
           timeName = (listTimeFilter === '72') ? '3 ngày qua' : `${listTimeFilter}h qua`;
         }
 
-        let radiusName = 'Toàn vùng';
+        let radiusName = 'Không giới hạn bán kính';
         if (listRadiusFilter && listRadiusFilter !== 'all') {
           radiusName = `Bán kính ${listRadiusFilter}km`;
         }
 
-        bannerTextEl.innerText = `${regName} • ${statusName} • ${chainName} • ${timeName} • ${radiusName}`;
+        bannerTextEl.innerText = `${statusName} • ${chainName} • ${timeName} • ${radiusName}`;
       }
 
       const tgTag = document.getElementById('list-tg-status-tag');
@@ -3479,9 +3647,7 @@ def index():
       }
 
       let matched = [];
-      const listTargetPrefs = REGIONS[currentRegion] ? REGIONS[currentRegion].prefs : ['osaka'];
       for (const store of allStores) {
-        if (currentRegion !== 'all' && !listTargetPrefs.includes(store.pref) && store.pref !== currentPref) continue;
         const info = decodeStatus(effectiveStatus[store.id] || effectiveStatus[store.id + '_c']);
 
         // 1. Trạng thái hàng hóa (List Status Tab / Modal Filter)
@@ -3710,74 +3876,45 @@ def index():
         if (headerLoc) {
           headerLoc.innerText = (regObj.id === 'all') ? '全エリア' : `${regObj.defaultCity}周辺`;
         }
-      }
-
-      showRegionToast(`Đang tải dữ liệu ${regObj.name}...`, '⏳');
-      isRegionLoading = true;
-
-      try {
-        const [storesRes, hotRes, coldRes] = await Promise.all([
-          fetch(`/api/stores_data?region=${regionId}`),
-          fetch(`/api/hot_status?region=${regionId}`).catch(() => null),
-          fetch(`/api/cold_status?region=${regionId}`).catch(() => null)
-        ]);
-
-        if (storesRes && storesRes.ok) {
-          storesDict = await storesRes.json();
-          window.storesDict = storesDict;
-        }
-        if (hotRes && hotRes.ok) {
-          try { hotStatus = await hotRes.json(); } catch(e) {}
-        }
-        if (coldRes && coldRes.ok) {
-          try { coldStatus = await coldRes.json(); } catch(e) {}
-        }
-
-        // Fly map if requested
-        if (flyToRegion && regObj.center) {
+        if (regObj.center) {
           map.flyTo(regObj.center, regObj.zoom, { animate: true, duration: 1.0 });
         }
-
-        // Render markers on map
-        renderMapMarkers();
-
-        // If list view is open, refresh it
-        const listContainer = document.getElementById('view-list-container');
-        if (listContainer && listContainer.classList.contains('open')) {
-          renderStoreList();
-        }
-
-        // Prefetch report counts for this region
-        fetch(`/api/report_counts?region=${regionId}`).then(r => r.json()).then(data => {
-          if (data && typeof data === 'object') {
-            for (const [sid, c] of Object.entries(data)) {
-              storeCountsCache[sid] = { in: c.in, out: c.out, loaded: true };
-              const pIn = document.getElementById(`count-in-${sid}`);
-              const pOut = document.getElementById(`count-out-${sid}`);
-              if (pIn) pIn.innerText = c.in;
-              if (pOut) pOut.innerText = c.out;
-
-              const lIn = document.getElementById(`list-count-in-${sid}`);
-              const lOut = document.getElementById(`list-count-out-${sid}`);
-              if (lIn) lIn.innerText = c.in;
-              if (lOut) lOut.innerText = c.out;
-            }
-          }
-        }).catch(() => {});
-
-        // Reconnect realtime listeners for active region
-        setupRealtime();
-
-        const count = Object.keys(storesDict).length;
-        showRegionToast(`Đã nạp ${count} quán (${regObj.name})`, '⚡');
-        hideRegionToast(2000);
-      } catch (err) {
-        console.error('Error switching region:', err);
-        showRegionToast('Lỗi khi tải dữ liệu vùng', '⚠️');
-        hideRegionToast(2500);
-      } finally {
-        isRegionLoading = false;
       }
+
+      // If storesDict is not fully loaded, load all stores
+      if (!storesDict || Object.keys(storesDict).length === 0) {
+        showRegionToast(`Đang tải dữ liệu toàn quốc...`, '⏳');
+        isRegionLoading = true;
+        try {
+          const [storesRes, hotRes, coldRes] = await Promise.all([
+            fetch('/api/stores_data?region=all'),
+            fetch('/api/hot_status?region=all').catch(() => null),
+            fetch('/api/cold_status?region=all').catch(() => null)
+          ]);
+
+          if (storesRes && storesRes.ok) {
+            storesDict = await storesRes.json();
+            window.storesDict = storesDict;
+          }
+          if (hotRes && hotRes.ok) {
+            try { hotStatus = await hotRes.json(); } catch(e) {}
+          }
+          if (coldRes && coldRes.ok) {
+            try { coldStatus = await coldRes.json(); } catch(e) {}
+          }
+        } catch (err) {
+          console.error('Error loading data:', err);
+        } finally {
+          isRegionLoading = false;
+        }
+      }
+
+      // Render markers on map
+      renderMapMarkers();
+
+      const count = Object.keys(storesDict).length;
+      showRegionToast(`Đã chuyển tới ${regObj.name} (${count} quán)`, '⚡');
+      hideRegionToast(2000);
     }
     window.selectRegion = selectRegion;
 
@@ -3996,16 +4133,8 @@ def index():
         });
       }
 
-      // 4. Sync Telegram checkbox & status pill
-      const tgCheck = document.getElementById('set-tg-check');
-      const tgPill = document.getElementById('set-tg-status-pill');
-      const isTg = !!configData.telegramEnabled;
-      if (tgCheck) tgCheck.checked = isTg;
-      if (tgPill) {
-        tgPill.innerText = isTg ? '✈️ Đang bật' : '✈️ Đang tắt';
-        tgPill.style.background = isTg ? '#dcfce7' : '#fee2e2';
-        tgPill.style.color = isTg ? '#15803d' : '#b91c1c';
-      }
+      // 4. Sync Telegram UI badge
+      updateTelegramUIBadge();
 
       // 5. Sync Sound checkbox
       const soundCheck = document.getElementById('set-sound-check');
@@ -4020,10 +4149,6 @@ def index():
         setPrefEl.innerText = prefLabelEl.innerText;
       }
 
-      // Reset test result if previously open
-      const resEl = document.getElementById('test-tg-result');
-      if (resEl) resEl.style.display = 'none';
-
       document.getElementById('settings-modal').classList.add('open');
     }
     window.openSettingsModal = openSettingsModal;
@@ -4033,32 +4158,101 @@ def index():
     }
     window.closeSettingsModal = closeSettingsModal;
 
-    function toggleTelegramNotification(enabled) {
-      configData.telegramEnabled = enabled;
+    // TELEGRAM NOTIFICATION & CONFIGURATION MODAL HANDLERS
+    function updateTelegramUIBadge() {
+      const isTg = !!configData.telegramEnabled;
+      const tgTag = document.getElementById('list-tg-status-tag');
+      if (tgTag) {
+        tgTag.innerText = isTg ? '✈️ Telegram: BẬT' : '✈️ Telegram: TẮT';
+        tgTag.style.background = isTg ? '#dcfce7' : '#fee2e2';
+        tgTag.style.color = isTg ? '#15803d' : '#b91c1c';
+      }
       const tgPill = document.getElementById('set-tg-status-pill');
       if (tgPill) {
-        tgPill.innerText = enabled ? '✈️ Đang bật' : '✈️ Đang tắt';
-        tgPill.style.background = enabled ? '#dcfce7' : '#fee2e2';
-        tgPill.style.color = enabled ? '#15803d' : '#b91c1c';
+        tgPill.innerText = isTg ? '✈️ Đang bật' : '✈️ Đang tắt';
+        tgPill.style.background = isTg ? '#dcfce7' : '#fee2e2';
+        tgPill.style.color = isTg ? '#15803d' : '#b91c1c';
       }
-      updateSettings('telegramEnabled', enabled);
-      renderStoreList();
+      const tgEnabledCheck = document.getElementById('tg-cfg-enabled');
+      if (tgEnabledCheck) {
+        tgEnabledCheck.checked = isTg;
+      }
     }
-    window.toggleTelegramNotification = toggleTelegramNotification;
+    window.updateTelegramUIBadge = updateTelegramUIBadge;
 
-    async function sendTestTelegramNotification() {
-      const btn = document.getElementById('btn-test-tg');
-      const resEl = document.getElementById('test-tg-result');
+    function openTelegramModal() {
+      const tokenEl = document.getElementById('tg-cfg-token');
+      const chatIdEl = document.getElementById('tg-cfg-chatid');
+      const enabledEl = document.getElementById('tg-cfg-enabled');
+      const statusEl = document.getElementById('tg-cfg-status');
+      const chainEl = document.getElementById('tg-cfg-chain');
+      const timeEl = document.getElementById('tg-cfg-time');
+      const regionEl = document.getElementById('tg-cfg-region');
+      const resEl = document.getElementById('modal-test-tg-result');
+
+      if (tokenEl) tokenEl.value = configData.telegramBotToken || '';
+      if (chatIdEl) chatIdEl.value = configData.telegramChatId || '';
+      if (enabledEl) enabledEl.checked = !!configData.telegramEnabled;
+      if (statusEl) statusEl.value = configData.telegramStatus || 'in';
+      if (chainEl) chainEl.value = configData.telegramChain || 'all';
+      if (timeEl) timeEl.value = String(configData.telegramTime || '24');
+      if (regionEl) regionEl.value = configData.telegramRegion || 'all';
+      if (resEl) resEl.style.display = 'none';
+
+      document.getElementById('telegram-modal').classList.add('open');
+    }
+    window.openTelegramModal = openTelegramModal;
+
+    function closeTelegramModal() {
+      const modal = document.getElementById('telegram-modal');
+      if (modal) modal.classList.remove('open');
+    }
+    window.closeTelegramModal = closeTelegramModal;
+
+    function onTelegramToggleChanged(enabled) {
+      configData.telegramEnabled = enabled;
+      updateTelegramUIBadge();
+      updateSettings('telegramEnabled', enabled);
+    }
+    window.onTelegramToggleChanged = onTelegramToggleChanged;
+
+    async function testTelegramInModal() {
+      const btn = document.getElementById('btn-modal-test-tg');
+      const resEl = document.getElementById('modal-test-tg-result');
+      const token = (document.getElementById('tg-cfg-token') ? document.getElementById('tg-cfg-token').value : '').trim();
+      const chatId = (document.getElementById('tg-cfg-chatid') ? document.getElementById('tg-cfg-chatid').value : '').trim();
+
       if (!btn || !resEl) return;
 
+      if (!token || !chatId) {
+        resEl.style.display = 'block';
+        resEl.style.background = '#fef3c7';
+        resEl.style.color = '#92400e';
+        resEl.innerHTML = '⚠️ Vui lòng nhập cả <b>Telegram Bot Token</b> và <b>Telegram Chat ID</b> trước khi gửi thử.';
+        return;
+      }
+
       btn.disabled = true;
-      btn.innerHTML = '<span>⏳ Đang gửi thông báo thử nghiệm...</span>';
+      btn.innerHTML = '<span>⏳ Đang gửi tin nhắn thử nghiệm...</span>';
       resEl.style.display = 'block';
       resEl.style.background = '#f1f5f9';
       resEl.style.color = '#475569';
-      resEl.innerText = 'Đang kết nối tới Telegram bot...';
+      resEl.innerText = 'Đang kết nối tới Telegram API...';
 
       try {
+        await fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            notifications: {
+              telegramBotToken: token,
+              telegramChatId: chatId
+            }
+          })
+        });
+        configData.telegramBotToken = token;
+        configData.telegramChatId = chatId;
+
         const res = await fetch('/api/notify/webhook', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -4066,13 +4260,13 @@ def index():
             is_test: true,
             store: {
               id: 'test_store_webhook',
-              name: 'Pokémon Center Osaka DX (Thông báo thử nghiệm)',
+              name: 'Pokémon Center Osaka DX (Tin nhắn thử nghiệm)',
               chain: 'specialty',
               chain_label: 'Pokémon Center',
               address: 'Osaka, Chuo Ward, Shinsaibashisuji 1-7-1',
               lat: 34.6732,
               lng: 135.5008,
-              pref: currentPref || 'osaka'
+              pref: 'osaka'
             },
             info: {
               status_code: 'i',
@@ -4089,14 +4283,10 @@ def index():
           resEl.style.background = '#dcfce7';
           resEl.style.color = '#15803d';
           resEl.innerHTML = '✅ <b>Thành công!</b> Đã gửi tin nhắn test tới Telegram. Vui lòng kiểm tra app Telegram của bạn.';
-        } else if (data.status === 'disabled') {
-          resEl.style.background = '#fef3c7';
-          resEl.style.color = '#92400e';
-          resEl.innerHTML = '⚠️ Telegram đang bị TẮT trong cài đặt. Vui lòng tick chọn "Bật gửi báo cáo tới Telegram" ở trên.';
         } else {
           resEl.style.background = '#fee2e2';
           resEl.style.color = '#b91c1c';
-          resEl.innerHTML = `❌ <b>Lỗi:</b> ${data.error || data.reason || JSON.stringify(data)}`;
+          resEl.innerHTML = `❌ <b>Lỗi gửi tin:</b> ${data.error || data.reason || JSON.stringify(data)}`;
         }
       } catch (err) {
         resEl.style.background = '#fee2e2';
@@ -4104,18 +4294,69 @@ def index():
         resEl.innerHTML = `❌ <b>Không thể kết nối máy chủ:</b> ${err.message}`;
       } finally {
         btn.disabled = false;
-        btn.innerHTML = '<span>🧪 Gửi thông báo thử nghiệm tới Telegram</span>';
+        btn.innerHTML = '<span>🧪 Gửi tin nhắn thử nghiệm (Test Bot)</span>';
       }
+    }
+    window.testTelegramInModal = testTelegramInModal;
+
+    async function saveTelegramSettings() {
+      const token = (document.getElementById('tg-cfg-token') ? document.getElementById('tg-cfg-token').value : '').trim();
+      const chatId = (document.getElementById('tg-cfg-chatid') ? document.getElementById('tg-cfg-chatid').value : '').trim();
+      const enabled = document.getElementById('tg-cfg-enabled') ? document.getElementById('tg-cfg-enabled').checked : false;
+      const status = document.getElementById('tg-cfg-status') ? document.getElementById('tg-cfg-status').value : 'in';
+      const chain = document.getElementById('tg-cfg-chain') ? document.getElementById('tg-cfg-chain').value : 'all';
+      const time = document.getElementById('tg-cfg-time') ? document.getElementById('tg-cfg-time').value : '24';
+      const region = document.getElementById('tg-cfg-region') ? document.getElementById('tg-cfg-region').value : 'all';
+
+      configData.telegramBotToken = token;
+      configData.telegramChatId = chatId;
+      configData.telegramEnabled = enabled;
+      configData.telegramStatus = status;
+      configData.telegramChain = chain;
+      configData.telegramTime = time;
+      configData.telegramRegion = region;
+
+      try {
+        await fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            notifications: {
+              telegramBotToken: token,
+              telegramChatId: chatId,
+              telegramEnabled: enabled,
+              telegramStatus: status,
+              telegramChain: chain,
+              telegramTime: time,
+              telegramRegion: region
+            }
+          })
+        });
+        updateTelegramUIBadge();
+        closeTelegramModal();
+        alert('✅ Đã lưu cấu hình Telegram và bộ lọc cảnh báo thành công!');
+      } catch (err) {
+        alert(`❌ Lỗi lưu cấu hình: ${err.message}`);
+      }
+    }
+    window.saveTelegramSettings = saveTelegramSettings;
+
+    // Backward-compatible individual handlers
+    function toggleTelegramNotification(enabled) {
+      onTelegramToggleChanged(enabled);
+    }
+    window.toggleTelegramNotification = toggleTelegramNotification;
+
+    function sendTestTelegramNotification() {
+      testTelegramInModal();
     }
     window.sendTestTelegramNotification = sendTestTelegramNotification;
 
     function setSettingsFilter(filterName) {
       const actual = (filterName === 'none') ? 'all' : filterName;
-      activeFilter = actual;
-      listStatusFilter = actual;
-      updateActiveFilterBadges();
+      mapStatusFilter = actual;
+      updateMapFilterUI();
       renderMapMarkers();
-      renderStoreList(document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '');
       updateSettings('activeFilter', actual);
     }
     window.setSettingsFilter = setSettingsFilter;
@@ -4127,7 +4368,8 @@ def index():
 
     function updateSettings(key, val) {
       const payload = {};
-      if (key === 'telegramEnabled' || key === 'soundEnabled' || key === 'telegramBotToken' || key === 'telegramChatId') {
+      const tgKeys = ['telegramEnabled', 'soundEnabled', 'telegramBotToken', 'telegramChatId', 'telegramStatus', 'telegramChain', 'telegramTime', 'telegramRegion'];
+      if (tgKeys.includes(key)) {
         payload.notifications = { [key]: val };
       } else {
         payload[key] = val;
@@ -4644,28 +4886,20 @@ def index():
         locateUser(false);
         startContinuousGpsWatch();
 
-        // Step 1: Fetch config, stores, hot_status, and cold_status ALL IN PARALLEL for currentRegion!
+        // Step 1: Fetch config, stores, hot_status, and cold_status ALL IN PARALLEL for all Japan!
         const [cfgRes, storesRes, hotRes, coldRes] = await Promise.all([
           fetch('/api/config'),
-          fetch(`/api/stores_data?region=${currentRegion}`),
-          fetch(`/api/hot_status?region=${currentRegion}`).catch(() => null),
-          fetch(`/api/cold_status?region=${currentRegion}`).catch(() => null)
+          fetch('/api/stores_data?region=all'),
+          fetch('/api/hot_status?region=all').catch(() => null),
+          fetch('/api/cold_status?region=all').catch(() => null)
         ]);
 
         configData = await cfgRes.json();
         storesDict = await storesRes.json();
         window.storesDict = storesDict;
 
-        // Apply synchronized server settings if available
-        if (configData.activeFilter && configData.activeFilter !== 'all') {
-          activeFilter = configData.activeFilter;
-          listStatusFilter = configData.activeFilter;
-        }
-        if (configData.activeTime && configData.activeTime !== 'all') {
-          activeTime = configData.activeTime;
-          listTimeFilter = String(configData.activeTime);
-        }
-        updateActiveFilterBadges();
+        // Sync Telegram UI Badges
+        updateTelegramUIBadge();
 
         if (hotRes && hotRes.ok) {
           try { hotStatus = await hotRes.json(); } catch(e) {}
@@ -4674,11 +4908,11 @@ def index():
           try { coldStatus = await coldRes.json(); } catch(e) {}
         }
 
-        // Render markers for selected region - smooth, fast, zero unnecessary memory overhead!
+        // Render markers for map based purely on map filters
         renderMapMarkers();
 
-        // Prefetch precomputed report counts for in-stock stores of this region
-        fetch(`/api/report_counts?region=${currentRegion}`).then(r => r.json()).then(data => {
+        // Prefetch precomputed report counts for in-stock stores
+        fetch('/api/report_counts?region=all').then(r => r.json()).then(data => {
           if (data && typeof data === 'object') {
             for (const [sid, c] of Object.entries(data)) {
               storeCountsCache[sid] = { in: c.in, out: c.out, loaded: true };
@@ -4713,7 +4947,7 @@ def index():
         setTimeout(() => map.invalidateSize(), 150);
         setTimeout(() => map.invalidateSize(), 500);
 
-        // Realtime Firestore sync for active region
+        // Realtime Firestore sync for all prefectures
         setupRealtime();
       } catch (e) {
         console.error('Init error:', e);
@@ -4725,12 +4959,16 @@ def index():
 
     function refreshData() {
       Promise.all([
-        fetch(`/api/hot_status?region=${currentRegion}`).then(r => r.json()).catch(() => ({})),
-        fetch(`/api/cold_status?region=${currentRegion}`).then(r => r.json()).catch(() => ({}))
+        fetch('/api/hot_status?region=all').then(r => r.json()).catch(() => ({})),
+        fetch('/api/cold_status?region=all').then(r => r.json()).catch(() => ({}))
       ]).then(([hot, cold]) => {
         hotStatus = hot;
         coldStatus = cold;
         renderMapMarkers();
+        const listContainer = document.getElementById('view-list-container');
+        if (listContainer && listContainer.classList.contains('open')) {
+          renderStoreList();
+        }
       });
     }
     window.refreshData = refreshData;
@@ -4748,24 +4986,39 @@ def index():
       if (!configData.telegramEnabled) return;
       if (!newData || typeof newData !== 'object') return;
 
+      const tgRegion = configData.telegramRegion || 'all';
+      if (tgRegion !== 'all') {
+        const allowedPrefs = (REGIONS[tgRegion] ? REGIONS[tgRegion].prefs : [tgRegion]) || [];
+        if (pref && !allowedPrefs.includes(pref)) return;
+      }
+
+      const tgStatus = configData.telegramStatus || 'in';
+      const tgChain = configData.telegramChain || 'all';
+      const tgTime = configData.telegramTime || '24';
       const nowSec = Math.floor(Date.now() / 1000);
-      const maxAgeSec = (activeTime && activeTime !== 'all') ? parseInt(activeTime, 10) * 3600 : 86400;
+      const maxAgeSec = (tgTime !== 'all') ? parseInt(tgTime, 10) * 3600 : 86400 * 30;
 
       for (const [sid, raw] of Object.entries(newData)) {
         const info = decodeStatus(raw);
-        if (!info || info.code !== 'i') continue;
+        if (!info) continue;
 
-        // Status filter check (Settings sync)
-        if (activeFilter === 'onsite' && !info.onsite) continue;
+        // Dedicated Telegram status filter
+        if (tgStatus === 'in' && info.code !== 'i') continue;
+        if (tgStatus === 'onsite' && (info.code !== 'i' || !info.onsite)) continue;
+        if (tgStatus === 'recent' && (info.code !== 'i' && !(info.timestamp > 0 && (nowSec - info.timestamp <= 86400 * 7) && info.code !== 'n'))) continue;
 
-        // Time window check (Settings sync)
+        // Dedicated Telegram time window check
         if (info.timestamp && (nowSec - info.timestamp > maxAgeSec)) continue;
+
+        const store = storesDict[sid] || { id: sid, name: sid, pref: pref };
+
+        // Dedicated Telegram chain filter check
+        if (!matchesChainFilter(store.chain, tgChain)) continue;
 
         const notifKey = `${sid}_${info.timestamp || ''}`;
         if (notifiedRealtimeKeys.has(notifKey)) continue;
         notifiedRealtimeKeys.add(notifKey);
 
-        const store = storesDict[sid] || { id: sid, name: sid, pref: pref };
         fetch('/api/notify/webhook', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -4811,7 +5064,8 @@ def index():
         });
         realtimeUnsubscribes = [];
 
-        const targetPrefs = REGIONS[currentRegion] ? REGIONS[currentRegion].prefs : ['osaka'];
+        // Listen to all prefectures nationwide
+        const targetPrefs = ['osaka', 'kanagawa', 'aichi', 'gifu', 'mie'];
         targetPrefs.forEach(p => {
           const unsub = onSnapshot(doc(realtimeDb, 'status', p), (snap) => {
             if (snap.exists()) {
