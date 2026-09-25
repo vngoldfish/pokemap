@@ -1119,8 +1119,9 @@ def index():
     .leaflet-popup-content {
       margin: 0;
       padding: 14px 16px;
-      min-width: 240px;
-      max-width: 320px;
+      min-width: 250px;
+      max-width: 330px;
+      height: auto !important;
       color: #0f172a;
     }
     .popup-store-title {
@@ -1521,6 +1522,8 @@ def index():
     let currentPref = 'osaka';
     let activeFilter = 'none'; // 'none' | 'in' | 'onsite' | 'recent' | 'hidenone'
     let latestStockStoreId = null;
+    const storeHistoryCache = {};
+    const openPopupHistStoreIds = new Set();
 
     // GPS State
     let userLat = null;
@@ -1581,6 +1584,9 @@ def index():
     }).addTo(map);
 
     L.control.zoom({ position: 'bottomleft' }).addTo(map);
+    map.on('popupclose', () => {
+      openPopupHistStoreIds.clear();
+    });
 
     // 3. MARKER CLUSTERING (Matching PokéTan Image 3: Blue bordered count circles ②, ③)
     let clusterGroup = L.markerClusterGroup({
@@ -1770,38 +1776,44 @@ def index():
       let distHtml = '';
       if (userLat !== null && userLng !== null) {
         const d = calcDistanceKm(userLat, userLng, store.lat, store.lng);
-        distHtml = `<div style="font-size:0.75rem; color:#4f46e5; font-weight:700; margin-top:2px;">📍 現在地から ${formatDist(d)}</div>`;
+        distHtml = `<div style="font-size:0.75rem; color:#4f46e5; font-weight:700; margin-top:2px;">📍 Hiện tại: cách ${formatDist(d)}</div>`;
       }
 
       let statusBg = '#f1f5f9';
       let statusColor = '#64748b';
-      let statusText = '⚪ 扱ってない / 不明';
+      let statusText = '⚪ Chưa rõ / Không bán';
       if (info.code === 'i') {
-        statusBg = '#dcfce7'; statusColor = '#15803d'; statusText = '🟢 在庫あり (In Stock)';
+        statusBg = '#dcfce7'; statusColor = '#15803d'; statusText = '🟢 Có hàng (In Stock)';
       } else if (info.code === 'o') {
-        statusBg = '#fee2e2'; statusColor = '#b91c1c'; statusText = '🔴 在庫なし (Out of Stock)';
+        statusBg = '#fee2e2'; statusColor = '#b91c1c'; statusText = '🔴 Hết hàng (Out of Stock)';
       }
 
-      const packs = info.packs.length ? `<div style="font-size:0.74rem; margin-top:4px;"><b>📦 パック:</b> ${info.packs.join(', ')}</div>` : '';
-      const time = info.timeAgo ? `<div style="font-size:0.72rem; color:#64748b; margin-top:3px;">🕒 報告: ${info.timeAgo} (${info.reported_at})</div>` : '';
-      const chain = (configData.chainNames && configData.chainNames[store.chain]) || store.chain || 'コンビニ・カード店';
+      const packs = (info.packs && info.packs.length) ? `<div style="font-size:0.74rem; margin-top:4px;"><b>📦 Gói:</b> ${info.packs.join(', ')}</div>` : '';
+      const time = info.timeAgo ? `<div style="font-size:0.72rem; color:#64748b; margin-top:3px;">🕒 Báo: ${info.timeAgo} (${info.reported_at})</div>` : '';
+      const chain = (configData.chainNames && configData.chainNames[store.chain]) || store.chain || 'Cửa hàng';
       const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent((store.name || '') + ' ' + (store.address || ''))}`;
+
+      const isHistOpen = openPopupHistStoreIds.has(store.id);
+      const histDisplay = isHistOpen ? 'flex' : 'none';
+      const histArrow = isHistOpen ? '▲' : '▼';
+      const cachedHist = storeHistoryCache[store.id];
+      const histInner = (isHistOpen && cachedHist) ? renderPopupHistoryItemsHtml(store.id, cachedHist) : '';
 
       return `
         <div>
-          <div class="popup-store-title">${store.name}</div>
-          <div class="popup-store-chain">${chain}</div>
+          <div class="popup-store-title">${escapeHtml(store.name || '')}</div>
+          <div class="popup-store-chain">${escapeHtml(chain)}</div>
           <div class="popup-status-badge" style="background:${statusBg}; color:${statusColor};">${statusText}</div>
           ${distHtml}
           ${time}
           ${packs}
           <div class="popup-actions-grid">
-            <a href="${mapsUrl}" target="_blank" class="btn-popup-maps">🗺️ ルート案内 ↗</a>
-            <button type="button" class="btn-popup-hist" id="btn-hist-toggle-${store.id}" onclick="event.stopPropagation(); togglePopupHistory('${store.id}')">
-              📜 入荷履歴 <span id="arrow-hist-${store.id}">▼</span>
+            <a href="${mapsUrl}" target="_blank" class="btn-popup-maps">🗺️ Chỉ đường ↗</a>
+            <button type="button" class="btn-popup-hist" id="btn-hist-toggle-${store.id}" onclick="event.stopPropagation(); togglePopupHistory('${store.id}', this)">
+              📜 入荷履歴 <span id="arrow-hist-${store.id}">${histArrow}</span>
             </button>
           </div>
-          <div id="popup-hist-container-${store.id}" class="popup-hist-scroll" style="display:none;"></div>
+          <div id="popup-hist-container-${store.id}" class="popup-hist-scroll" style="display:${histDisplay};">${histInner}</div>
         </div>
       `;
     }
@@ -2115,88 +2127,29 @@ def index():
     window.updateSettings = updateSettings;
 
     // 13c. STORE HISTORY & POPUP ACCORDION (📜 入荷履歴 / Lịch sử báo cáo)
-    const storeHistoryCache = {};
-
-    function updateLeafletPopup() {
-      if (typeof map !== 'undefined' && map.eachLayer) {
-        map.eachLayer(l => {
-          if (l.getPopup && l.getPopup() && l.getPopup().isOpen()) {
-            l.getPopup().update();
-          }
-        });
-      }
-    }
-
-    async function togglePopupHistory(storeId) {
-      const containerEl = document.getElementById(`popup-hist-container-${storeId}`);
-      const arrowEl = document.getElementById(`arrow-hist-${storeId}`);
-      if (!containerEl) return;
-
-      const isOpen = containerEl.style.display !== 'none';
-      if (isOpen) {
-        containerEl.style.display = 'none';
-        if (arrowEl) arrowEl.innerText = '▼';
-        updateLeafletPopup();
-        return;
-      }
-
-      containerEl.style.display = 'flex';
-      if (arrowEl) arrowEl.innerText = '▲';
-
-      if (!storeHistoryCache[storeId]) {
-        containerEl.innerHTML = `
-          <div style="text-align:center; padding:10px 4px; color:#64748b; font-size:0.73rem;">
-            <span style="display:inline-block; animation:pulse 1s infinite;">⏳</span>
-            <div style="margin-top:2px; font-weight:600;">入荷履歴を読込中...</div>
-          </div>
-        `;
-        updateLeafletPopup();
-      }
-
-      try {
-        let history = storeHistoryCache[storeId];
-        if (!history) {
-          const res = await fetch(`/api/store_history/${storeId}`);
-          history = await res.json();
-          storeHistoryCache[storeId] = history;
-        }
-
-        renderPopupHistoryContent(storeId, containerEl, history);
-      } catch (err) {
-        containerEl.innerHTML = `
-          <div style="color:#ef4444; font-size:0.72rem; padding:6px; text-align:center;">
-            ⚠️ 履歴の取得に失敗しました: ${escapeHtml(err.message)}
-          </div>
-        `;
-      }
-
-      updateLeafletPopup();
-    }
-    window.togglePopupHistory = togglePopupHistory;
-
-    function renderPopupHistoryContent(storeId, containerEl, history) {
+    function renderPopupHistoryItemsHtml(storeId, history) {
       const effectiveStatus = Object.assign({}, coldStatus, hotStatus);
       const currentRaw = effectiveStatus[storeId] || effectiveStatus[storeId + '_c'];
       const info = decodeStatus(currentRaw);
 
       if (!history || history.length === 0) {
-        let statusBadge = '⚪ 不明 (Chưa rõ)';
+        let statusBadge = '⚪ Không rõ';
         let itemBg = '#f8fafc';
         let itemBorder = '#e2e8f0';
         let itemColor = '#475569';
 
         if (info.code === 'i') {
-          statusBadge = '🟢 在庫あり (Có hàng)';
+          statusBadge = '🟢 Có hàng (在庫あり)';
           itemBg = '#f0fdf4';
           itemBorder = '#bbf7d0';
           itemColor = '#15803d';
         } else if (info.code === 'o') {
-          statusBadge = '🔴 売り切れ (Hết hàng)';
+          statusBadge = '🔴 Hết hàng (売り切れ)';
           itemBg = '#fef2f2';
           itemBorder = '#fecaca';
           itemColor = '#b91c1c';
         } else if (info.code === 'n') {
-          statusBadge = '⚪ 扱無 (Không bán thẻ)';
+          statusBadge = '⚪ Không bán thẻ (扱無)';
           itemBg = '#f8fafc';
           itemBorder = '#e2e8f0';
           itemColor = '#64748b';
@@ -2204,58 +2157,111 @@ def index():
 
         const packName = (info.packs && info.packs.length > 0) ? info.packs.join(', ') : '';
 
-        containerEl.innerHTML = `
-          <div style="background:${itemBg}; border:1px solid ${itemBorder}; border-radius:6px; padding:6px 8px; font-size:0.72rem;">
+        return `
+          <div style="background:${itemBg}; border:1px solid ${itemBorder}; border-radius:8px; padding:7px 10px; font-size:0.73rem;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
               <b style="color:${itemColor};">${statusBadge}</b>
-              <span style="color:#64748b; font-size:0.68rem;">🕒 ${escapeHtml(info.timeAgo || info.reported_at || '最新')}</span>
+              <span style="color:#64748b; font-size:0.68rem; font-weight:600;">🕒 ${escapeHtml(info.timeAgo || info.reported_at || 'Mới nhất')}</span>
             </div>
-            ${packName ? `<div style="color:#1e293b; font-weight:700; margin-top:2px;">📦 商品: ${escapeHtml(packName)}</div>` : ''}
-            <div style="color:#64748b; font-size:0.66rem; margin-top:2px;">👤 報告者: 匿名トレーナー (アプリ共有)</div>
+            ${packName ? `<div style="color:#0f172a; font-weight:700; font-size:0.72rem; margin-top:3px;">📦 Sản phẩm: <span style="color:#2563eb;">${escapeHtml(packName)}</span></div>` : ''}
+            <div style="color:#64748b; font-size:0.67rem; margin-top:3px;">👤 Người báo: <b>Ẩn danh (Hệ thống)</b></div>
           </div>
-          <div style="font-size:0.67rem; color:#94a3b8; text-align:center; padding:2px;">(過去の追加ログはありません)</div>
+          <div style="font-size:0.68rem; color:#94a3b8; text-align:center; padding:3px;">(Chưa có lịch sử các lần báo trước)</div>
         `;
-        return;
       }
 
-      containerEl.innerHTML = history.map(item => {
-        let statusBadge = '⚪ 不明';
+      return history.map(item => {
+        let statusBadge = '⚪ Không rõ';
         let itemBg = '#f8fafc';
         let itemBorder = '#e2e8f0';
         let itemColor = '#475569';
 
         if (item.status_code === 'i') {
-          statusBadge = '🟢 在庫あり (Có hàng)';
+          statusBadge = '🟢 Có hàng (在庫あり)';
           itemBg = '#f0fdf4';
           itemBorder = '#bbf7d0';
           itemColor = '#15803d';
         } else if (item.status_code === 'o') {
-          statusBadge = '🔴 売り切れ (Hết hàng)';
+          statusBadge = '🔴 Hết hàng (売り切れ)';
           itemBg = '#fef2f2';
           itemBorder = '#fecaca';
           itemColor = '#b91c1c';
         } else if (item.status_code === 'n') {
-          statusBadge = '⚪ 扱無 (Không bán)';
+          statusBadge = '⚪ Không bán thẻ (扱無)';
           itemBg = '#f8fafc';
           itemBorder = '#e2e8f0';
           itemColor = '#64748b';
         }
 
-        const noteHtml = item.note ? `<div style="color:#1e293b; font-weight:700; margin-top:2px;">📦 商品: ${escapeHtml(item.note)}</div>` : '';
-        const userHtml = `👤 報告者: ${escapeHtml(item.user || '匿名トレーナー')}${item.onsite ? ' • 📸 現地確認済' : ''}`;
+        const noteHtml = item.note ? `<div style="color:#0f172a; font-weight:700; font-size:0.72rem; margin-top:3px;">📦 Sản phẩm: <span style="color:#2563eb;">${escapeHtml(item.note)}</span></div>` : '';
+        const reporterName = item.user || 'Ẩn danh';
+        const userHtml = `👤 Người báo: <b>${escapeHtml(reporterName)}</b>${item.onsite ? ' • <span style="color:#16a34a; font-weight:700;">📸 Tại chỗ</span>' : ''}`;
 
         return `
-          <div style="background:${itemBg}; border:1px solid ${itemBorder}; border-radius:6px; padding:6px 8px; font-size:0.72rem;">
+          <div style="background:${itemBg}; border:1px solid ${itemBorder}; border-radius:8px; padding:7px 10px; font-size:0.73rem;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
               <b style="color:${itemColor};">${statusBadge}</b>
-              <span style="color:#64748b; font-size:0.68rem;">🕒 ${escapeHtml(item.formatted_time || '')}</span>
+              <span style="color:#64748b; font-size:0.68rem; font-weight:600;">🕒 ${escapeHtml(item.formatted_time || '')}</span>
             </div>
             ${noteHtml}
-            <div style="color:#64748b; font-size:0.66rem; margin-top:2px;">${userHtml}</div>
+            <div style="color:#64748b; font-size:0.67rem; margin-top:3px;">${userHtml}</div>
           </div>
         `;
       }).join('');
     }
+
+    function renderPopupHistoryContent(storeId, containerEl, history) {
+      if (containerEl) {
+        containerEl.innerHTML = renderPopupHistoryItemsHtml(storeId, history);
+      }
+    }
+
+    async function togglePopupHistory(storeId, btn) {
+      const popupEl = (btn && btn.closest('.leaflet-popup-content')) || document;
+      const containerEl = popupEl.querySelector(`#popup-hist-container-${storeId}`) || document.getElementById(`popup-hist-container-${storeId}`);
+      const arrowEl = popupEl.querySelector(`#arrow-hist-${storeId}`) || document.getElementById(`arrow-hist-${storeId}`);
+      if (!containerEl) return;
+
+      const isCurrentlyOpen = openPopupHistStoreIds.has(storeId) || containerEl.style.display !== 'none';
+      if (isCurrentlyOpen) {
+        openPopupHistStoreIds.delete(storeId);
+        containerEl.style.display = 'none';
+        if (arrowEl) arrowEl.innerText = '▼';
+        return;
+      }
+
+      openPopupHistStoreIds.add(storeId);
+      containerEl.style.display = 'flex';
+      if (arrowEl) arrowEl.innerText = '▲';
+
+      let history = storeHistoryCache[storeId];
+      if (!history) {
+        containerEl.innerHTML = `
+          <div style="text-align:center; padding:10px 4px; color:#64748b; font-size:0.73rem;">
+            <span style="display:inline-block; animation:pulse 1s infinite;">⏳</span>
+            <div style="margin-top:2px; font-weight:600;">Đang tải lịch sử báo cáo...</div>
+          </div>
+        `;
+
+        try {
+          const res = await fetch(`/api/store_history/${storeId}`);
+          history = await res.json();
+          storeHistoryCache[storeId] = history;
+        } catch (err) {
+          containerEl.innerHTML = `
+            <div style="color:#ef4444; font-size:0.72rem; padding:6px; text-align:center;">
+              ⚠️ Lỗi tải lịch sử: ${escapeHtml(err.message)}
+            </div>
+          `;
+          return;
+        }
+      }
+
+      if (openPopupHistStoreIds.has(storeId)) {
+        containerEl.innerHTML = renderPopupHistoryItemsHtml(storeId, history);
+      }
+    }
+    window.togglePopupHistory = togglePopupHistory;
 
     async function openStoreHistoryModal(storeId) {
       const modal = document.getElementById('store-history-modal');
