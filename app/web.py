@@ -866,7 +866,7 @@ def index():
       overflow: hidden;
     }
 
-    #map {
+    #map, .leaflet-container {
       width: 100%;
       height: 100%;
       position: absolute;
@@ -875,6 +875,25 @@ def index():
       right: 0;
       bottom: 0;
       z-index: 1;
+      touch-action: none !important;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+      overscroll-behavior: none;
+      cursor: grab;
+    }
+    #map:active, .leaflet-container:active {
+      cursor: grabbing;
+    }
+    .leaflet-pane, .leaflet-tile, .leaflet-marker-icon, .leaflet-marker-shadow,
+    .leaflet-tile-container, .leaflet-pane > svg, .leaflet-pane > canvas,
+    .leaflet-zoom-box, .leaflet-image-layer, .leaflet-layer {
+      will-change: transform;
+      transform: translateZ(0);
+      -webkit-transform: translateZ(0);
+    }
+    .leaflet-tile {
+      image-rendering: -webkit-optimize-contrast;
     }
 
     /* FLOATING GPS BUTTON (Bottom Right - High z-index to stay above all Leaflet layers) */
@@ -2256,24 +2275,48 @@ def index():
       }
     } catch(e) {}
 
-    // 2. LEAFLET MAP WITH GOOGLE MAPS TILES (Smooth, buffered, zero watermarks)
+    // 2. LEAFLET MAP WITH GOOGLE MAPS PHYSICS (Ultra-smooth kinetic dragging, high-precision pinch zoom)
     const map = L.map('map', {
       center: initialCenter,
       zoom: initialZoom,
       zoomControl: false,
       preferCanvas: true,
+
+      // Google Maps-like kinetic inertia & fluid momentum
+      inertia: true,
+      inertiaDeceleration: 1400, // Reduced friction allows natural, smooth gliding when swiping/flicking
+      inertiaMaxSpeed: 3500,     // Allows quick flick gestures to glide across neighborhoods
+      easeLinearity: 0.12,       // Gentle natural deceleration curve matching Google Maps
+
+      // Smooth continuous zooming & gesture response
       zoomAnimation: true,
       fadeAnimation: true,
-      markerZoomAnimation: true
+      markerZoomAnimation: true,
+      zoomAnimationThreshold: 8,
+
+      // High-precision fractional pinch-to-zoom (smooth like Google Maps)
+      zoomSnap: 0.25,            // Fractional zoom steps remove chunky integer jumping
+      zoomDelta: 0.5,            // Half-level steps for much smoother button/tap zoom
+      wheelPxPerZoomLevel: 100,
+      wheelDebounceTime: 40,
+
+      // Native mobile touch optimization
+      tap: false,                // Disables legacy 300ms tap emulator that caused touch drag lag on iOS Safari
+      touchZoom: true,
+      bounceAtZoomLimits: false,
+      maxBoundsViscosity: 0
     });
 
-    // High performance Google Maps Streets Tiles with pre-buffering across subdomains
+    // High performance Google Maps Streets Tiles with GPU compositing
     L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
       subdomains: ['0', '1', '2', '3'],
       maxZoom: 20,
+      maxNativeZoom: 19,
       attribution: '&copy; Google Maps',
       updateWhenIdle: false,
-      keepBuffer: 6
+      updateWhenZooming: false,
+      keepBuffer: 3,
+      crossOrigin: true
     }).addTo(map);
 
     map.on('popupclose', () => {
@@ -2295,6 +2338,12 @@ def index():
       spiderfyOnMaxZoom: true,
       showCoverageOnHover: false,
       zoomToBoundsOnClick: true,
+      chunkedLoading: true,
+      chunkInterval: 100,
+      chunkDelay: 40,
+      animate: true,
+      animateAddingMarkers: false,
+      disableClusteringAtZoom: 17,
       iconCreateFunction: function(cluster) {
         const count = cluster.getChildCount();
         const markers = cluster.getAllChildMarkers();
