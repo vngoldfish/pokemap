@@ -1387,9 +1387,9 @@ def index():
     }
     .map-controls-box {
       position: absolute;
-      top: 16px;
-      right: 16px;
-      z-index: 1000;
+      bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+      right: 18px;
+      z-index: 1200;
       display: flex;
       flex-direction: column;
       gap: 8px;
@@ -1415,12 +1415,23 @@ def index():
       color: #2563eb;
     }
     .gps-locate-btn {
-      width: 44px;
-      height: 44px;
+      width: 48px;
+      height: 48px;
       border-radius: 50%;
       padding: 0;
       justify-content: center;
-      box-shadow: 0 4px 14px rgba(0,0,0,0.2);
+      background: #ffffff;
+      border: 2px solid #2563eb;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      transition: all 0.2s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .gps-locate-btn:hover {
+      background: #eff6ff;
+      transform: scale(1.06);
     }
     .gps-locate-btn.active {
       background: #2563eb;
@@ -2332,10 +2343,11 @@ def index():
         left: 0;
       }
 
-      /* Map floating controls: compact for mobile */
+      /* Map floating controls: bottom right corner, above bottom nav */
       .map-controls-box {
-        top: 8px;
-        right: 8px;
+        bottom: calc(74px + env(safe-area-inset-bottom, 0px));
+        right: 14px;
+        top: auto;
         gap: 6px;
       }
       .floating-btn {
