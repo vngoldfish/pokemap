@@ -2,7 +2,11 @@
   "mapDisplay": {
     "mode": "only_in",
     "chain": "",
-    "includeCold": true
+    "includeCold": true,
+    "showInStock": true,
+    "showOutOfStock": false,
+    "showNotHandled": false,
+    "showUnknown": false
   },
   "notifications": {
     "soundEnabled": true,
@@ -18,7 +22,14 @@
     "discordEnabled": false,
     "telegramBotToken": "8888535478:AAFtlcFhwjhlAvLZ4lPf7tGQtnZ8XIoKvSE",
     "telegramChatId": "5572197416",
-    "telegramEnabled": true
+    "telegramEnabled": true,
+    "notifyPrefs": [
+      "osaka",
+      "aichi",
+      "kanagawa",
+      "gifu",
+      "mie"
+    ]
   },
   "sidebarTab": "feed",
   "statusFilter": {

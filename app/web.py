@@ -39,9 +39,13 @@ SETTINGS_FILE = os.path.join(DEFAULT_CACHE_DIR, "settings.json")
 DEFAULT_SETTINGS = {
     # 1. BẢN ĐỒ: HIỂN THỊ CỬA HÀNG TRÊN BẢN ĐỒ (MAP STORE VISIBILITY)
     "mapDisplay": {
-        "mode": "all",              # 'all' = hiện tất cả 4,050 cửa hàng, 'only_in' = chỉ hiện điểm có hàng, 'with_out' = hiện có hàng & hết hàng
+        "mode": "all",              # 'all', 'only_in', 'with_out', 'custom'
         "chain": "",                # Lọc chuỗi trên bản đồ ("" = tất cả)
-        "includeCold": True         # Nạp dữ liệu lịch sử (>24h)
+        "includeCold": True,        # Nạp dữ liệu lịch sử (>24h)
+        "showInStock": True,        # 🟢 Cửa hàng có hàng
+        "showOutOfStock": True,     # 🔴 Cửa hàng hết hàng
+        "showNotHandled": True,     # ⚪ Cửa hàng không bán thẻ
+        "showUnknown": True         # 🔘 Chưa có thông báo gì / chưa rõ
     },
 
     # 2. THÔNG BÁO: HIỂN THỊ THÔNG BÁO CÓ HÀNG & CẢNH BÁO (IN-STOCK NOTIFICATIONS & ALERTS)
@@ -2731,17 +2735,10 @@ def index():
           </div>
         </div>
         <div class="drawer-section">
-          <div class="drawer-section-title">🗺️ Cài đặt bản đồ</div>
-          <div class="drawer-menu-item" onclick="toggleMapSettingsModal(); closeSideDrawer();">
+          <div class="drawer-section-title">⚙️ Cài đặt &amp; Tùy chỉnh</div>
+          <div class="drawer-menu-item" onclick="mobileNavTo('settings'); closeSideDrawer();">
             <span class="dm-icon">⚙️</span>
-            <span>Cài đặt cửa hàng hiển thị trên bản đồ</span>
-          </div>
-        </div>
-        <div class="drawer-section">
-          <div class="drawer-section-title">🔔 Thông báo</div>
-          <div class="drawer-menu-item" onclick="toggleNotifSettingsModal(); closeSideDrawer();">
-            <span class="dm-icon">🔔</span>
-            <span>Cài đặt thông báo (Telegram / Discord)</span>
+            <span>Cài đặt bản đồ, cửa hàng &amp; thông báo</span>
           </div>
           <div class="drawer-menu-item" onclick="requestPushPermission(); closeSideDrawer();">
             <span class="dm-icon">📲</span>
@@ -2925,399 +2922,381 @@ def index():
       </div>
     </div>
 
-    <!-- VIEW 3: NOTIFICATION SETTINGS (FULL SCREEN) -->
+    <!-- VIEW 3: UNIFIED SETTINGS & PREFERENCES (FULL SCREEN) -->
     <div id="view-notif-mode" class="app-view">
       <div class="notif-view-header">
         <div>
-          <h3>🔔 Cài Đặt Thông Báo & Cảnh Báo</h3>
-          <div class="nv-subtitle">Tùy chọn chuông, thông báo nổi, Discord & Telegram</div>
+          <h3>⚙️ Cài Đặt &amp; Tùy Chỉnh Toàn Diện</h3>
+          <div class="nv-subtitle">Bản đồ, trạng thái cửa hàng, tỉnh thành, thông báo &amp; kết nối bot</div>
         </div>
+        <button type="button" onclick="mobileNavTo('map')" style="background:#1e293b;border:1px solid #334155;color:white;padding:6px 12px;border-radius:8px;font-size:0.75rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;">
+          🗺️ Về Bản Đồ
+        </button>
       </div>
       <div class="notif-view-body" id="notif-view-body-container">
-        <!-- Content will be populated from existing modal body -->
-      </div>
-    </div>
 
-  </div>
+        <!-- KHU VỰC 1: CÀI ĐẶT BẢN ĐỒ & HIỂN THỊ CỬA HÀNG -->
+        <div class="setting-group" style="border: 1.5px solid #93c5fd; background: #f0f7ff; border-radius: 12px; padding: 16px;">
+          <label class="setting-group-title" style="color: #1d4ed8; font-size: 0.92rem; display: flex; align-items: center; justify-content: space-between;">
+            <span>🗺️ CÀI ĐẶT HIỂN THỊ TRÊN BẢN ĐỒ</span>
+            <span style="font-size: 0.72rem; color: #1e40af; background: #dbeafe; padding: 2px 8px; border-radius: 10px; font-weight: 700;">Bản đồ</span>
+          </label>
+          <div style="font-size: 0.75rem; color: #475569; margin-bottom: 12px;">
+            Tùy chọn hiển thị cửa hàng theo trạng thái hàng, chuỗi và dữ liệu lịch sử trên bản đồ.
+          </div>
 
-  <!-- 4.1. MAP DISPLAY SETTINGS MODAL (CÀI ĐẶT BẢN ĐỒ TÁCH BIỆT HOÀN TOÀN) -->
-  <div id="map-settings-modal" class="modal-overlay" style="display: none;" onclick="if(event.target === this) toggleMapSettingsModal();">
-    <div class="modal-content">
-      <div class="modal-header">
-        <div>
-          <h3 style="font-size:1.05rem;display:flex;align-items:center;gap:8px;">⚙️ Cài Đặt Cửa Hàng Bản Đồ</h3>
-          <div style="font-size:0.75rem;color:#94a3b8;margin-top:2px;">Tùy chọn hiển thị cửa hàng trên bản đồ & danh sách (Hiện tất cả 4,050 điểm / Chỉ có hàng / Hết hàng / Chuỗi)</div>
-        </div>
-        <button class="modal-close-btn" onclick="toggleMapSettingsModal()">✕</button>
-      </div>
+          <!-- Nút chọn nhanh (Presets) -->
+          <div style="font-size:0.75rem; font-weight:700; color:#0f172a; margin-bottom:6px;">⚡ Chế độ chọn nhanh:</div>
+          <div class="modal-quick-actions" style="margin-bottom: 14px;">
+            <button type="button" class="btn-preset active" id="btn-map-preset-all" onclick="applyMapStatusPreset('all')">
+              🏢 Hiện tất cả (Cả 4 loại)
+            </button>
+            <button type="button" class="btn-preset" id="btn-map-preset-in" onclick="applyMapStatusPreset('only_in')">
+              🟢 Chỉ điểm Có Hàng
+            </button>
+            <button type="button" class="btn-preset" id="btn-map-preset-both" onclick="applyMapStatusPreset('with_out')">
+              🟢🔴 Có Hàng &amp; Hết Hàng
+            </button>
+          </div>
 
-      <div class="modal-body">
-        <!-- SECTION 1: CHẾ ĐỘ HIỂN THỊ GHIM BẢN ĐỒ -->
-        <div class="setting-group">
-          <label class="setting-group-title">📍 CHẾ ĐỘ GHIM CỬA HÀNG TRÊN BẢN ĐỒ</label>
-          <div class="time-radio-group">
-            <label class="time-radio-row">
-              <input type="radio" name="map-display-mode" value="all" id="map-mode-all" onchange="setMapMode('all')" checked />
-              <div>
-                <b style="color:#0284c7;">🏢 Hiện tất cả 4,050 cửa hàng trên bản đồ Osaka (Mặc định)</b>
-                <div class="time-desc">Hiển thị trọn vẹn toàn bộ cửa hàng tiện lợi & card shop. Cửa hàng có hàng phát sáng xanh lá 🟢 to nổi bật, hết hàng màu đỏ 🔴.</div>
-              </div>
-            </label>
-            <label class="time-radio-row">
-              <input type="radio" name="map-display-mode" value="only_in" id="map-mode-only_in" onchange="setMapMode('only_in')" />
-              <div>
-                <b style="color:#16a34a;">🟢 Chỉ ghim các cửa hàng ĐANG CÓ HÀNG</b>
-                <div class="time-desc">Ẩn toàn bộ các điểm chưa có báo cáo để bản đồ thoáng gọn, chỉ tập trung vào các điểm có hàng.</div>
-              </div>
-            </label>
-            <label class="time-radio-row">
-              <input type="radio" name="map-display-mode" value="with_out" id="map-mode-with_out" onchange="setMapMode('with_out')" />
-              <div>
-                <b style="color:#dc2626;">🟢🔴 Ghim cửa hàng CÓ HÀNG & HẾT HÀNG</b>
-                <div class="time-desc">Chỉ ghim các điểm vừa có báo cáo biến động mới (có hàng hoặc hết hàng).</div>
+          <!-- Chi tiết từng trạng thái hiển thị -->
+          <div style="background: white; border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+            <div style="font-size: 0.8rem; font-weight: 700; color: #0f172a; margin-bottom: 8px;">
+              📍 Tùy chỉnh chi tiết từng trạng thái hiển thị:
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <label class="setting-checkbox-row" style="padding: 4px 0;">
+                <div class="setting-checkbox-left">
+                  <input type="checkbox" id="map-check-instock" checked onchange="updateMapStatusItem('showInStock', this.checked)" />
+                  <div>
+                    <b style="color: #16a34a;">🟢 Cửa hàng CÓ HÀNG (In Stock)</b>
+                    <div class="time-desc">Hiển thị các điểm vừa có người dùng báo cáo còn hàng mở bán.</div>
+                  </div>
+                </div>
+              </label>
+              <label class="setting-checkbox-row" style="padding: 4px 0;">
+                <div class="setting-checkbox-left">
+                  <input type="checkbox" id="map-check-outofstock" checked onchange="updateMapStatusItem('showOutOfStock', this.checked)" />
+                  <div>
+                    <b style="color: #dc2626;">🔴 Cửa hàng HẾT HÀNG (Out of Stock)</b>
+                    <div class="time-desc">Hiển thị các điểm vừa có người dùng báo cáo đã hết hàng.</div>
+                  </div>
+                </div>
+              </label>
+              <label class="setting-checkbox-row" style="padding: 4px 0;">
+                <div class="setting-checkbox-left">
+                  <input type="checkbox" id="map-check-nothandled" checked onchange="updateMapStatusItem('showNotHandled', this.checked)" />
+                  <div>
+                    <b style="color: #64748b;">⚪ Cửa hàng KHÔNG BÁN THẺ (Not Handled)</b>
+                    <div class="time-desc">Hiển thị các cửa hàng không kinh doanh thẻ Pokémon.</div>
+                  </div>
+                </div>
+              </label>
+              <label class="setting-checkbox-row" style="padding: 4px 0;">
+                <div class="setting-checkbox-left">
+                  <input type="checkbox" id="map-check-unknown" checked onchange="updateMapStatusItem('showUnknown', this.checked)" />
+                  <div>
+                    <b style="color: #94a3b8;">🔘 Cửa hàng CHƯA CÓ THÔNG BÁO GÌ (Chưa rõ / Chưa có tin gần đây)</b>
+                    <div class="time-desc">Hiển thị toàn bộ các điểm còn lại chưa có ai báo cáo gần đây.</div>
+                  </div>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <!-- Lọc chuỗi trên bản đồ -->
+          <div style="background: white; border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+            <div style="font-size: 0.8rem; font-weight: 700; color: #0f172a; margin-bottom: 4px;">
+              🏪 Lọc chuỗi cửa hàng trên bản đồ:
+            </div>
+            <select id="map-modal-chain-select" class="control-dropdown" onchange="setMapChain(this.value)" style="height:38px; width:100%;">
+              <option value="" selected>🏢 Tất cả các chuỗi cửa hàng (Mặc định)</option>
+              <option value="seven">🏪 7-Eleven (セブン-イレブン)</option>
+              <option value="lawson">🏪 Lawson (ローソン)</option>
+              <option value="familymart">🏪 FamilyMart (ファミリーマート)</option>
+              <option value="ministop">🏪 Ministop (ミニストップ)</option>
+              <option value="specialty">🃏 Cửa hàng thẻ Pokémon (Card Shop)</option>
+            </select>
+          </div>
+
+          <!-- Nguồn dữ liệu lịch sử -->
+          <div style="background: white; border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px;">
+            <label class="setting-checkbox-row" style="padding: 0;">
+              <div class="setting-checkbox-left">
+                <input type="checkbox" id="check-include-cold" checked onchange="toggleMapCold(this.checked)" />
+                <div>
+                  <b>⏳ Tải toàn bộ dữ liệu lịch sử (>24 giờ)</b>
+                  <div class="time-desc">Đảm bảo hiển thị đầy đủ mọi cửa hàng tiện lợi và card shop.</div>
+                </div>
               </div>
             </label>
           </div>
         </div>
 
-        <!-- SECTION 2: LỌC CHUỖI TRÊN BẢN ĐỒ -->
-        <div class="setting-group">
-          <label class="setting-group-title">🏪 LỌC CHUỖI CỬA HÀNG TRÊN BẢN ĐỒ</label>
-          <div style="font-size:0.75rem;color:#64748b;margin-bottom:6px;">Chỉ ghim những chuỗi cửa hàng bạn muốn xem trên bản đồ:</div>
-          <select id="map-modal-chain-select" class="control-dropdown" onchange="setMapChain(this.value)" style="height:40px;">
-            <option value="" selected>🏢 Tất cả các chuỗi cửa hàng (Mặc định)</option>
-            <option value="seven">🏪 7-Eleven</option>
-            <option value="lawson">🏪 Lawson</option>
-            <option value="familymart">🏪 FamilyMart</option>
-            <option value="ministop">🏪 Ministop</option>
-            <option value="specialty">🃏 Cửa hàng thẻ Pokémon</option>
-          </select>
-        </div>
-
-        <!-- SECTION 3: NGUỒN DỮ LIỆU LỊCH SỬ -->
-        <div class="setting-group">
-          <label class="setting-group-title">⏳ NGUỒN DỮ LIỆU TOÀN DIỆN</label>
-          <label class="setting-checkbox-row">
-            <div class="setting-checkbox-left">
-              <input type="checkbox" id="check-include-cold" checked onchange="toggleMapCold(this.checked)" />
-              <div>
-                <b>Tải toàn bộ 4,050 điểm từ kho dữ liệu Osaka</b>
-                <div class="time-desc">Đảm bảo hiển thị đầy đủ mọi cửa hàng tiện lợi và card shop tại Osaka.</div>
-              </div>
-            </div>
+        <!-- KHU VỰC 2: LỌC TỈNH THÀNH HIỂN THỊ & THÔNG BÁO -->
+        <div class="setting-group" style="background: white; border: 1.5px solid #cbd5e1; border-radius: 12px; padding: 16px;">
+          <label class="setting-group-title" style="color: #0f172a; font-size: 0.92rem; display: flex; align-items: center; justify-content: space-between;">
+            <span>🗾 LỌC THEO TỈNH THÀNH (BẢN ĐỒ, DANH SÁCH &amp; THÔNG BÁO)</span>
+            <span style="font-size: 0.72rem; color: #16a34a; background: #dcfce7; padding: 2px 8px; border-radius: 10px; font-weight: 700;">Toàn quốc</span>
           </label>
-        </div>
-
-        <!-- PRESET BUTTONS -->
-        <div class="modal-quick-actions">
-          <button class="btn-preset active" id="btn-map-preset-all" onclick="setMapMode('all')">
-            🏢 Hiện tất cả 4,050 điểm
-          </button>
-          <button class="btn-preset" id="btn-map-preset-in" onclick="setMapMode('only_in')">
-            🟢 Chỉ ghim điểm có hàng
-          </button>
-          <button class="btn-preset" id="btn-map-preset-both" onclick="setMapMode('with_out')">
-            🟢🔴 Có hàng & Hết hàng
-          </button>
-        </div>
-
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:10px;border-top:1px solid #e2e8f0;flex-wrap:wrap;gap:8px;">
-          <span style="font-size:0.75rem;color:#16a34a;display:flex;align-items:center;gap:4px;" id="map-save-indicator">
-            💾 Đã lưu cấu hình bản đồ vào <b>settings.json</b>
-          </span>
-          <button type="button" onclick="resetMapSettings()" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;padding:5px 10px;border-radius:6px;font-size:0.75rem;font-weight:700;cursor:pointer;">
-            🔄 Khôi phục mặc định bản đồ
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 4.2. NOTIFICATION SETTINGS MODAL (CÀI ĐẶT THÔNG BÁO TÁCH BIỆT HOÀN TOÀN) -->
-  <div id="notif-settings-modal" class="modal-overlay" style="display: none;" onclick="if(event.target === this) toggleNotifSettingsModal();">
-    <div class="modal-content" style="max-width: 580px;">
-      <div class="modal-header">
-        <div>
-          <h3 style="font-size:1.05rem;display:flex;align-items:center;gap:8px;">🔔 Cài Đặt Thông Báo Có Hàng & Cảnh Báo</h3>
-          <div style="font-size:0.75rem;color:#94a3b8;margin-top:2px;">Tùy chọn chuông, thông báo nổi & danh sách Báo Có Hàng (Tách biệt hoàn toàn khỏi bản đồ)</div>
-        </div>
-        <button class="modal-close-btn" onclick="toggleNotifSettingsModal()">✕</button>
-      </div>
-
-      <div class="modal-body">
-        <!-- SECTION 1: KÊNH THÔNG BÁO -->
-        <div class="setting-group">
-          <label class="setting-group-title">🔊 KÊNH THÔNG BÁO (ÂM THANH & TRÌNH DUYỆT)</label>
-          
-          <label class="setting-checkbox-row">
-            <div class="setting-checkbox-left">
-              <input type="checkbox" id="notif-check-sound" checked onchange="updateNotifSetting('soundEnabled', this.checked)" />
-              <div>
-                <b>🔔 Chuông âm thanh cảnh báo</b>
-                <div class="time-desc">Phát chuông báo khi phát hiện có biến động hoặc sự kiện mới.</div>
-              </div>
-            </div>
-            <button type="button" class="btn-test-action" onclick="testNotifSound()">🔊 Nghe thử</button>
-          </label>
-
-          <label class="setting-checkbox-row">
-            <div class="setting-checkbox-left">
-              <input type="checkbox" id="notif-check-push" checked onchange="updateNotifSetting('pushEnabled', this.checked)" />
-              <div>
-                <b>🌐 Thông báo nổi máy tính (Web Push)</b>
-                <div class="time-desc">Hiện thông báo góc màn hình máy tính (ngay cả khi thu nhỏ trình duyệt).</div>
-              </div>
-            </div>
-            <div style="display:flex;align-items:center;gap:6px;">
-              <span id="notif-perm-status" class="notif-badge-state notif-badge-default">Kiểm tra...</span>
-              <button type="button" class="btn-test-action" id="btn-request-perm" onclick="requestPushPermission()">Cấp quyền</button>
-            </div>
-          </label>
-        </div>
-
-        <!-- SECTION 2: CHẾ ĐỘ THÔNG BÁO THEO TÌNH TRẠNG -->
-        <div class="setting-group">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-            <label class="setting-group-title" style="margin-bottom:0;">🎯 TÌNH TRẠNG CẦN NHẬN THÔNG BÁO & HIỆN TRONG BÁO CÓ HÀNG</label>
-            <div style="display:flex;gap:6px;">
-              <button type="button" class="btn-preset active" id="notif-preset-only-in" onclick="applyNotifPreset('only_in')" style="padding:2px 8px;font-size:0.75rem;font-weight:700;">
-                🟢 Chỉ báo Có hàng
-              </button>
-              <button type="button" class="btn-preset" id="notif-preset-all" onclick="applyNotifPreset('all')" style="padding:2px 8px;font-size:0.75rem;font-weight:700;">
-                🏢 Báo Tất cả
-              </button>
-            </div>
+          <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 10px;">
+            Chọn các tỉnh bạn muốn hiển thị trên bản đồ, danh sách và nhận thông báo:
           </div>
-
-          <!-- OPTION 1: CÓ HÀNG -->
-          <label class="setting-checkbox-row">
-            <div class="setting-checkbox-left">
-              <input type="checkbox" id="notif-check-instock" checked onchange="updateNotifSetting('notifyInStock', this.checked)" />
-              <div>
-                <b style="color:#16a34a;">🟢 Thông báo khi CÓ HÀNG (In Stock) [Mặc định]</b>
-                <div class="time-desc">Báo chuông & hiển thị trong danh sách khi có cửa hàng vừa có thẻ Pokémon.</div>
-              </div>
-            </div>
-            <span class="status-count-pill in">Khuyên dùng</span>
-          </label>
-
-          <!-- OPTION 2: HẾT HÀNG -->
-          <label class="setting-checkbox-row">
-            <div class="setting-checkbox-left">
-              <input type="checkbox" id="notif-check-outofstock" onchange="updateNotifSetting('notifyOutOfStock', this.checked)" />
-              <div>
-                <b style="color:#dc2626;">🔴 Thông báo khi HẾT HÀNG (Out of Stock)</b>
-                <div class="time-desc">Nhận thông báo khi cửa hàng đổi sang hết hàng (để tránh đi nhầm).</div>
-              </div>
-            </div>
-            <span class="status-count-pill out">Tùy chọn</span>
-          </label>
-
-          <!-- OPTION 3: KHÔNG CÓ HÀNG / KHÔNG BÁN THẺ -->
-          <label class="setting-checkbox-row">
-            <div class="setting-checkbox-left">
-              <input type="checkbox" id="notif-check-nothandled" onchange="updateNotifSetting('notifyNotHandled', this.checked)" />
-              <div>
-                <b style="color:#64748b;">⚪ Thông báo khi KHÔNG CÓ HÀNG / KHÔNG BÁN THẺ (Not Handled)</b>
-                <div class="time-desc">Nhận thông báo khi cửa hàng báo không kinh doanh hoặc không có thẻ.</div>
-              </div>
-            </div>
-            <span class="status-count-pill none">Tùy chọn</span>
-          </label>
-
-          <!-- OPTION 4: LỊCH BỐC THĂM / SỰ KIỆN MỚI -->
-          <label class="setting-checkbox-row">
-            <div class="setting-checkbox-left">
-              <input type="checkbox" id="notif-check-lottery" checked onchange="updateNotifSetting('notifyLottery', this.checked)" />
-              <div>
-                <b style="color:#2563eb;">📅 Thông báo LỊCH BỐC THĂM MỚI từ Quản trị viên</b>
-                <div class="time-desc">Báo tức thì khi Poketan đăng bài mở đợt bốc thăm mới (Amazon, Geo, Pokemon Center...).</div>
-              </div>
-            </div>
-            <span class="status-count-pill" style="background:#dbeafe;color:#1e40af;">Admin Push</span>
-          </label>
-        </div>
-
-        <!-- SECTION 3: ĐỘ MỚI BÁO CÁO CÓ HÀNG (LỌC THỜI GIAN - TRÁNH TIN CŨ ĐÃ HẾT HÀNG) -->
-        <div class="setting-group">
-          <label class="setting-group-title">⏰ ĐỘ MỚI TIN BÁO CÓ HÀNG (TRÁNH TIN LÂU ĐÃ HẾT HÀNG)</label>
-          <div class="time-radio-group">
-            <label class="time-radio-row">
-              <input type="radio" name="notif-max-age" value="1" id="notif-age-1" onchange="setNotifMaxAge(1)" />
-              <div>
-                <b style="color:#16a34a;">⚡ Siêu mới: Trong vòng 1 giờ</b>
-                <div class="time-desc">Khả năng còn hàng cao nhất! Chỉ thông báo & hiện tin vừa đăng tức thì.</div>
-              </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px;">
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; background: #f8fafc; padding: 8px 10px; border-radius: 8px; border: 1px solid #e2e8f0;">
+              <input type="checkbox" class="notif-pref-check" value="osaka" onchange="togglePrefFilterUnified(this)" checked style="width:18px;height:18px;" />
+              <span>🏯 大阪府 (Osaka)</span>
             </label>
-            <label class="time-radio-row">
-              <input type="radio" name="notif-max-age" value="3" id="notif-age-3" onchange="setNotifMaxAge(3)" />
-              <div>
-                <b style="color:#2563eb;">⏱ Trong vòng 3 giờ</b>
-                <div class="time-desc">Khuyên dùng khi bắt đầu đi săn thẻ để tránh đến nơi bị hết hàng.</div>
-              </div>
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; background: #f8fafc; padding: 8px 10px; border-radius: 8px; border: 1px solid #e2e8f0;">
+              <input type="checkbox" class="notif-pref-check" value="aichi" onchange="togglePrefFilterUnified(this)" checked style="width:18px;height:18px;" />
+              <span>🏯 愛知県 (Aichi)</span>
             </label>
-            <label class="time-radio-row">
-              <input type="radio" name="notif-max-age" value="6" id="notif-age-6" onchange="setNotifMaxAge(6)" />
-              <div>
-                <b style="color:#0284c7;">⏱ Trong vòng 6 giờ</b>
-                <div class="time-desc">Báo cáo trong nửa ngày (buổi sáng hoặc buổi chiều).</div>
-              </div>
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; background: #f8fafc; padding: 8px 10px; border-radius: 8px; border: 1px solid #e2e8f0;">
+              <input type="checkbox" class="notif-pref-check" value="kanagawa" onchange="togglePrefFilterUnified(this)" checked style="width:18px;height:18px;" />
+              <span>🏯 神奈川県 (Kanagawa)</span>
             </label>
-            <label class="time-radio-row">
-              <input type="radio" name="notif-max-age" value="12" id="notif-age-12" onchange="setNotifMaxAge(12)" />
-              <div>
-                <b>📅 Trong vòng 12 giờ</b>
-                <div class="time-desc">Tất cả báo cáo trong ngày hôm nay.</div>
-              </div>
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; background: #f8fafc; padding: 8px 10px; border-radius: 8px; border: 1px solid #e2e8f0;">
+              <input type="checkbox" class="notif-pref-check" value="gifu" onchange="togglePrefFilterUnified(this)" checked style="width:18px;height:18px;" />
+              <span>🏯 岐阜県 (Gifu)</span>
             </label>
-            <label class="time-radio-row">
-              <input type="radio" name="notif-max-age" value="24" id="notif-age-24" checked onchange="setNotifMaxAge(24)" />
-              <div>
-                <b>📅 Trong vòng 24 giờ (Mặc định)</b>
-                <div class="time-desc">Bao gồm tất cả báo cáo trong ngày qua.</div>
-              </div>
-            </label>
-            <label class="time-radio-row">
-              <input type="radio" name="notif-max-age" value="0" id="notif-age-0" onchange="setNotifMaxAge(0)" />
-              <div>
-                <b style="color:#64748b;">⏳ Tất cả thời gian (Bao gồm tin cũ >24h)</b>
-                <div class="time-desc">Lưu ý: Tin báo có hàng từ nhiều ngày trước thường đã hết hàng.</div>
-              </div>
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; background: #f8fafc; padding: 8px 10px; border-radius: 8px; border: 1px solid #e2e8f0;">
+              <input type="checkbox" class="notif-pref-check" value="mie" onchange="togglePrefFilterUnified(this)" checked style="width:18px;height:18px;" />
+              <span>🏯 三重県 (Mie)</span>
             </label>
           </div>
         </div>
 
-        <!-- SECTION 4: LỌC THÔNG BÁO THEO CHUỖI -->
-        <div class="setting-group">
-          <label class="setting-group-title">🏪 LỌC THÔNG BÁO THEO CHUỖI CỬA HÀNG</label>
-          <div style="font-size:0.75rem;color:#64748b;margin-bottom:4px;">
-            Chỉ nhận thông báo từ chuỗi bạn quan tâm (Bản đồ vẫn hiển thị theo cài đặt bản đồ riêng):
-          </div>
-          <select id="notif-chain-select" class="control-dropdown" onchange="updateNotifSetting('notifyChain', this.value)" style="height:40px;">
-            <option value="" selected>🏢 Nhận thông báo TẤT CẢ các chuỗi cửa hàng (Mặc định)</option>
-            <option value="seven">🏪 Chỉ nhận thông báo từ 7-Eleven</option>
-            <option value="lawson">🏪 Chỉ nhận thông báo từ Lawson</option>
-            <option value="familymart">🏪 Chỉ nhận thông báo từ FamilyMart</option>
-            <option value="ministop">🏪 Chỉ nhận thông báo từ Ministop</option>
-            <option value="specialty">🃏 Chỉ nhận thông báo từ Cửa hàng thẻ Pokémon</option>
-          </select>
-        </div>
+        <!-- KHU VỰC 3: CÀI ĐẶT THÔNG BÁO & ÂM THANH -->
+        <div class="setting-group" style="background: white; border: 1.5px solid #cbd5e1; border-radius: 12px; padding: 16px;">
+          <label class="setting-group-title" style="color: #0f172a; font-size: 0.92rem; display: flex; align-items: center; justify-content: space-between;">
+            <span>🔔 CÀI ĐẶT THÔNG BÁO &amp; ÂM THANH</span>
+            <span style="font-size: 0.72rem; color: #f59e0b; background: #fef3c7; padding: 2px 8px; border-radius: 10px; font-weight: 700;">Cảnh báo</span>
+          </label>
 
-        <!-- SECTION 5: ĐỘ TIN CẬY -->
-        <div class="setting-group">
-          <label class="setting-group-title">📍 ĐỘ TIN CẬY & XÁC THỰC VỊ TRÍ</label>
-          <label class="setting-checkbox-row">
-            <div class="setting-checkbox-left">
-              <input type="checkbox" id="notif-check-onsite" onchange="updateNotifSetting('onlyOnsiteGps', this.checked)" />
-              <div>
-                <b>📍 Chỉ thông báo khi có người xác nhận tại quán (GPS onsite)</b>
-                <div class="time-desc">Bỏ qua tin báo từ xa, chỉ báo khi người đăng đứng trực tiếp tại cửa hàng (tránh tin báo ảo).</div>
+          <!-- Âm thanh & Web push -->
+          <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px;">
+            <label class="setting-checkbox-row">
+              <div class="setting-checkbox-left">
+                <input type="checkbox" id="notif-check-sound" checked onchange="updateNotifSetting('soundEnabled', this.checked)" />
+                <div>
+                  <b>🔔 Chuông âm thanh cảnh báo</b>
+                  <div class="time-desc">Phát chuông báo tức thì khi có cửa hàng vừa có hàng.</div>
+                </div>
+              </div>
+              <button type="button" class="btn-test-action" onclick="testNotifSound()">🔊 Nghe thử</button>
+            </label>
+
+            <label class="setting-checkbox-row">
+              <div class="setting-checkbox-left">
+                <input type="checkbox" id="notif-check-push" checked onchange="updateNotifSetting('pushEnabled', this.checked)" />
+                <div>
+                  <b>🌐 Thông báo nổi máy tính &amp; điện thoại (Web Push)</b>
+                  <div class="time-desc">Hiện thông báo góc màn hình ngay cả khi thu nhỏ trình duyệt.</div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <span id="notif-perm-status" class="notif-badge-state notif-badge-default">Kiểm tra...</span>
+                <button type="button" class="btn-test-action" id="btn-request-perm" onclick="requestPushPermission()">Cấp quyền</button>
+              </div>
+            </label>
+          </div>
+
+          <!-- Tình trạng nhận thông báo -->
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <span style="font-size: 0.8rem; font-weight: 700; color: #0f172a;">🎯 Loại tin nhận thông báo:</span>
+              <div style="display:flex;gap:6px;">
+                <button type="button" class="btn-preset active" id="notif-preset-only-in" onclick="applyNotifPreset('only_in')" style="padding:2px 8px;font-size:0.72rem;font-weight:700;">
+                  🟢 Chỉ có hàng
+                </button>
+                <button type="button" class="btn-preset" id="notif-preset-all" onclick="applyNotifPreset('all')" style="padding:2px 8px;font-size:0.72rem;font-weight:700;">
+                  🏢 Báo tất cả
+                </button>
               </div>
             </div>
-          </label>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <label class="setting-checkbox-row" style="padding: 2px 0;">
+                <div class="setting-checkbox-left">
+                  <input type="checkbox" id="notif-check-instock" checked onchange="updateNotifSetting('notifyInStock', this.checked)" />
+                  <div>
+                    <b style="color:#16a34a;">🟢 Thông báo khi CÓ HÀNG (In Stock)</b>
+                  </div>
+                </div>
+                <span class="status-count-pill in">Khuyên dùng</span>
+              </label>
+              <label class="setting-checkbox-row" style="padding: 2px 0;">
+                <div class="setting-checkbox-left">
+                  <input type="checkbox" id="notif-check-outofstock" onchange="updateNotifSetting('notifyOutOfStock', this.checked)" />
+                  <div>
+                    <b style="color:#dc2626;">🔴 Thông báo khi HẾT HÀNG (Out of Stock)</b>
+                  </div>
+                </div>
+                <span class="status-count-pill out">Tùy chọn</span>
+              </label>
+              <label class="setting-checkbox-row" style="padding: 2px 0;">
+                <div class="setting-checkbox-left">
+                  <input type="checkbox" id="notif-check-nothandled" onchange="updateNotifSetting('notifyNotHandled', this.checked)" />
+                  <div>
+                    <b style="color:#64748b;">⚪ Thông báo khi KHÔNG BÁN THẺ (Not Handled)</b>
+                  </div>
+                </div>
+                <span class="status-count-pill none">Tùy chọn</span>
+              </label>
+              <label class="setting-checkbox-row" style="padding: 2px 0;">
+                <div class="setting-checkbox-left">
+                  <input type="checkbox" id="notif-check-lottery" checked onchange="updateNotifSetting('notifyLottery', this.checked)" />
+                  <div>
+                    <b style="color:#2563eb;">📅 Thông báo LỊCH BỐC THĂM MỚI (Admin Push)</b>
+                  </div>
+                </div>
+                <span class="status-count-pill" style="background:#dbeafe;color:#1e40af;">Admin</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Lọc thời gian tin báo -->
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+            <div style="font-size:0.78rem; font-weight:700; color:#0f172a; margin-bottom:6px;">⏰ Độ mới tin báo có hàng:</div>
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap:6px;">
+              <label style="display:flex;align-items:center;gap:4px;font-size:0.75rem;cursor:pointer;">
+                <input type="radio" name="notif-max-age" value="1" id="notif-age-1" onchange="setNotifMaxAge(1)" />
+                <span>🔥 1 giờ qua</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:4px;font-size:0.75rem;cursor:pointer;">
+                <input type="radio" name="notif-max-age" value="3" id="notif-age-3" onchange="setNotifMaxAge(3)" />
+                <span>⚡ 3 giờ qua</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:4px;font-size:0.75rem;cursor:pointer;">
+                <input type="radio" name="notif-max-age" value="6" id="notif-age-6" onchange="setNotifMaxAge(6)" />
+                <span>🕐 6 giờ qua</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:4px;font-size:0.75rem;cursor:pointer;">
+                <input type="radio" name="notif-max-age" value="24" id="notif-age-24" checked onchange="setNotifMaxAge(24)" />
+                <span>📅 24 giờ</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Lọc chuỗi & độ tin cậy -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px;">
+              <div style="font-size: 0.75rem; font-weight: 700; color: #0f172a; margin-bottom: 4px;">🏪 Lọc chuỗi thông báo:</div>
+              <select id="notif-chain-select" class="control-dropdown" onchange="updateNotifSetting('notifyChain', this.value)" style="height:34px; width:100%; font-size:0.75rem;">
+                <option value="" selected>Tất cả chuỗi</option>
+                <option value="seven">7-Eleven</option>
+                <option value="lawson">Lawson</option>
+                <option value="familymart">FamilyMart</option>
+                <option value="ministop">Ministop</option>
+                <option value="specialty">Card Shop</option>
+              </select>
+            </div>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; display:flex; align-items:center;">
+              <label style="display:flex;align-items:center;gap:6px;font-size:0.75rem;font-weight:600;cursor:pointer;">
+                <input type="checkbox" id="notif-check-onsite" onchange="updateNotifSetting('onlyOnsiteGps', this.checked)" />
+                <span>📍 Chỉ báo khi có xác nhận tại quán (GPS onsite)</span>
+              </label>
+            </div>
+          </div>
         </div>
 
-        <!-- SECTION 6: KẾT NỐI DISCORD & TELEGRAM WEBHOOK -->
-        <div class="setting-group" style="background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 10px; padding: 14px;">
-          <label class="setting-group-title" style="color: #0f172a; display: flex; align-items: center; justify-content: space-between;">
-            <span>🤖 THÔNG BÁO TỰ ĐỘNG VỀ DISCORD &amp; TELEGRAM</span>
-            <span style="font-size: 0.72rem; color: #16a34a; font-weight: 700; background: #dcfce7; padding: 2px 8px; border-radius: 12px;">Mới</span>
+        <!-- KHU VỰC 4: KẾT NỐI TELEGRAM BOT & DISCORD -->
+        <div class="setting-group" style="background: white; border: 1.5px solid #cbd5e1; border-radius: 12px; padding: 16px;">
+          <label class="setting-group-title" style="color: #0f172a; font-size: 0.92rem; display: flex; align-items: center; justify-content: space-between;">
+            <span>🤖 KẾT NỐI TELEGRAM BOT &amp; DISCORD</span>
+            <span style="font-size: 0.72rem; color: #0284c7; background: #e0f2fe; padding: 2px 8px; border-radius: 10px; font-weight: 700;">Webhooks</span>
           </label>
           <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 12px;">
-            Nhận tin báo tức thì khi có cửa hàng vừa có hàng (kèm tên Pack, địa chỉ và link dẫn đường Google Maps).
-          </div>
-
-          <!-- DISCORD CONFIG -->
-          <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px; margin-bottom: 10px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-              <label style="font-size: 0.82rem; font-weight: 700; color: #5865F2; display: flex; align-items: center; gap: 6px;">
-                <input type="checkbox" id="notif-check-discord" onchange="updateNotifSetting('discordEnabled', this.checked)" />
-                <span>🎮 Bật gửi về kênh Discord</span>
-              </label>
-              <button type="button" class="btn-test-action" onclick="testWebhookNotification('discord')" style="font-size:0.72rem; padding: 3px 8px;">
-                📨 Test Discord
-              </button>
-            </div>
-            <div style="display: flex; flex-direction: column; gap: 4px;">
-              <input type="text" id="notif-input-discord-url" class="search-box" placeholder="Dán Discord Webhook URL (https://discord.com/api/webhooks/...)" onchange="updateNotifSetting('discordWebhookUrl', this.value.trim())" style="height:32px; font-size:0.75rem;" />
-              <div style="font-size: 0.68rem; color: #94a3b8;">* Cách lấy: Vào Discord Server ➔ Cài đặt kênh ➔ Integrations ➔ Webhooks ➔ Tạo &amp; Copy URL</div>
-            </div>
+            Nhận tin báo tức thì về Telegram cá nhân/nhóm và Discord kèm khoảng cách &amp; link mở app.
           </div>
 
           <!-- TELEGRAM CONFIG -->
-          <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-              <label style="font-size: 0.82rem; font-weight: 700; color: #0284c7; display: flex; align-items: center; gap: 6px;">
-                <input type="checkbox" id="notif-check-telegram" onchange="updateNotifSetting('telegramEnabled', this.checked)" />
-                <span>✈️ Bật gửi về Telegram</span>
+          <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <label style="font-size: 0.85rem; font-weight: 700; color: #0284c7; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                <input type="checkbox" id="notif-check-telegram" onchange="updateNotifSetting('telegramEnabled', this.checked)" style="width:16px;height:16px;" />
+                <span>✈️ Bật gửi tin nhắn về Telegram</span>
               </label>
-              <button type="button" class="btn-test-action" onclick="testWebhookNotification('telegram')" style="font-size:0.72rem; padding: 3px 8px;">
+              <button type="button" class="btn-test-action" onclick="testWebhookNotification('telegram')" style="font-size:0.72rem; padding: 4px 10px;">
                 📨 Test Telegram
               </button>
             </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 4px;">
-              <input type="text" id="notif-input-tg-token" class="search-box" placeholder="Bot Token (vd: 123456:ABC-DEF...)" onchange="updateNotifSetting('telegramBotToken', this.value.trim())" style="height:32px; font-size:0.75rem;" />
-              <input type="text" id="notif-input-tg-chatid" class="search-box" placeholder="Chat ID (vd: 987654321 hoặc @tenkenh)" onchange="updateNotifSetting('telegramChatId', this.value.trim())" style="height:32px; font-size:0.75rem;" />
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 6px;">
+              <input type="text" id="notif-input-tg-token" class="search-box" placeholder="Bot Token (vd: 8888535478:AAFtl...)" onchange="updateNotifSetting('telegramBotToken', this.value.trim())" style="height:34px; font-size:0.75rem;" />
+              <input type="text" id="notif-input-tg-chatid" class="search-box" placeholder="Chat ID (vd: 987654321 hoặc @tenkenh)" onchange="updateNotifSetting('telegramChatId', this.value.trim())" style="height:34px; font-size:0.75rem;" />
             </div>
-            <div style="font-size: 0.68rem; color: #94a3b8;">* Tạo Bot qua @BotFather để nhận Token, lấy Chat ID cá nhân/nhóm qua @userinfobot</div>
+            <div style="font-size: 0.68rem; color: #64748b;">* Tạo Bot qua @BotFather để nhận Token, lấy Chat ID cá nhân/nhóm qua @userinfobot</div>
           </div>
 
-          <!-- PREFECTURE FILTER FOR NOTIFICATIONS -->
-          <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px; margin-top: 10px;">
-            <div style="font-size: 0.82rem; font-weight: 700; color: #0f172a; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between;">
-              <span>🗾 Lựa chọn tỉnh thành nhận tin (Telegram &amp; App)</span>
-              <span style="font-size: 0.68rem; color: #2563eb; font-weight: 600;">Chỉ báo khi có hàng ở tỉnh chọn</span>
+          <!-- DISCORD CONFIG -->
+          <div style="background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 8px; padding: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <label style="font-size: 0.85rem; font-weight: 700; color: #5865F2; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                <input type="checkbox" id="notif-check-discord" onchange="updateNotifSetting('discordEnabled', this.checked)" style="width:16px;height:16px;" />
+                <span>🎮 Bật gửi về kênh Discord</span>
+              </label>
+              <button type="button" class="btn-test-action" onclick="testWebhookNotification('discord')" style="font-size:0.72rem; padding: 4px 10px;">
+                📨 Test Discord
+              </button>
             </div>
-            <div style="font-size: 0.72rem; color: #64748b; margin-bottom: 6px;">
-              Bỏ chọn các tỉnh bạn không muốn nhận tin nhắn Telegram và thông báo trên App:
-            </div>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 6px;">
-              <label style="display: flex; align-items: center; gap: 5px; font-size: 0.78rem; font-weight: 600; cursor: pointer;">
-                <input type="checkbox" class="notif-pref-check" value="osaka" onchange="updateNotifPrefSetting(this)" checked />
-                <span>🏯 大阪府 (Osaka)</span>
-              </label>
-              <label style="display: flex; align-items: center; gap: 5px; font-size: 0.78rem; font-weight: 600; cursor: pointer;">
-                <input type="checkbox" class="notif-pref-check" value="aichi" onchange="updateNotifPrefSetting(this)" checked />
-                <span>🏯 愛知県 (Aichi)</span>
-              </label>
-              <label style="display: flex; align-items: center; gap: 5px; font-size: 0.78rem; font-weight: 600; cursor: pointer;">
-                <input type="checkbox" class="notif-pref-check" value="kanagawa" onchange="updateNotifPrefSetting(this)" checked />
-                <span>🏯 神奈川県 (Kanagawa)</span>
-              </label>
-              <label style="display: flex; align-items: center; gap: 5px; font-size: 0.78rem; font-weight: 600; cursor: pointer;">
-                <input type="checkbox" class="notif-pref-check" value="gifu" onchange="updateNotifPrefSetting(this)" checked />
-                <span>🏯 岐阜県 (Gifu)</span>
-              </label>
-              <label style="display: flex; align-items: center; gap: 5px; font-size: 0.78rem; font-weight: 600; cursor: pointer;">
-                <input type="checkbox" class="notif-pref-check" value="mie" onchange="updateNotifPrefSetting(this)" checked />
-                <span>🏯 三重県 (Mie)</span>
-              </label>
-            </div>
+            <input type="text" id="notif-input-discord-url" class="search-box" placeholder="Dán Discord Webhook URL (https://discord.com/api/webhooks/...)" onchange="updateNotifSetting('discordWebhookUrl', this.value.trim())" style="height:34px; font-size:0.75rem; width:100%;" />
           </div>
         </div>
 
-        <!-- SECTION 7: THỬ NGHIỆM -->
-        <div style="display:flex;justify-content:space-between;align-items:center;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 14px;flex-wrap:wrap;gap:8px;">
-          <div>
-            <div style="font-weight:700;font-size:0.85rem;color:#0f172a;">Kiểm tra chuông & thông báo hoạt động</div>
-            <div style="font-size:0.75rem;color:#64748b;">Gửi 1 thông báo mẫu kèm chuông &amp; đẩy thử về Webhook để kiểm tra</div>
+        <!-- KHU VỰC 5: VỊ TRÍ & ĐỊNH VỊ GPS -->
+        <div class="setting-group" style="background: white; border: 1.5px solid #cbd5e1; border-radius: 12px; padding: 16px;">
+          <label class="setting-group-title" style="color: #0f172a; font-size: 0.92rem; display: flex; align-items: center; justify-content: space-between;">
+            <span>📍 VỊ TRÍ &amp; ĐỊNH VỊ GPS</span>
+            <span style="font-size: 0.72rem; color: #0284c7; background: #e0f2fe; padding: 2px 8px; border-radius: 10px; font-weight: 700;">Realtime GPS</span>
+          </label>
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+            <div>
+              <div style="font-weight: 700; font-size: 0.85rem; color: #0f172a;" id="settings-gps-summary">
+                📍 Vị trí: Đang theo dõi liên tục
+              </div>
+              <div style="font-size: 0.75rem; color: #64748b; margin-top: 2px;">
+                Tọa độ tự động cập nhật khi di chuyển, dùng tính khoảng cách đến từng cửa hàng.
+              </div>
+            </div>
+            <button type="button" class="btn-test-action" onclick="requestUserLocation(true)" style="background:#2563eb; color:white; border-color:#2563eb; padding:6px 14px; font-size:0.78rem;">
+              📍 Định vị lại ngay
+            </button>
           </div>
-          <button type="button" class="btn-test-action" onclick="testNotifPopup()" style="background:#2563eb;color:white;border-color:#2563eb;">
-            💬 Gửi thông báo mẫu
-          </button>
         </div>
 
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:10px;border-top:1px solid #e2e8f0;flex-wrap:wrap;gap:8px;">
-          <span style="font-size:0.75rem;color:#16a34a;display:flex;align-items:center;gap:4px;" id="notif-save-indicator">
-            💾 Đã lưu cấu hình thông báo vào <b>settings.json</b>
-          </span>
-          <button type="button" onclick="resetNotifSettings()" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;padding:5px 10px;border-radius:6px;font-size:0.75rem;font-weight:700;cursor:pointer;">
-            🔄 Khôi phục mặc định thông báo
-          </button>
+        <!-- KHU VỰC 6: THAO TÁC & KHÔI PHỤC HỆ THỐNG -->
+        <div style="display: flex; flex-direction: column; gap: 10px; background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+            <div>
+              <div style="font-weight: 700; font-size: 0.85rem; color: #0f172a;">Kiểm tra chuông &amp; thông báo hoạt động</div>
+              <div style="font-size: 0.75rem; color: #64748b;">Gửi 1 thông báo mẫu kèm chuông &amp; đẩy thử về Webhook</div>
+            </div>
+            <button type="button" class="btn-test-action" onclick="testNotifPopup()" style="background:#0f172a; color:white; border-color:#0f172a; padding:6px 12px;">
+              💬 Gửi thông báo mẫu
+            </button>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 10px; border-top: 1px solid #e2e8f0; flex-wrap: wrap; gap: 8px;">
+            <button type="button" onclick="refreshAll()" style="background:#eff6ff; color:#1d4ed8; border:1px solid #93c5fd; padding:6px 12px; border-radius:6px; font-size:0.78rem; font-weight:700; cursor:pointer;">
+              🔄 Làm mới toàn bộ dữ liệu
+            </button>
+            <button type="button" onclick="resetAllSettings()" style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; padding:6px 12px; border-radius:6px; font-size:0.78rem; font-weight:700; cursor:pointer;">
+              ⚠️ Khôi phục cài đặt gốc
+            </button>
+          </div>
+
+          <div style="font-size: 0.72rem; color: #16a34a; display: flex; align-items: center; gap: 4px; margin-top: 4px;" id="unified-save-indicator">
+            💾 Đã lưu cấu hình tự động vào <b>settings.json</b>
+          </div>
         </div>
       </div>
     </div>
+
   </div>
+
+
+
+  <!-- LEGACY NOTIF MODAL (Consolidated into Unified Settings #view-notif-mode) -->
+  <div id="notif-settings-modal" style="display: none;"></div>
 
   <!-- STORE REPORT HISTORY MODAL -->
   <div id="store-history-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this) closeStoreHistoryModal()">
@@ -3358,25 +3337,25 @@ def index():
   <nav id="mobile-bottom-nav">
     <button class="mobile-nav-btn active" id="mob-nav-map" onclick="mobileNavTo('map')">
       <span class="nav-btn-icon">🗺️</span>
-      <span class="nav-btn-label">地図</span>
+      <span class="nav-btn-label">Bản đồ</span>
     </button>
     <button class="mobile-nav-btn" id="mob-nav-list" onclick="mobileNavTo('list')">
       <span class="nav-btn-icon">📋</span>
-      <span class="nav-btn-label">一覧</span>
+      <span class="nav-btn-label">Danh sách</span>
       <span class="nav-btn-badge" id="mob-badge-stock">0</span>
     </button>
     <button class="mobile-nav-btn gacha-center-btn" id="mob-nav-gacha" onclick="mobileNavTo('gacha')">
       <span class="nav-btn-icon">⚡</span>
-      <span class="nav-btn-label">ガチ巡り</span>
+      <span class="nav-btn-label">Săn thẻ</span>
     </button>
     <button class="mobile-nav-btn" id="mob-nav-cal" onclick="mobileNavTo('calendar')">
       <span class="nav-btn-icon">📅</span>
-      <span class="nav-btn-label">さがす</span>
+      <span class="nav-btn-label">Lịch</span>
       <span class="nav-btn-badge cal-badge-color" id="mob-badge-cal">0</span>
     </button>
     <button class="mobile-nav-btn" id="mob-nav-settings" onclick="mobileNavTo('settings')">
-      <span class="nav-btn-icon">🔔</span>
-      <span class="nav-btn-label">掲示板</span>
+      <span class="nav-btn-icon">⚙️</span>
+      <span class="nav-btn-label">Cài đặt</span>
     </button>
   </nav>
 
@@ -3789,9 +3768,13 @@ def index():
     
     // 1.1 CẤU HÌNH BẢN ĐỒ (CHỈ ĐIỀU KHIỂN GHIM TRÊN BẢN ĐỒ)
     let mapDisplay = {
-      mode: 'all',          // 'all' = 4,050 cửa hàng, 'only_in' = chỉ ghim có hàng, 'with_out' = ghim có hàng + hết hàng
+      mode: 'all',          // 'all' = 4,050 cửa hàng, 'only_in' = chỉ ghim có hàng, 'with_out' = ghim có hàng + hết hàng, 'custom'
       chain: '',            // Lọc chuỗi trên bản đồ: '' = tất cả
-      includeCold: true     // Nạp dữ liệu lịch sử (>24h)
+      includeCold: true,    // Nạp dữ liệu lịch sử (>24h)
+      showInStock: true,    // 🟢 Có hàng
+      showOutOfStock: true, // 🔴 Hết hàng
+      showNotHandled: true, // ⚪ Không bán thẻ
+      showUnknown: true     // 🔘 Không có thông báo gì / Chưa có tin gần đây
     };
 
     // 1.2 CẤU HÌNH DANH SÁCH SIDEBAR (TÁCH BIỆT HOÀN TOÀN KHỎI BẢN ĐỒ)
@@ -3922,12 +3905,47 @@ def index():
     // 3. ĐIỀU KHIỂN GHIM TRÊN BẢN ĐỒ (CHỈ TÁC ĐỘNG BẢN ĐỒ LEAFLET, KHÔNG ĐỤNG SIDEBAR)
     function setMapMode(mode) {
       mapDisplay.mode = mode;
+      if (mode === 'all') {
+        mapDisplay.showInStock = true;
+        mapDisplay.showOutOfStock = true;
+        mapDisplay.showNotHandled = true;
+        mapDisplay.showUnknown = true;
+      } else if (mode === 'only_in') {
+        mapDisplay.showInStock = true;
+        mapDisplay.showOutOfStock = false;
+        mapDisplay.showNotHandled = false;
+        mapDisplay.showUnknown = false;
+      } else if (mode === 'with_out') {
+        mapDisplay.showInStock = true;
+        mapDisplay.showOutOfStock = true;
+        mapDisplay.showNotHandled = false;
+        mapDisplay.showUnknown = false;
+      }
       syncMapSettingsUI();
       updateQuickMapModeBtn();
       renderMapMarkersOnly(); // Chỉ vẽ lại ghim bản đồ!
       saveSettings();
     }
     window.setMapMode = setMapMode;
+    window.applyMapStatusPreset = setMapMode;
+
+    function updateMapStatusItem(key, checked) {
+      mapDisplay[key] = !!checked;
+      if (mapDisplay.showInStock && mapDisplay.showOutOfStock && mapDisplay.showNotHandled && mapDisplay.showUnknown) {
+        mapDisplay.mode = 'all';
+      } else if (mapDisplay.showInStock && !mapDisplay.showOutOfStock && !mapDisplay.showNotHandled && !mapDisplay.showUnknown) {
+        mapDisplay.mode = 'only_in';
+      } else if (mapDisplay.showInStock && mapDisplay.showOutOfStock && !mapDisplay.showNotHandled && !mapDisplay.showUnknown) {
+        mapDisplay.mode = 'with_out';
+      } else {
+        mapDisplay.mode = 'custom';
+      }
+      syncMapSettingsUI();
+      updateQuickMapModeBtn();
+      renderMapMarkersOnly();
+      saveSettings();
+    }
+    window.updateMapStatusItem = updateMapStatusItem;
 
     function setMapChain(chain) {
       mapDisplay.chain = chain;
@@ -4012,12 +4030,14 @@ def index():
     window.updateFilterBanner = updateFilterBanner;
 
     function syncMapSettingsUI() {
-      const rAll = document.getElementById('map-mode-all');
-      const rIn = document.getElementById('map-mode-only_in');
-      const rWithOut = document.getElementById('map-mode-with_out');
-      if (rAll && mapDisplay.mode === 'all') rAll.checked = true;
-      if (rIn && mapDisplay.mode === 'only_in') rIn.checked = true;
-      if (rWithOut && mapDisplay.mode === 'with_out') rWithOut.checked = true;
+      const chkIn = document.getElementById('map-check-instock');
+      const chkOut = document.getElementById('map-check-outofstock');
+      const chkNone = document.getElementById('map-check-nothandled');
+      const chkUnk = document.getElementById('map-check-unknown');
+      if (chkIn) chkIn.checked = mapDisplay.showInStock !== undefined ? mapDisplay.showInStock : true;
+      if (chkOut) chkOut.checked = mapDisplay.showOutOfStock !== undefined ? mapDisplay.showOutOfStock : (mapDisplay.mode !== 'only_in');
+      if (chkNone) chkNone.checked = mapDisplay.showNotHandled !== undefined ? mapDisplay.showNotHandled : (mapDisplay.mode === 'all');
+      if (chkUnk) chkUnk.checked = mapDisplay.showUnknown !== undefined ? mapDisplay.showUnknown : (mapDisplay.mode === 'all');
 
       const pAll = document.getElementById('btn-map-preset-all');
       const pIn = document.getElementById('btn-map-preset-in');
@@ -4030,7 +4050,7 @@ def index():
       if (modalChain) modalChain.value = mapDisplay.chain || '';
 
       const checkCold = document.getElementById('check-include-cold');
-      if (checkCold) checkCold.checked = mapDisplay.includeCold;
+      if (checkCold) checkCold.checked = mapDisplay.includeCold !== undefined ? mapDisplay.includeCold : true;
 
       updateQuickMapModeBtn();
       updateFilterBanner();
@@ -4106,29 +4126,53 @@ def index():
     window.setSortMode = setSortMode;
 
     function toggleMapSettingsModal() {
-      const modal = document.getElementById('map-settings-modal');
-      const notifModal = document.getElementById('notif-settings-modal');
-      if (notifModal) notifModal.style.display = 'none';
-
-      const isVisible = modal.style.display !== 'none';
-      modal.style.display = isVisible ? 'none' : 'flex';
-      const sideBtn = document.getElementById('btn-sidebar-settings');
-      if (sideBtn) sideBtn.classList.toggle('active', !isVisible);
-      if (!isVisible) syncMapSettingsUI();
+      mobileNavTo('settings');
     }
     window.toggleMapSettingsModal = toggleMapSettingsModal;
     window.toggleSettingsModal = toggleMapSettingsModal; // backward-compat
 
     function toggleNotifSettingsModal() {
-      const notifModal = document.getElementById('notif-settings-modal');
-      const mapModal = document.getElementById('map-settings-modal');
-      if (mapModal) mapModal.style.display = 'none';
-
-      const isVisible = notifModal.style.display !== 'none';
-      notifModal.style.display = isVisible ? 'none' : 'flex';
-      if (!isVisible) syncNotifUI();
+      mobileNavTo('settings');
     }
     window.toggleNotifSettingsModal = toggleNotifSettingsModal;
+
+    function resetAllSettings() {
+      if (!confirm('Khôi phục toàn bộ cài đặt (Bản đồ, Thông báo, Tỉnh thành) về mặc định ban đầu?')) return;
+      mapDisplay = {
+        mode: 'all',
+        chain: '',
+        includeCold: true,
+        showInStock: true,
+        showOutOfStock: true,
+        showNotHandled: true,
+        showUnknown: true
+      };
+      notifSettings = {
+        soundEnabled: true,
+        pushEnabled: true,
+        notifyInStock: true,
+        notifyOutOfStock: false,
+        notifyNotHandled: false,
+        notifyLottery: true,
+        maxReportAgeHours: 24,
+        notifyChain: '',
+        onlyOnsiteGps: false,
+        discordEnabled: false,
+        discordWebhookUrl: '',
+        telegramEnabled: false,
+        telegramBotToken: '',
+        telegramChatId: '',
+        notifyPrefs: ['osaka', 'aichi', 'kanagawa', 'gifu', 'mie']
+      };
+      enabledPrefs.clear();
+      ['osaka', 'aichi', 'kanagawa', 'gifu', 'mie'].forEach(p => enabledPrefs.add(p));
+      try { localStorage.removeItem('pokemap_prefs'); } catch(e) {}
+      syncMapSettingsUI();
+      syncNotifUI();
+      renderUI();
+      saveSettings();
+    }
+    window.resetAllSettings = resetAllSettings;
 
     // 2.1 SETTINGS PERSISTENCE & RESTORE
     function saveSettings() {
@@ -4161,8 +4205,10 @@ def index():
 
       const indMap = document.getElementById('map-save-indicator');
       const indNotif = document.getElementById('notif-save-indicator');
+      const indUni = document.getElementById('unified-save-indicator');
       if (indMap) indMap.innerHTML = '💾 Đang lưu...';
       if (indNotif) indNotif.innerHTML = '💾 Đang lưu...';
+      if (indUni) indUni.innerHTML = '💾 Đang lưu...';
 
       fetch('/api/settings', {
         method: 'POST',
@@ -4173,11 +4219,13 @@ def index():
       .then(() => {
         if (indMap) indMap.innerHTML = '💾 Đã lưu cấu hình bản đồ vào <b>settings.json</b>';
         if (indNotif) indNotif.innerHTML = '💾 Đã lưu cấu hình thông báo vào <b>settings.json</b>';
+        if (indUni) indUni.innerHTML = '💾 Đã lưu cấu hình tự động vào <b>settings.json</b>';
       })
       .catch(err => {
         console.warn('Could not save settings to server:', err);
         if (indMap) indMap.innerHTML = '💾 Đã lưu bộ nhớ trình duyệt';
         if (indNotif) indNotif.innerHTML = '💾 Đã lưu bộ nhớ trình duyệt';
+        if (indUni) indUni.innerHTML = '💾 Đã lưu bộ nhớ trình duyệt';
       });
     }
     window.saveSettings = saveSettings;
@@ -4193,10 +4241,22 @@ def index():
         else mapDisplay.mode = 'only_in';
       }
 
+      if (mapDisplay.showInStock === undefined) {
+        mapDisplay.showInStock = true;
+        mapDisplay.showOutOfStock = mapDisplay.mode !== 'only_in';
+        mapDisplay.showNotHandled = mapDisplay.mode === 'all';
+        mapDisplay.showUnknown = mapDisplay.mode === 'all';
+      }
+
       if (settings.notifications && typeof settings.notifications === 'object') {
         notifSettings = { ...notifSettings, ...settings.notifications };
       } else if (typeof settings.maxReportAgeHours === 'number') {
         notifSettings.maxReportAgeHours = settings.maxReportAgeHours;
+      }
+
+      if (notifSettings.notifyPrefs && Array.isArray(notifSettings.notifyPrefs)) {
+        enabledPrefs.clear();
+        notifSettings.notifyPrefs.forEach(p => enabledPrefs.add(p));
       }
 
       if (typeof settings.sidebarTab === 'string') {
@@ -4770,9 +4830,16 @@ def index():
         const rawVal = effectiveStatus[sid];
         const info = decodeStatus(rawVal, effectiveStatus[sid + '_c']);
 
-        // Check mapDisplay mode filter (CHỈ LỌC CHO BẢN ĐỒ)
-        if (mapDisplay.mode === 'only_in' && info.code !== 'i') continue;
-        if (mapDisplay.mode === 'with_out' && info.code !== 'i' && info.code !== 'o') continue;
+        // Check mapDisplay granular status filters
+        const showIn = mapDisplay.showInStock !== undefined ? mapDisplay.showInStock : true;
+        const showOut = mapDisplay.showOutOfStock !== undefined ? mapDisplay.showOutOfStock : (mapDisplay.mode !== 'only_in');
+        const showNone = mapDisplay.showNotHandled !== undefined ? mapDisplay.showNotHandled : (mapDisplay.mode === 'all');
+        const showUnk = mapDisplay.showUnknown !== undefined ? mapDisplay.showUnknown : (mapDisplay.mode === 'all');
+
+        if (info.code === 'i' && !showIn) continue;
+        if (info.code === 'o' && !showOut) continue;
+        if (info.code === 'n' && !showNone) continue;
+        if (info.code !== 'i' && info.code !== 'o' && info.code !== 'n' && !showUnk) continue;
 
         let distanceKm = null;
         if (userLat !== null && userLng !== null) {
@@ -6090,24 +6157,10 @@ def index():
       } else if (viewName === 'calendar') {
         viewCal.classList.add('active');
         loadCalendar();
-      } else if (viewName === 'notif') {
+      } else if (viewName === 'notif' || viewName === 'settings') {
         viewNotif.classList.add('active');
-        // Move modal body content into full-screen view on first open
-        ensureNotifViewPopulated();
+        syncMapSettingsUI();
         syncNotifUI();
-      }
-    }
-
-    function ensureNotifViewPopulated() {
-      const container = document.getElementById('notif-view-body-container');
-      if (container && container.children.length === 0) {
-        const modalBody = document.querySelector('#notif-settings-modal .modal-body');
-        if (modalBody) {
-          // Move all children from modal body into the full-screen view
-          while (modalBody.firstChild) {
-            container.appendChild(modalBody.firstChild);
-          }
-        }
       }
     }
 
@@ -6123,14 +6176,19 @@ def index():
         currentMobileTab = 'list';
         showAppView('list');
         document.getElementById('mob-nav-list').classList.add('active');
-      } else if (tab === 'gacha' || tab === 'settings') {
-        currentMobileTab = tab;
-        showAppView('notif');
-        document.getElementById(tab === 'gacha' ? 'mob-nav-gacha' : 'mob-nav-settings').classList.add('active');
+      } else if (tab === 'gacha') {
+        currentMobileTab = 'map';
+        applyMapStatusPreset('only_in');
+        showAppView('map');
+        document.getElementById('mob-nav-map').classList.add('active');
       } else if (tab === 'calendar') {
         currentMobileTab = 'calendar';
         showAppView('calendar');
         document.getElementById('mob-nav-cal').classList.add('active');
+      } else if (tab === 'settings' || tab === 'notif') {
+        currentMobileTab = 'settings';
+        showAppView('notif');
+        document.getElementById('mob-nav-settings').classList.add('active');
       }
     }
     window.mobileNavTo = mobileNavTo;
@@ -6161,17 +6219,41 @@ def index():
     const enabledPrefs = new Set(['osaka', 'aichi', 'kanagawa', 'gifu', 'mie']);
 
     function togglePrefFilter(checkbox) {
+      togglePrefFilterUnified(checkbox);
+    }
+    window.togglePrefFilter = togglePrefFilter;
+
+    function togglePrefFilterUnified(checkbox) {
       const pref = checkbox.value;
-      if (checkbox.checked) {
+      const checked = checkbox.checked;
+      if (checked) {
         enabledPrefs.add(pref);
       } else {
         enabledPrefs.delete(pref);
       }
+      // Also sync to notifSettings.notifyPrefs
+      if (!Array.isArray(notifSettings.notifyPrefs)) {
+        notifSettings.notifyPrefs = ['osaka', 'aichi', 'kanagawa', 'gifu', 'mie'];
+      }
+      if (checked) {
+        if (!notifSettings.notifyPrefs.includes(pref)) notifSettings.notifyPrefs.push(pref);
+      } else {
+        notifSettings.notifyPrefs = notifSettings.notifyPrefs.filter(p => p !== pref);
+      }
+
+      // Sync all pref checkboxes across the entire document
+      document.querySelectorAll(`input[value="${pref}"]`).forEach(cb => {
+        if (cb !== checkbox && (cb.classList.contains('notif-pref-check') || cb.closest('.drawer-menu-item'))) {
+          cb.checked = checked;
+        }
+      });
+
       // Save to localStorage
       try { localStorage.setItem('pokemap_prefs', JSON.stringify([...enabledPrefs])); } catch(e) {}
+      saveSettings();
       renderUI();
     }
-    window.togglePrefFilter = togglePrefFilter;
+    window.togglePrefFilterUnified = togglePrefFilterUnified;
 
     // Restore saved pref filter from localStorage
     try {
