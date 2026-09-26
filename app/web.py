@@ -31,6 +31,20 @@ from .fetcher import fetch_stores, fetch_firestore_document, DEFAULT_CACHE_DIR, 
 from .parser import merge_stores_with_status, parse_store_status
 from .calendar_tracker import fetch_calendar_events
 from .config import CHAIN_NAMES, PACK_CODES, FIREBASE_API_KEY, PROJECT_ID
+from .db import (
+    init_db,
+    seed_stores_if_empty,
+    get_stores as db_get_stores,
+    get_store_by_id as db_get_store_by_id,
+    get_store_history as db_get_store_history,
+    record_new_report,
+    save_bulk_history,
+    get_report_counts as db_get_report_counts
+)
+
+# Initialize local SQLite database and populate stores on startup
+init_db()
+seed_stores_if_empty()
 
 app = FastAPI(title="BAWUI POKE APP - Real-Time Stock & Lottery Tracker")
 
@@ -338,6 +352,23 @@ async def send_webhook_notification(request: Request):
             except Exception:
                 pass
 
+        # Ingest into SQLite database
+        sid = store.get("id") or info.get("store_id")
+        if sid:
+            status_code_raw = info.get("status_code") or info.get("code") or "i"
+            timestamp_raw = info.get("timestamp") or int(time.time())
+            record_new_report(
+                store_id=sid,
+                status_code=status_code_raw,
+                timestamp=timestamp_raw,
+                onsite=bool(info.get("onsite", False)),
+                packs=info.get("packs") or [],
+                note=info.get("note") or "",
+                user=info.get("user") or "匿名トレーナー",
+                formatted_time=info.get("reported_at") or "",
+                source="webhook" if is_test else "poketan"
+            )
+
         # 6. Deduplication: do not spam the exact same report within 2 hours
         global _recent_notified_keys
         now_t = time.time()
@@ -357,86 +388,163 @@ async def send_webhook_notification(request: Request):
         return JSONResponse(status_code=500, content={"status": "error", "error": str(e)})
 
 
+def _backfill_store_history_safe(store_id: str):
+    """Safely fetch full history from PokéTan and save to SQLite in background."""
+    clean_id = store_id[:-2] if store_id.endswith("_c") else store_id
+    try:
+        remote_hist = fetch_store_history(clean_id)
+        if remote_hist:
+            save_bulk_history(clean_id, remote_hist, source="poketan")
+    except Exception as e:
+        print(f"  [DB] Background history backfill error for {clean_id}: {e}")
+
+
 def telegram_background_watcher():
-    """Background thread to poll Firestore for new in-stock reports matching Telegram filter settings and send alerts."""
+    """Background thread to continuously ingest hot reports from PokéTan into SQLite and dispatch Telegram alerts."""
     import time
-    time.sleep(8)
-    print("  [TelegramDaemon] Background stock monitor daemon started (polling every 35s)")
+    import threading
+    time.sleep(5)
+    print("  [DataSync & TelegramDaemon] Background daemon started (syncing reports & monitoring alerts)")
     is_first_scan = True
     while True:
         try:
             settings = load_user_settings()
             notif_cfg = settings.get("notifications", {})
-            if not notif_cfg.get("telegramEnabled", False):
-                time.sleep(30)
-                continue
-            
+            tg_enabled = bool(notif_cfg.get("telegramEnabled", False))
             tg_token = (notif_cfg.get("telegramBotToken") or "").strip()
             tg_chat_id = (notif_cfg.get("telegramChatId") or "").strip()
-            if not (tg_token and tg_chat_id):
-                time.sleep(30)
-                continue
-            
+            tg_ready = tg_enabled and bool(tg_token and tg_chat_id)
+
             tg_reg = notif_cfg.get("telegramRegion", "osaka")
-            target_prefs = REGION_PREFS.get(tg_reg, ["osaka"])
-            if tg_reg == "all":
-                target_prefs = ALL_PREFS
-            
+            tg_target_prefs = REGION_PREFS.get(tg_reg, ["osaka"]) if tg_reg != "all" else ALL_PREFS
             tg_status = notif_cfg.get("telegramStatus", "in")
             tg_chain = notif_cfg.get("telegramChain", "all")
             tg_time = notif_cfg.get("telegramTime", "24")
             max_age_sec = int(tg_time) * 3600 if tg_time != "all" else 3600 * 24
 
             now_sec = time.time()
-            for pref in target_prefs:
+
+            # Poll all active prefectures to ingest real-time reports into SQLite database
+            for pref in ALL_PREFS:
                 try:
                     hot_data = fetch_realtime_status(pref, include_cold=False)
-                    pref_stores = get_stores_by_pref(pref)
-                    for sid, raw in hot_data.items():
-                        parsed = parse_store_status(str(raw))
+                    for k, raw in hot_data.items():
+                        if k.endswith("_c"):
+                            continue
+                        sid = k
+                        conf_raw = hot_data.get(f"{sid}_c")
+                        parsed = parse_store_status(str(raw), str(conf_raw) if conf_raw else None)
                         if not parsed:
                             continue
-                        
+
                         ts = parsed.get("timestamp") or 0
-                        report_key = f"{sid}_{ts}"
+                        code = parsed.get("status_code") or "u"
+                        onsite = bool(parsed.get("onsite", False))
+                        packs = parsed.get("packs") or []
+                        rep_time = parsed.get("reported_at") or ""
+
+                        # 1. Ingest report into SQLite database
+                        is_new, rep = record_new_report(
+                            store_id=sid,
+                            status_code=code,
+                            timestamp=ts,
+                            onsite=onsite,
+                            packs=packs,
+                            formatted_time=rep_time,
+                            source="poketan"
+                        )
+
+                        report_key = f"{sid}_{ts}_{code}"
+                        if is_new and code == "i":
+                            # Backfill rich history with notes/packs in background
+                            threading.Thread(target=_backfill_store_history_safe, args=(sid,), daemon=True).start()
 
                         if is_first_scan:
-                            # Seed existing reports on startup so we only notify for fresh incoming reports
                             _recent_notified_keys[report_key] = now_sec
                             continue
 
-                        code = parsed.get("status_code")
-                        if tg_status == "in" and code != "i":
-                            continue
-                        if tg_status == "onsite" and (code != "i" or not parsed.get("onsite")):
-                            continue
-                        
-                        if ts > 0 and (now_sec - ts > max_age_sec):
-                            continue
-
-                        st = pref_stores.get(sid) or {"id": sid, "name": sid, "pref": pref}
-                        st["pref"] = pref
-                        st_chain = (st.get("chain") or "").lower()
-                        if tg_chain != "all":
-                            if tg_chain == "conbini" and st_chain not in ["seven", "lawson", "familymart", "ministop"]:
+                        # 2. Check Telegram Alert Conditions
+                        if tg_ready and pref in tg_target_prefs:
+                            if tg_status == "in" and code != "i":
                                 continue
-                            elif tg_chain == "specialty" and st_chain != "specialty":
+                            if tg_status == "onsite" and (code != "i" or not onsite):
                                 continue
-                            elif tg_chain == "electronics" and st_chain not in ['geo', 'joshin', 'edion', 'aeon', 'yamada', 'ks', 'toysrus', 'biccamera', 'yodobashi']:
-                                continue
-                            elif tg_chain not in ["conbini", "specialty", "electronics"] and st_chain != tg_chain:
+                            if tg_status == "recent" and (code != "i" and not (ts > 0 and code != "n")):
                                 continue
 
-                        if report_key not in _recent_notified_keys:
-                            _recent_notified_keys[report_key] = now_sec
-                            print(f"  [TelegramDaemon] Auto-dispatching Telegram alert for {st.get('name')}")
-                            send_telegram_alert(st, parsed, notif_cfg, is_test=False)
-                except Exception:
+                            if ts > 0 and (now_sec - ts > max_age_sec):
+                                continue
+
+                            st = db_get_store_by_id(sid) or get_stores_by_pref(pref).get(sid) or {"id": sid, "name": sid, "pref": pref}
+                            st["pref"] = pref
+                            st_chain = (st.get("chain") or "").lower()
+
+                            if tg_chain != "all":
+                                if tg_chain == "conbini" and st_chain not in ["seven", "lawson", "familymart", "ministop"]:
+                                    continue
+                                elif tg_chain == "specialty" and st_chain != "specialty":
+                                    continue
+                                elif tg_chain == "electronics" and st_chain not in ['geo', 'joshin', 'edion', 'aeon', 'yamada', 'ks', 'toysrus', 'biccamera', 'yodobashi']:
+                                    continue
+                                elif tg_chain not in ["conbini", "specialty", "electronics"] and st_chain != tg_chain:
+                                    continue
+
+                            if report_key not in _recent_notified_keys:
+                                _recent_notified_keys[report_key] = now_sec
+                                print(f"  [TelegramDaemon] Auto-dispatching Telegram alert for {st.get('name')}")
+                                send_telegram_alert(st, parsed, notif_cfg, is_test=False)
+                except Exception as pe:
                     pass
+
             is_first_scan = False
-        except Exception:
+        except Exception as e:
             pass
         time.sleep(35)
+
+
+@app.post("/api/record_report")
+async def record_report_endpoint(request: Request):
+    """
+    Ingest a newly observed report into local SQLite store_history and update store status.
+    Called when Firestore onSnapshot fires on the client or via external reporting.
+    """
+    import time
+    import threading
+    try:
+        body = await request.json()
+        store_id = body.get("store_id")
+        if not store_id:
+            return JSONResponse(status_code=400, content={"error": "store_id required"})
+        
+        status_code = body.get("status_code") or body.get("code") or "i"
+        timestamp = body.get("timestamp") or int(time.time())
+        onsite = bool(body.get("onsite", False))
+        packs = body.get("packs") or []
+        note = body.get("note") or ""
+        user = body.get("user") or "匿名トレーナー"
+        who = body.get("who") or ""
+        formatted_time = body.get("formatted_time")
+        source = body.get("source") or "poketan"
+
+        is_new, rep = record_new_report(
+            store_id=store_id,
+            status_code=status_code,
+            timestamp=timestamp,
+            onsite=onsite,
+            packs=packs,
+            note=note,
+            user=user,
+            who=who,
+            formatted_time=formatted_time,
+            source=source
+        )
+
+        if is_new and status_code == "i":
+            threading.Thread(target=_backfill_store_history_safe, args=(store_id,), daemon=True).start()
+
+        return JSONResponse(content={"status": "ok", "is_new": is_new, "report": rep})
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"status": "error", "error": str(e)})
 
 
 _pref_stores_cache = {}
@@ -478,6 +586,13 @@ def fetch_single_pref_status(pref, is_cold=False):
 
 @app.get("/api/stores_data")
 def get_stores_data(region: Optional[str] = None, pref: Optional[str] = None):
+    try:
+        stores = db_get_stores(region=region, pref=pref)
+        if stores:
+            return JSONResponse(content=stores)
+    except Exception as e:
+        print("[DB] Error querying stores from SQLite:", e)
+
     target_prefs = get_target_prefs(region, pref)
     all_stores = {}
     for p in target_prefs:
@@ -520,50 +635,34 @@ def get_hot_status(region: Optional[str] = None, pref: Optional[str] = None):
 
 @app.get("/api/store_history/{store_id}")
 def get_store_history(store_id: str):
+    clean_id = store_id[:-2] if store_id.endswith("_c") else store_id
     try:
-        return JSONResponse(content=fetch_store_history(store_id))
+        local_hist = db_get_store_history(clean_id, limit=30)
+        # If fewer than 2 records, backfill from PokéTan and save into SQLite
+        if len(local_hist) < 2:
+            try:
+                remote_hist = fetch_store_history(clean_id)
+                if remote_hist:
+                    save_bulk_history(clean_id, remote_hist, source="poketan")
+                    local_hist = db_get_store_history(clean_id, limit=30)
+            except Exception as e:
+                print(f"[DB] Error backfilling history for {clean_id}: {e}")
+        return JSONResponse(content=local_hist)
     except Exception as e:
-        print(f"Error fetching history for {store_id}:", e)
-        return JSONResponse(content=[])
-
-_report_counts_cache = {}
-_report_counts_time = {}
+        print(f"Error fetching history for {clean_id}:", e)
+        try:
+            return JSONResponse(content=fetch_store_history(clean_id))
+        except Exception:
+            return JSONResponse(content=[])
 
 @app.get("/api/report_counts")
 def get_report_counts(region: Optional[str] = None, pref: Optional[str] = None):
-    global _report_counts_cache, _report_counts_time
-    import time
-    now = time.time()
-    target_prefs = get_target_prefs(region, pref)
-    cache_key = "_".join(sorted(target_prefs))
-
-    if cache_key in _report_counts_cache and (now - _report_counts_time.get(cache_key, 0) < 60):
-        return JSONResponse(content=_report_counts_cache[cache_key])
-
     try:
-        merged_counts = {}
-        for p in target_prefs:
-            try:
-                hot = fetch_realtime_status(p, include_cold=False)
-                in_stores = [k for k, v in hot.items() if str(v).startswith('i')]
-                for sid in in_stores:
-                    try:
-                        h = fetch_store_history(sid)
-                        merged_counts[sid] = {
-                            "in": sum(1 for x in h if x.get("status_code") == "i"),
-                            "out": sum(1 for x in h if x.get("status_code") == "o")
-                        }
-                    except Exception:
-                        merged_counts[sid] = {"in": 1, "out": 0}
-            except Exception as pe:
-                print(f"Error fetching counts for pref {p}:", pe)
-
-        _report_counts_cache[cache_key] = merged_counts
-        _report_counts_time[cache_key] = now
-        return JSONResponse(content=merged_counts)
+        counts = db_get_report_counts(region=region, pref=pref)
+        return JSONResponse(content=counts)
     except Exception as e:
-        print("Error fetching report counts:", e)
-        return JSONResponse(content=_report_counts_cache.get(cache_key, {}))
+        print("[DB] Error fetching SQL report counts:", e)
+        return JSONResponse(content={})
 
 
 

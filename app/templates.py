@@ -2347,6 +2347,24 @@ def render_map_page() -> str:
       }
     }
 
+    function syncReportToBackend(storeId, statusVal, confVal) {
+      if (!storeId || !statusVal || typeof statusVal !== 'string') return;
+      const code = statusVal[0].toLowerCase();
+      const ts = parseInt(statusVal.slice(1)) || Math.floor(Date.now() / 1000);
+      const isGps = confVal && typeof confVal === 'string' && confVal.includes('g');
+      fetch('/api/record_report', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          store_id: storeId,
+          status_code: code,
+          timestamp: ts,
+          onsite: !!isGps,
+          source: 'poketan'
+        })
+      }).catch(() => {});
+    }
+
     function setupRealtime() {
       if (!window.FirebaseInit || !configData.apiKey) return;
       try {
@@ -2356,8 +2374,16 @@ def render_map_page() -> str:
         ['osaka', 'kanagawa', 'aichi', 'gifu', 'mie'].forEach(p => {
           onSnapshot(doc(db, 'status', p), (snap) => {
             if (snap.exists()) {
-              Object.assign(hotStatus, snap.data());
+              const data = snap.data();
+              Object.assign(hotStatus, data);
               renderMapMarkers();
+              try {
+                for (const [k, v] of Object.entries(data)) {
+                  if (!k.endsWith('_c') && typeof v === 'string' && v.startsWith('i')) {
+                    syncReportToBackend(k, v, data[k + '_c']);
+                  }
+                }
+              } catch(e) {}
             }
           });
         });
@@ -3734,6 +3760,24 @@ def render_thongbao_page() -> str:
       }
     }
 
+    function syncReportToBackend(storeId, statusVal, confVal) {
+      if (!storeId || !statusVal || typeof statusVal !== 'string') return;
+      const code = statusVal[0].toLowerCase();
+      const ts = parseInt(statusVal.slice(1)) || Math.floor(Date.now() / 1000);
+      const isGps = confVal && typeof confVal === 'string' && confVal.includes('g');
+      fetch('/api/record_report', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          store_id: storeId,
+          status_code: code,
+          timestamp: ts,
+          onsite: !!isGps,
+          source: 'poketan'
+        })
+      }).catch(() => {});
+    }
+
     function setupRealtime() {
       if (!window.FirebaseInit || !configData.apiKey) return;
       try {
@@ -3743,12 +3787,20 @@ def render_thongbao_page() -> str:
         ['osaka', 'kanagawa', 'aichi', 'gifu', 'mie'].forEach(p => {
           onSnapshot(doc(db, 'status', p), (snap) => {
             if (snap.exists()) {
-              Object.assign(hotStatus, snap.data());
+              const data = snap.data();
+              Object.assign(hotStatus, data);
               const q = document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '';
               renderStoreList(q);
               localStorage.setItem('poketan_last_read_ts', String(Math.floor(Date.now() / 1000)));
               const badgeEl = document.getElementById('footer-unread-badge');
               if (badgeEl) badgeEl.style.display = 'none';
+              try {
+                for (const [k, v] of Object.entries(data)) {
+                  if (!k.endsWith('_c') && typeof v === 'string' && v.startsWith('i')) {
+                    syncReportToBackend(k, v, data[k + '_c']);
+                  }
+                }
+              } catch(e) {}
             }
           });
         });

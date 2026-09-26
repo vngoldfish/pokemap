@@ -131,7 +131,9 @@ def fetch_store_history(store_id: str) -> list:
         if now - cached["time"] < 30:  # 30 second cache
             return cached["data"]
 
-    url = f"{FIRESTORE_BASE_URL}/stores/{clean_id}/history?key={FIREBASE_API_KEY}&pageSize=20"
+    import urllib.parse
+    clean_id_quoted = urllib.parse.quote(clean_id)
+    url = f"{FIRESTORE_BASE_URL}/stores/{clean_id_quoted}/history?key={FIREBASE_API_KEY}&pageSize=20"
     history = []
     try:
         doc_json = fetch_json(url)
