@@ -184,6 +184,118 @@ def seed_stores_if_empty():
         return total_inserted
 
 
+def backfill_all_poketan_statuses(force: bool = False) -> int:
+    """
+    Backfill all current & historical statuses from PokéTan Firestore into SQLite stores and store_history.
+    If store_history already has >= 50 records and not force, skips backfill.
+    """
+    from .fetcher import fetch_firestore_document
+    from .parser import parse_store_status
+
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM store_history;")
+        existing_hist = cursor.fetchone()[0]
+        if existing_hist >= 50 and not force:
+            return existing_hist
+        cursor.execute("SELECT id FROM stores;")
+        existing_store_ids = set(r[0] for r in cursor.fetchall())
+
+    print("  [DB] Backfilling store statuses and history from PokéTan Firestore...")
+    prefs = ["osaka", "kanagawa", "aichi", "gifu", "mie"]
+    now_ts = int(time.time())
+
+    history_batch = []
+    store_update_batch = []
+    new_stores_map = {}
+
+    for p in prefs:
+        try:
+            hot = fetch_firestore_document(f"status/{p}")
+            cold = fetch_firestore_document(f"status/{p}_cold")
+            # Cold first, hot overwrites cold so hot takes precedence
+            merged = {**cold, **hot}
+            for sid, raw in merged.items():
+                if sid.endswith("_c"):
+                    continue
+                conf_raw = merged.get(f"{sid}_c")
+                parsed = parse_store_status(str(raw), str(conf_raw) if conf_raw else None)
+                if not parsed:
+                    continue
+
+                code = parsed.get("status_code") or "u"
+                ts = parsed.get("timestamp") or 0
+                onsite = bool(parsed.get("onsite", False))
+                packs = parsed.get("packs") or []
+                rep_time = parsed.get("reported_at") or ""
+                label = parsed.get("status_label") or ("🟢 Có hàng" if code == "i" else ("🔴 Hết hàng" if code == "o" else "🟡 Không bán thẻ"))
+                hist_id = f"{sid}_{ts}_{code}"
+
+                if sid not in existing_store_ids and sid not in new_stores_map:
+                    new_stores_map[sid] = (sid, sid, 'other', '', p, code, now_ts)
+
+                history_batch.append((
+                    hist_id,
+                    sid,
+                    code,
+                    label,
+                    "",
+                    json.dumps(packs, ensure_ascii=False),
+                    "匿名トレーナー",
+                    "",
+                    1 if onsite else 0,
+                    ts,
+                    rep_time,
+                    now_ts,
+                    "poketan"
+                ))
+
+                store_update_batch.append((
+                    code,
+                    ts, ts,
+                    ts, rep_time,
+                    ts, 1 if onsite else 0,
+                    ts, json.dumps(packs, ensure_ascii=False),
+                    now_ts,
+                    sid
+                ))
+        except Exception as e:
+            print(f"  [DB] Error backfilling pref {p}: {e}")
+
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        if new_stores_map:
+            cursor.executemany("""
+                INSERT OR IGNORE INTO stores (id, name, chain, address, pref, current_status, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?);
+            """, list(new_stores_map.values()))
+
+        if history_batch:
+            cursor.executemany("""
+                INSERT OR IGNORE INTO store_history (
+                    id, store_id, status_code, status_label, note, packs_json,
+                    user, who, onsite, timestamp, formatted_time, created_at, source
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            """, history_batch)
+
+        if store_update_batch:
+            cursor.executemany("""
+                UPDATE stores
+                SET current_status = ?,
+                    last_timestamp = CASE WHEN ? > last_timestamp THEN ? ELSE last_timestamp END,
+                    last_reported_at = CASE WHEN ? >= last_timestamp THEN ? ELSE last_reported_at END,
+                    onsite = CASE WHEN ? >= last_timestamp THEN ? ELSE onsite END,
+                    packs_json = CASE WHEN ? >= last_timestamp THEN ? ELSE packs_json END,
+                    updated_at = ?
+                WHERE id = ?;
+            """, store_update_batch)
+        conn.commit()
+
+    total_backfilled = len(history_batch)
+    print(f"  [DB] Successfully backfilled {total_backfilled} statuses into SQLite store_history & stores!")
+    return total_backfilled
+
+
 def get_stores(region: Optional[str] = None, pref: Optional[str] = None) -> Dict[str, Dict[str, Any]]:
     """Query stores dictionary from SQLite database matching region or prefecture."""
     from .config import CHAIN_NAMES
@@ -376,6 +488,14 @@ def record_new_report(
         if cursor.fetchone():
             return False, {"id": hist_id, "store_id": clean_id, "status_code": status_code, "timestamp": timestamp}
 
+        # Ensure store exists in stores table to satisfy foreign key
+        cursor.execute("SELECT id FROM stores WHERE id = ?;", (clean_id,))
+        if not cursor.fetchone():
+            cursor.execute("""
+                INSERT OR IGNORE INTO stores (id, name, chain, address, pref, current_status, updated_at)
+                VALUES (?, ?, 'other', '', 'osaka', ?, ?);
+            """, (clean_id, clean_id, status_code, now_ts))
+
         # Insert new history item
         cursor.execute("""
             INSERT OR REPLACE INTO store_history (
@@ -486,6 +606,13 @@ def save_bulk_history(store_id: str, history_list: List[Dict[str, Any]], source:
 
     with get_db_connection() as conn:
         cursor = conn.cursor()
+        cursor.execute("SELECT id FROM stores WHERE id = ?;", (clean_id,))
+        if not cursor.fetchone():
+            cursor.execute("""
+                INSERT OR IGNORE INTO stores (id, name, chain, address, pref, current_status, updated_at)
+                VALUES (?, ?, 'other', '', 'osaka', 'u', ?);
+            """, (clean_id, clean_id, now_ts))
+
         cursor.executemany("""
             INSERT OR REPLACE INTO store_history (
                 id, store_id, status_code, status_label, note, packs_json,

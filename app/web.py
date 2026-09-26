@@ -34,6 +34,7 @@ from .config import CHAIN_NAMES, PACK_CODES, FIREBASE_API_KEY, PROJECT_ID
 from .db import (
     init_db,
     seed_stores_if_empty,
+    backfill_all_poketan_statuses,
     get_stores as db_get_stores,
     get_store_by_id as db_get_store_by_id,
     get_store_history as db_get_store_history,
@@ -41,10 +42,12 @@ from .db import (
     save_bulk_history,
     get_report_counts as db_get_report_counts
 )
+import threading
 
 # Initialize local SQLite database and populate stores on startup
 init_db()
 seed_stores_if_empty()
+threading.Thread(target=backfill_all_poketan_statuses, daemon=True).start()
 
 app = FastAPI(title="BAWUI POKE APP - Real-Time Stock & Lottery Tracker")
 

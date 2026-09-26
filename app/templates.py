@@ -1583,6 +1583,49 @@ def render_map_page() -> str:
       return { code, label: labelMap[code] || '未確認', packs, reported_at: dtStr, timeAgo, onsite, timestamp };
     }
 
+    function getStoreStatusInfo(store) {
+      let code = (store.status || 'u').toLowerCase();
+      let timestamp = store.last_timestamp || 0;
+      let onsite = !!store.onsite;
+      let packs = store.packs || [];
+      let reported_at = store.last_reported_at || '';
+
+      const raw = hotStatus[store.id] || coldStatus[store.id];
+      if (raw && typeof raw === 'string') {
+        const decoded = decodeStatus(raw);
+        if (decoded.timestamp > timestamp) {
+          code = decoded.code;
+          timestamp = decoded.timestamp;
+          onsite = decoded.onsite;
+          packs = decoded.packs;
+          reported_at = decoded.reported_at;
+        }
+      }
+
+      let timeAgo = '';
+      if (timestamp > 0) {
+        const d = new Date(timestamp * 1000);
+        if (!reported_at) {
+          reported_at = `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')} (${d.getMonth()+1}/${d.getDate()})`;
+        }
+        const diffSec = Math.floor(Date.now() / 1000 - timestamp);
+        if (diffSec < 60) timeAgo = 'たった今';
+        else if (diffSec < 3600) timeAgo = `${Math.floor(diffSec / 60)}分前`;
+        else if (diffSec < 86400) timeAgo = `${Math.floor(diffSec / 3600)}時間前`;
+        else timeAgo = `${Math.floor(diffSec / 86400)}日前`;
+      }
+      const labelMap = { 'i': '在庫あり', 'o': '在庫なし', 'n': '扱ってない', 'u': '未確認' };
+      return {
+        code,
+        label: labelMap[code] || '未確認',
+        packs,
+        reported_at,
+        timeAgo,
+        onsite,
+        timestamp
+      };
+    }
+
     function calcDistanceKm(lat1, lon1, lat2, lon2) {
       const R = 6371;
       const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -1722,8 +1765,7 @@ def render_map_page() -> str:
           if (!allowedPrefs.includes(storePref)) continue;
         }
 
-        const raw = effectiveStatus[store.id] || effectiveStatus[store.id + '_c'];
-        const info = decodeStatus(raw);
+        const info = getStoreStatusInfo(store);
         const reportAge = (info.timestamp > 0) ? (now - info.timestamp) : Infinity;
 
         // Fresh stock filter if time filter applied
@@ -2299,16 +2341,12 @@ def render_map_page() -> str:
     // 11. INIT DATA & URL QUERY PARAMS
     async function initData() {
       try {
-        const [cfgRes, storesRes, hotRes, coldRes] = await Promise.all([
+        const [cfgRes, storesRes] = await Promise.all([
           fetch('/api/config'),
-          fetch('/api/stores_data?region=all'),
-          fetch('/api/hot_status?region=all').catch(() => null),
-          fetch('/api/cold_status?region=all').catch(() => null)
+          fetch('/api/stores_data?region=all')
         ]);
         configData = await cfgRes.json();
         storesDict = await storesRes.json();
-        if (hotRes && hotRes.ok) hotStatus = await hotRes.json();
-        if (coldRes && coldRes.ok) coldStatus = await coldRes.json();
 
         updateMapFilterUI();
         renderMapMarkers();
@@ -2376,14 +2414,25 @@ def render_map_page() -> str:
             if (snap.exists()) {
               const data = snap.data();
               Object.assign(hotStatus, data);
-              renderMapMarkers();
-              try {
-                for (const [k, v] of Object.entries(data)) {
-                  if (!k.endsWith('_c') && typeof v === 'string' && v.startsWith('i')) {
-                    syncReportToBackend(k, v, data[k + '_c']);
+              for (const [k, v] of Object.entries(data)) {
+                if (k.endsWith('_c') || typeof v !== 'string' || v.length < 2) continue;
+                const sid = k;
+                const code = v[0].toLowerCase();
+                const ts = parseInt(v.slice(1)) || Math.floor(Date.now() / 1000);
+                const confVal = data[k + '_c'] || '';
+                const isGps = typeof confVal === 'string' && confVal.includes('g');
+
+                if (storesDict[sid]) {
+                  const st = storesDict[sid];
+                  if (st.status !== code || (st.last_timestamp || 0) < ts) {
+                    st.status = code;
+                    st.last_timestamp = ts;
+                    st.onsite = isGps;
                   }
                 }
-              } catch(e) {}
+                syncReportToBackend(sid, v, confVal);
+              }
+              renderMapMarkers();
             }
           });
         });
@@ -3091,6 +3140,57 @@ def render_thongbao_page() -> str:
       return { code, label: labelMap[code] || 'Chưa có tin', packs, reported_at: dtStr, timeOnly, dateOnly, timeAgo, onsite, timestamp };
     }
 
+    function getStoreStatusInfo(store) {
+      let code = (store.status || 'u').toLowerCase();
+      let timestamp = store.last_timestamp || 0;
+      let onsite = !!store.onsite;
+      let packs = store.packs || [];
+      let reported_at = store.last_reported_at || '';
+
+      const raw = hotStatus[store.id] || coldStatus[store.id];
+      if (raw && typeof raw === 'string') {
+        const decoded = decodeStatus(raw, hotStatus[store.id + '_c'] || coldStatus[store.id + '_c'] || '');
+        if (decoded.timestamp > timestamp) {
+          code = decoded.code;
+          timestamp = decoded.timestamp;
+          onsite = decoded.onsite;
+          packs = decoded.packs;
+          reported_at = decoded.reported_at;
+        }
+      }
+
+      let dtStr = '', timeAgo = '', timeOnly = '', dateOnly = '';
+      if (timestamp > 0) {
+        const d = new Date(timestamp * 1000);
+        const hours = String(d.getHours()).padStart(2, '0');
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+        const seconds = String(d.getSeconds()).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        timeOnly = `${hours}:${minutes}:${seconds}`;
+        dateOnly = `${day}/${month}`;
+        if (!reported_at) reported_at = `${hours}:${minutes} (${day}/${month})`;
+
+        const diffSec = Math.floor(Date.now() / 1000 - timestamp);
+        if (diffSec < 60) timeAgo = 'Vừa xong';
+        else if (diffSec < 3600) timeAgo = `${Math.floor(diffSec / 60)} phút trước`;
+        else if (diffSec < 86400) timeAgo = `${Math.floor(diffSec / 3600)} giờ trước`;
+        else timeAgo = `${Math.floor(diffSec / 86400)} ngày trước`;
+      }
+      const labelMap = { 'i': 'Có hàng', 'o': 'Không có', 'n': 'Không bán thẻ', 'u': 'Chưa có tin' };
+      return {
+        code,
+        label: labelMap[code] || 'Chưa có tin',
+        packs,
+        reported_at: reported_at || dtStr,
+        timeOnly,
+        dateOnly,
+        timeAgo,
+        onsite,
+        timestamp
+      };
+    }
+
     function calcDistanceKm(lat1, lon1, lat2, lon2) {
       const R = 6371;
       const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -3180,9 +3280,7 @@ def render_thongbao_page() -> str:
           if (!allowedPrefs.includes(storePref)) continue;
         }
 
-        const rawVal = effectiveStatus[store.id];
-        const confVal = effectiveStatus[store.id + '_c'] || '';
-        const info = decodeStatus(rawVal, confVal);
+        const info = getStoreStatusInfo(store);
 
         // Check time filter if specified (e.g. 1h, 3h, 6h, 24h)
         if (maxSec !== null) {
@@ -3729,16 +3827,14 @@ def render_thongbao_page() -> str:
     async function initData() {
       checkGpsSilently();
       try {
-        const [cfgRes, storesRes, hotRes, coldRes] = await Promise.all([
+        const [cfgRes, storesRes, countsRes] = await Promise.all([
           fetch('/api/config'),
           fetch('/api/stores_data?region=all'),
-          fetch('/api/hot_status?region=all').catch(() => null),
-          fetch('/api/cold_status?region=all').catch(() => null)
+          fetch('/api/report_counts?region=all').catch(() => null)
         ]);
         configData = await cfgRes.json();
         storesDict = await storesRes.json();
-        if (hotRes && hotRes.ok) hotStatus = await hotRes.json();
-        if (coldRes && coldRes.ok) coldStatus = await coldRes.json();
+        if (countsRes && countsRes.ok) reportCounts = await countsRes.json();
 
         // Sync initial UI badges
         document.querySelectorAll('.list-sort-btn').forEach(b => b.classList.toggle('active', b.id === `sort-btn-${listSortMode}`));
@@ -3789,18 +3885,29 @@ def render_thongbao_page() -> str:
             if (snap.exists()) {
               const data = snap.data();
               Object.assign(hotStatus, data);
+              for (const [k, v] of Object.entries(data)) {
+                if (k.endsWith('_c') || typeof v !== 'string' || v.length < 2) continue;
+                const sid = k;
+                const code = v[0].toLowerCase();
+                const ts = parseInt(v.slice(1)) || Math.floor(Date.now() / 1000);
+                const confVal = data[k + '_c'] || '';
+                const isGps = typeof confVal === 'string' && confVal.includes('g');
+
+                if (storesDict[sid]) {
+                  const st = storesDict[sid];
+                  if (st.status !== code || (st.last_timestamp || 0) < ts) {
+                    st.status = code;
+                    st.last_timestamp = ts;
+                    st.onsite = isGps;
+                  }
+                }
+                syncReportToBackend(sid, v, confVal);
+              }
               const q = document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '';
               renderStoreList(q);
               localStorage.setItem('poketan_last_read_ts', String(Math.floor(Date.now() / 1000)));
               const badgeEl = document.getElementById('footer-unread-badge');
               if (badgeEl) badgeEl.style.display = 'none';
-              try {
-                for (const [k, v] of Object.entries(data)) {
-                  if (!k.endsWith('_c') && typeof v === 'string' && v.startsWith('i')) {
-                    syncReportToBackend(k, v, data[k + '_c']);
-                  }
-                }
-              } catch(e) {}
             }
           });
         });
