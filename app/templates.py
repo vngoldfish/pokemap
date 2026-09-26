@@ -180,6 +180,7 @@ SHARED_BASE_CSS = """
     }
 
     .footer-tab-btn {
+      position: relative;
       flex: 1;
       display: flex;
       flex-direction: column;
@@ -196,6 +197,29 @@ SHARED_BASE_CSS = """
       text-decoration: none;
       -webkit-tap-highlight-color: transparent;
       transition: all 0.15s ease;
+    }
+    .footer-unread-badge {
+      position: absolute;
+      top: 2px;
+      right: 50%;
+      transform: translateX(14px);
+      background: #ef4444;
+      color: #ffffff;
+      font-size: 0.58rem;
+      font-weight: 800;
+      min-width: 17px;
+      height: 17px;
+      line-height: 17px;
+      padding: 0 4px;
+      border-radius: 9px;
+      text-align: center;
+      box-shadow: 0 2px 6px rgba(239, 68, 68, 0.45);
+      border: 1.5px solid #ffffff;
+      pointer-events: none;
+      z-index: 10;
+      display: none;
+      align-items: center;
+      justify-content: center;
     }
     .footer-tab-btn .tab-icon {
       font-size: 1.22rem;
@@ -439,46 +463,7 @@ SHARED_BASE_CSS = """
       background: #1d4ed8;
     }
 
-    /* TOAST ALERTS */
-    #live-stock-toast {
-      pointer-events: auto;
-      background: #ffffff;
-      border-radius: 12px;
-      padding: 8px 12px;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.14);
-      border: 1px solid #e2e8f0;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      font-size: 0.75rem;
-      cursor: pointer;
-      animation: slideDown 0.3s ease;
-      max-width: 480px;
-    }
-    @keyframes slideDown {
-      from { transform: translateY(-10px); opacity: 0; }
-      to { transform: translateY(0); opacity: 1; }
-    }
-    .toast-info {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .toast-close-btn {
-      background: none;
-      border: none;
-      color: #94a3b8;
-      font-size: 0.85rem;
-      font-weight: 700;
-      cursor: pointer;
-      padding: 0 4px;
-    }
-
+    /* REGION TOAST */
     #region-load-toast {
       display: none;
       align-items: center;
@@ -583,6 +568,7 @@ def render_shared_footer(active_page: str) -> str:
     <a href="/thongbao" class="footer-tab-btn{list_active}" id="f-tab-list" title="Thông báo &amp; Danh sách (一覧)">
       <span class="tab-icon">📋</span>
       <span class="tab-label">Thông báo</span>
+      <span id="footer-unread-badge" class="footer-unread-badge" style="display:none;">0</span>
     </a>
 
     <button type="button" class="footer-tab-btn" id="f-tab-settings" onclick="openSettingsModal()" title="Cài đặt hệ thống &amp; Telegram">
@@ -1455,16 +1441,6 @@ def render_map_page() -> str:
       </button>
     </div>
 
-    <!-- Real-time stock alert toast -->
-    <div id="live-stock-toast" style="display:none;" onclick="focusStockStore()">
-      <div class="toast-info">
-        <span class="chip-dot dot-green"></span>
-        <span id="toast-store-title" style="font-weight:700;">セブン-イレブン...</span>
-        <span>で <b style="color:#16a34a;">在庫あり</b> の報告 <span id="toast-time">1分前</span></span>
-      </div>
-      <button class="toast-close-btn" onclick="event.stopPropagation(); hideToast()">✕</button>
-    </div>
-
     <!-- Region loading & switch toast -->
     <div id="region-load-toast" style="display:none;">
       <span id="region-load-icon">⚡</span>
@@ -1842,18 +1818,8 @@ def render_map_page() -> str:
         counterEl.innerHTML = label;
       }
 
-      // Toast alert for newest in-stock store
-      const toastEl = document.getElementById('live-stock-toast');
-      if (newestInStore && newestInStore.id !== dismissedToastStoreId) {
-        latestStockStoreId = newestInStore.id;
-        const titleEl = document.getElementById('toast-store-title');
-        const timeEl = document.getElementById('toast-time');
-        if (titleEl) titleEl.innerText = newestInStore.name;
-        if (timeEl) timeEl.innerText = decodeStatus(effectiveStatus[newestInStore.id]).timeAgo || 'たった今';
-        if (toastEl) toastEl.style.display = 'flex';
-      } else {
-        if (toastEl) toastEl.style.display = 'none';
-      }
+      // Update footer unread notifications badge
+      updateFooterUnreadBadge();
     }
 
     // 5. POPUP HTML
@@ -1903,23 +1869,39 @@ def render_map_page() -> str:
       `;
     }
 
-    function focusStockStore() {
-      if (!latestStockStoreId || !storesDict[latestStockStoreId]) return;
-      isFollowingUser = false;
-      updateGpsBtnState();
-      const s = storesDict[latestStockStoreId];
-      map.flyTo([s.lat, s.lng], 16, { duration: 0.8 });
-      setTimeout(() => {
-        stockLayer.eachLayer(m => {
-          const ll = m.getLatLng();
-          if (Math.abs(ll.lat - s.lat) < 0.0001 && Math.abs(ll.lng - s.lng) < 0.0001) m.openPopup();
-        });
-      }, 850);
-    }
-    function hideToast() {
-      dismissedToastStoreId = latestStockStoreId;
-      const toastEl = document.getElementById('live-stock-toast');
-      if (toastEl) toastEl.style.display = 'none';
+    // 5.5 FOOTER UNREAD NOTIFICATIONS BADGE
+    function updateFooterUnreadBadge() {
+      const badgeEl = document.getElementById('footer-unread-badge');
+      if (!badgeEl) return;
+
+      const lastReadTs = parseInt(localStorage.getItem('poketan_last_read_ts') || '0', 10);
+      const effectiveStatus = { ...coldStatus, ...hotStatus };
+      const allStores = Object.values(storesDict);
+      const targetRegion = mapRegionFilter || currentRegion || 'osaka';
+      const allowedPrefs = (REGIONS[targetRegion] ? REGIONS[targetRegion].prefs : [targetRegion]) || ['osaka'];
+
+      let unreadCount = 0;
+      for (const store of allStores) {
+        if (targetRegion !== 'all') {
+          const storePref = (store.pref || '').toLowerCase();
+          if (!allowedPrefs.includes(storePref)) continue;
+        }
+        const raw = effectiveStatus[store.id] || effectiveStatus[store.id + '_c'];
+        const info = decodeStatus(raw);
+        if (info && info.code === 'i') {
+          const ts = info.timestamp || 0;
+          if (lastReadTs === 0 || ts > lastReadTs) {
+            unreadCount++;
+          }
+        }
+      }
+
+      if (unreadCount > 0) {
+        badgeEl.innerText = unreadCount > 99 ? '99+' : String(unreadCount);
+        badgeEl.style.display = 'inline-flex';
+      } else {
+        badgeEl.style.display = 'none';
+      }
     }
 
     // 6. MAP FILTERS UI & HANDLERS
@@ -3738,6 +3720,11 @@ def render_thongbao_page() -> str:
 
         renderStoreList();
         setupRealtime();
+
+        // Mark all notifications as read when viewing Thongbao page
+        localStorage.setItem('poketan_last_read_ts', String(Math.floor(Date.now() / 1000)));
+        const badgeEl = document.getElementById('footer-unread-badge');
+        if (badgeEl) badgeEl.style.display = 'none';
       } catch(e) {
         console.error('Init error:', e);
       } finally {
@@ -3757,7 +3744,11 @@ def render_thongbao_page() -> str:
           onSnapshot(doc(db, 'status', p), (snap) => {
             if (snap.exists()) {
               Object.assign(hotStatus, snap.data());
-              renderStoreList(document.getElementById('list-search-input').value);
+              const q = document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '';
+              renderStoreList(q);
+              localStorage.setItem('poketan_last_read_ts', String(Math.floor(Date.now() / 1000)));
+              const badgeEl = document.getElementById('footer-unread-badge');
+              if (badgeEl) badgeEl.style.display = 'none';
             }
           });
         });
