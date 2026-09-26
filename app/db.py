@@ -619,6 +619,50 @@ def save_bulk_history(store_id: str, history_list: List[Dict[str, Any]], source:
                 user, who, onsite, timestamp, formatted_time, created_at, source
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """, batch)
+
+        # Update store current_status with newest history report if available
+        sorted_history = sorted(history_list, key=lambda x: x.get("timestamp") or 0, reverse=True)
+        if sorted_history:
+            newest = sorted_history[0]
+            newest_ts = newest.get("timestamp") or 0
+            newest_code = newest.get("status_code") or newest.get("status") or "u"
+            if len(newest_code) > 1 and newest_code in ["in-stock", "i"]:
+                newest_code = "i"
+            elif len(newest_code) > 1 and newest_code in ["out-of-stock", "o"]:
+                newest_code = "o"
+            elif len(newest_code) > 1 and newest_code in ["not-handled", "none", "n"]:
+                newest_code = "n"
+
+            newest_formatted = newest.get("formatted_time") or ""
+            if newest_ts > 0 and not newest_formatted:
+                try:
+                    dt = datetime.fromtimestamp(newest_ts)
+                    newest_formatted = dt.strftime("%H:%M %d/%m/%Y")
+                except Exception:
+                    pass
+
+            newest_onsite = 1 if newest.get("onsite") else 0
+            newest_packs = json.dumps(newest.get("packs") or [], ensure_ascii=False)
+
+            cursor.execute("""
+                UPDATE stores
+                SET current_status = CASE WHEN (? >= last_timestamp OR current_status = 'u') THEN ? ELSE current_status END,
+                    last_timestamp = CASE WHEN ? > last_timestamp THEN ? ELSE last_timestamp END,
+                    last_reported_at = CASE WHEN ? >= last_timestamp THEN ? ELSE last_reported_at END,
+                    onsite = CASE WHEN ? >= last_timestamp THEN ? ELSE onsite END,
+                    packs_json = CASE WHEN ? >= last_timestamp THEN ? ELSE packs_json END,
+                    updated_at = ?
+                WHERE id = ?;
+            """, (
+                newest_ts, newest_code,
+                newest_ts, newest_ts,
+                newest_ts, newest_formatted,
+                newest_ts, newest_onsite,
+                newest_ts, newest_packs,
+                now_ts,
+                clean_id
+            ))
+
         conn.commit()
     return len(batch)
 

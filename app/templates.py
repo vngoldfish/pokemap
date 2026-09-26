@@ -1928,8 +1928,7 @@ def render_map_page() -> str:
           const storePref = (store.pref || '').toLowerCase();
           if (!allowedPrefs.includes(storePref)) continue;
         }
-        const raw = effectiveStatus[store.id] || effectiveStatus[store.id + '_c'];
-        const info = decodeStatus(raw);
+        const info = getStoreStatusInfo(store);
         if (info && info.code === 'i') {
           const ts = info.timestamp || 0;
           if (lastReadTs === 0 || ts > lastReadTs) {
@@ -2061,7 +2060,7 @@ def render_map_page() -> str:
       setMapStatusFilter('in');
       setMapChainFilter('all');
       const inStockStores = Object.values(storesDict).filter(s => {
-        const info = decodeStatus((coldStatus[s.id] || hotStatus[s.id]));
+        const info = getStoreStatusInfo(s);
         return info.code === 'i';
       });
       if (inStockStores.length > 0) {
@@ -2321,6 +2320,23 @@ def render_map_page() -> str:
         if (!history || history.length === 0) {
           bodyEl.innerHTML = '<div style="text-align:center; padding:20px; color:#64748b;">Chưa có lịch sử báo cáo nào.</div>';
           return;
+        }
+
+        // Propagate newest history record to local store object and refresh map marker
+        if (typeof storesDict !== 'undefined' && storesDict[storeId]) {
+          const newest = history[0];
+          const st = storesDict[storeId];
+          const histTs = Number(newest.timestamp) || 0;
+          if (histTs >= (st.last_timestamp || 0) || st.status === 'u') {
+            st.status = newest.status_code || newest.status || 'u';
+            st.last_timestamp = histTs;
+            st.last_reported_at = newest.formatted_time || '';
+            st.onsite = !!newest.onsite;
+            st.packs = newest.packs || [];
+            if (typeof renderMapMarkers === 'function') {
+              renderMapMarkers();
+            }
+          }
         }
         bodyEl.innerHTML = history.map(item => `
           <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px 10px; margin-bottom:8px;">
@@ -3783,6 +3799,23 @@ def render_thongbao_page() -> str:
         if (!history || history.length === 0) {
           bodyEl.innerHTML = '<div style="text-align:center; padding:20px; color:#64748b;">Chưa có lịch sử báo cáo nào.</div>';
           return;
+        }
+
+        // Propagate newest history record to local store object and refresh list
+        if (typeof storesDict !== 'undefined' && storesDict[storeId]) {
+          const newest = history[0];
+          const st = storesDict[storeId];
+          const histTs = Number(newest.timestamp) || 0;
+          if (histTs >= (st.last_timestamp || 0) || st.status === 'u') {
+            st.status = newest.status_code || newest.status || 'u';
+            st.last_timestamp = histTs;
+            st.last_reported_at = newest.formatted_time || '';
+            st.onsite = !!newest.onsite;
+            st.packs = newest.packs || [];
+            if (typeof renderStoreList === 'function') {
+              renderStoreList();
+            }
+          }
         }
         bodyEl.innerHTML = history.map(item => {
           let histColor = '#64748b', histText = '⚪ Chưa rõ';
