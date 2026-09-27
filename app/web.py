@@ -137,11 +137,18 @@ def get_settings():
 
 @app.post("/api/settings")
 async def update_settings(request: Request):
+    global _tg_enabled_since
     try:
         data = await request.json()
         current = load_user_settings()
+        old_tg = bool(current.get("notifications", {}).get("telegramEnabled", False))
         deep_update_dict(current, data)
         save_user_settings(current)
+        new_tg = bool(current.get("notifications", {}).get("telegramEnabled", False))
+        if new_tg and not old_tg:
+            import time
+            _tg_enabled_since = time.time()
+            print(f"  [TelegramSettings] Telegram enabled at {_tg_enabled_since}. Silencing prior backlog.")
         return JSONResponse(content={"status": "ok", "settings": current})
     except Exception as e:
         return JSONResponse(status_code=400, content={"error": str(e)})
@@ -149,6 +156,7 @@ async def update_settings(request: Request):
 
 from typing import Optional, List, Dict, Any
 from concurrent.futures import ThreadPoolExecutor
+import time
 
 # All available prefectures on PokéTan
 ALL_PREFS = ["osaka", "aichi", "kanagawa", "gifu", "mie"]
@@ -164,6 +172,9 @@ REGION_PREFS = {
 }
 
 _recent_notified_keys = {}
+_daemon_start_time = time.time()
+_tg_enabled_since = time.time()
+_last_tg_enabled = False
 
 def send_telegram_alert(store: dict, info: dict, notif_cfg: dict, is_test: bool = False) -> dict:
     """Send concise formatted alert to Telegram bot with 5 key data points."""
@@ -290,6 +301,131 @@ def send_telegram_alert(store: dict, info: dict, notif_cfg: dict, is_test: bool 
         return {"status": f"error: {str(te)}"}
 
 
+def maybe_dispatch_telegram_alert(
+    store_id: str,
+    status_code: str,
+    timestamp: int,
+    onsite: bool = False,
+    packs: list = None,
+    note: str = "",
+    formatted_time: str = None,
+    source: str = "poketan",
+    force_test: bool = False
+) -> dict:
+    """
+    Unified dispatcher for Telegram alerts.
+    Safely verifies all activation thresholds, freshness, deduplication, and user filters
+    before dispatching. Called by both record_report_endpoint and background watcher.
+    """
+    global _recent_notified_keys, _daemon_start_time, _tg_enabled_since
+    import time
+
+    if not store_id or not status_code:
+        return {"status": "invalid_args"}
+
+    clean_id = store_id[:-2] if store_id.endswith("_c") else store_id
+    code = status_code.lower()
+    ts = int(timestamp) if timestamp else int(time.time())
+    now_sec = time.time()
+
+    # 1. Deduplication check
+    report_key = f"{clean_id}_{ts}_{code}"
+    if report_key in _recent_notified_keys:
+        return {"status": "duplicate", "reason": "already_notified"}
+
+    # 2. Activation threshold: Never notify reports created before daemon started or TG enabled
+    activation_threshold = max(_daemon_start_time - 60, _tg_enabled_since - 30)
+    if not force_test and ts < activation_threshold:
+        _recent_notified_keys[report_key] = now_sec
+        return {"status": "too_old", "reason": f"report ts {ts} < activation threshold {activation_threshold}"}
+
+    # 3. Freshness check: Must be reported within last 5 minutes (300 seconds)
+    if not force_test and (now_sec - ts) > 300:
+        _recent_notified_keys[report_key] = now_sec
+        return {"status": "stale", "reason": f"report is {(now_sec - ts):.0f}s old (> 300s)"}
+
+    # 4. Anti-spam per store: do not spam the exact same store & status within 10 minutes
+    cooldown_key = f"cooldown_{clean_id}_{code}"
+    last_notified = _recent_notified_keys.get(cooldown_key, 0)
+    if not force_test and (now_sec - last_notified < 600):
+        _recent_notified_keys[report_key] = now_sec
+        return {"status": "cooldown", "reason": f"store {clean_id} notified {(now_sec - last_notified):.0f}s ago"}
+
+    # 5. Check user notification settings
+    settings = load_user_settings()
+    notif_cfg = settings.get("notifications", {})
+    tg_enabled = bool(notif_cfg.get("telegramEnabled", False)) or force_test
+    tg_token = (notif_cfg.get("telegramBotToken") or "").strip()
+    tg_chat_id = (notif_cfg.get("telegramChatId") or "").strip()
+
+    if not tg_enabled:
+        return {"status": "disabled", "reason": "telegram notifications disabled"}
+    if not (tg_token and tg_chat_id):
+        return {"status": "no_credentials", "reason": "missing bot token or chat_id"}
+
+    # 6. Status filter check
+    tg_status = notif_cfg.get("telegramStatus", "in")
+    if not force_test:
+        if tg_status == "in" and code != "i":
+            return {"status": "filtered", "reason": f"status '{code}' != 'i'"}
+        if tg_status == "onsite" and (code != "i" or not onsite):
+            return {"status": "filtered", "reason": "not onsite in-stock"}
+        if tg_status == "recent" and (code != "i" and not (ts > 0 and code != "n")):
+            return {"status": "filtered", "reason": "not recent or in-stock"}
+
+    # 7. Store resolution & Region filter
+    st = db_get_store_by_id(clean_id)
+    if not st:
+        for p_name in ALL_PREFS:
+            p_stores = get_stores_by_pref(p_name)
+            if clean_id in p_stores:
+                st = dict(p_stores[clean_id])
+                st["pref"] = p_name
+                break
+    if not st:
+        st = {"id": clean_id, "name": clean_id, "pref": "osaka"}
+
+    store_pref = (st.get("pref") or "osaka").lower()
+    tg_reg = notif_cfg.get("telegramRegion", "osaka")
+    tg_target_prefs = REGION_PREFS.get(tg_reg, ["osaka"]) if tg_reg != "all" else ALL_PREFS
+
+    if not force_test and tg_reg != "all" and store_pref not in tg_target_prefs:
+        return {"status": "filtered", "reason": f"store pref '{store_pref}' not in '{tg_reg}'"}
+
+    # 8. Chain filter check
+    tg_chain = notif_cfg.get("telegramChain", "all")
+    st_chain = (st.get("chain") or "").lower()
+    if not force_test and tg_chain != "all":
+        if tg_chain == "conbini" and st_chain not in ["seven", "lawson", "familymart", "ministop"]:
+            return {"status": "filtered", "reason": f"chain '{st_chain}' not in conbini"}
+        elif tg_chain == "specialty" and st_chain != "specialty":
+            return {"status": "filtered", "reason": f"chain '{st_chain}' not specialty"}
+        elif tg_chain == "electronics" and st_chain not in ['geo', 'joshin', 'edion', 'aeon', 'yamada', 'ks', 'toysrus', 'biccamera', 'yodobashi']:
+            return {"status": "filtered", "reason": f"chain '{st_chain}' not electronics"}
+        elif tg_chain not in ["conbini", "specialty", "electronics"] and st_chain != tg_chain:
+            return {"status": "filtered", "reason": f"chain '{st_chain}' != '{tg_chain}'"}
+
+    # Mark as notified to avoid duplicate dispatch
+    _recent_notified_keys[report_key] = now_sec
+    _recent_notified_keys[cooldown_key] = now_sec
+
+    # 9. Format info payload and send
+    info_payload = {
+        "status_code": code,
+        "code": code,
+        "timestamp": ts,
+        "onsite": onsite,
+        "packs": packs or [],
+        "note": note or "",
+        "reported_at": formatted_time or ""
+    }
+
+    print(f"  [TelegramAlert] ⚡ DISPATCHING TELEGRAM ALERT: {st.get('name')} (pref={store_pref}, ts={ts}, code={code})")
+    res = send_telegram_alert(st, info_payload, notif_cfg, is_test=force_test)
+    print(f"  [TelegramAlert] Dispatch result: {res}")
+    return res
+
+
 @app.post("/api/notify/webhook")
 async def send_webhook_notification(request: Request):
     """
@@ -404,13 +540,13 @@ def telegram_background_watcher():
     """Background thread to continuously ingest hot reports from PokéTan into SQLite and dispatch Telegram alerts."""
     import time
     import threading
+    global _recent_notified_keys, _daemon_start_time, _tg_enabled_since, _last_tg_enabled
     time.sleep(3)
 
-    daemon_start_time = time.time()
-    print(f"  [DataSync & TelegramDaemon] Background daemon started at {daemon_start_time} (monitoring real-time alerts)")
+    _daemon_start_time = time.time()
+    print(f"  [DataSync & TelegramDaemon] Background daemon started at {_daemon_start_time} (monitoring real-time alerts)")
 
     # 1. Warm-up phase: Seed ALL current reports from all prefectures so that ZERO preexisting reports are ever sent
-    global _recent_notified_keys
     print("  [TelegramDaemon] Initializing baseline scan: silencing all existing reports...")
     for pref in ALL_PREFS:
         try:
@@ -422,36 +558,26 @@ def telegram_background_watcher():
                 if parsed:
                     p_ts = parsed.get("timestamp") or 0
                     p_code = parsed.get("status_code") or "u"
-                    _recent_notified_keys[f"{k}_{p_ts}_{p_code}"] = daemon_start_time
-                    _recent_notified_keys[k] = daemon_start_time
+                    _recent_notified_keys[f"{k}_{p_ts}_{p_code}"] = _daemon_start_time
         except Exception:
             pass
     print(f"  [TelegramDaemon] Baseline initialized with {len(_recent_notified_keys)} existing reports silenced. Only reports newly created AFTER this moment will be notified.")
 
-    last_tg_enabled = False
-    tg_enabled_since = daemon_start_time
+    settings = load_user_settings()
+    _last_tg_enabled = bool(settings.get("notifications", {}).get("telegramEnabled", False))
+    _tg_enabled_since = _daemon_start_time
 
     while True:
         try:
             settings = load_user_settings()
             notif_cfg = settings.get("notifications", {})
             tg_enabled = bool(notif_cfg.get("telegramEnabled", False))
-            tg_token = (notif_cfg.get("telegramBotToken") or "").strip()
-            tg_chat_id = (notif_cfg.get("telegramChatId") or "").strip()
-            tg_ready = tg_enabled and bool(tg_token and tg_chat_id)
-
             now_sec = time.time()
 
-            # If user just flipped Telegram toggle to ON, silence any backlog prior to this activation moment
-            if tg_enabled and not last_tg_enabled:
-                tg_enabled_since = now_sec
+            if tg_enabled and not _last_tg_enabled:
+                _tg_enabled_since = now_sec
                 print(f"  [TelegramDaemon] Telegram notifications activated at {now_sec}. Only new reports from now on will be sent.")
-            last_tg_enabled = tg_enabled
-
-            tg_reg = notif_cfg.get("telegramRegion", "osaka")
-            tg_target_prefs = REGION_PREFS.get(tg_reg, ["osaka"]) if tg_reg != "all" else ALL_PREFS
-            tg_status = notif_cfg.get("telegramStatus", "in")
-            tg_chain = notif_cfg.get("telegramChain", "all")
+            _last_tg_enabled = tg_enabled
 
             # Poll active prefectures to ingest real-time reports into SQLite database
             for pref in ALL_PREFS:
@@ -483,64 +609,20 @@ def telegram_background_watcher():
                             source="poketan"
                         )
 
-                        report_key = f"{sid}_{ts}_{code}"
-
                         if is_new and code == "i":
                             # Backfill rich history with notes/packs in background
                             threading.Thread(target=_backfill_store_history_safe, args=(sid,), daemon=True).start()
 
-                        # --- TELEGRAM DISPATCH CONDITIONS ---
-                        # CONDITION 1: MUST BE A BRAND NEW REPORT JUST SAVED TO DATABASE
-                        if not is_new:
-                            continue
-
-                        # CONDITION 2: MUST HAVE BEEN CREATED AFTER TELEGRAM WAS ACTIVATED AND DAEMON STARTED
-                        # Never send reports created in the past before this session started!
-                        activation_threshold = max(daemon_start_time - 60, tg_enabled_since - 30)
-                        if ts < activation_threshold:
-                            continue
-
-                        # CONDITION 3: MUST BE FRESH (within the last 5 minutes)
-                        if (now_sec - ts) > 300:
-                            continue
-
-                        # CONDITION 4: MUST NOT BE ALREADY NOTIFIED
-                        if report_key in _recent_notified_keys:
-                            continue
-
-                        # Mark as processed immediately to prevent duplicate dispatch
-                        _recent_notified_keys[report_key] = now_sec
-
-                        # CONDITION 5: CHECK SETTINGS FILTERS (Ready, Region, Status, Chain)
-                        if not tg_ready:
-                            continue
-
-                        if pref not in tg_target_prefs:
-                            continue
-
-                        if tg_status == "in" and code != "i":
-                            continue
-                        if tg_status == "onsite" and (code != "i" or not onsite):
-                            continue
-                        if tg_status == "recent" and (code != "i" and not (ts > 0 and code != "n")):
-                            continue
-
-                        st = db_get_store_by_id(sid) or get_stores_by_pref(pref).get(sid) or {"id": sid, "name": sid, "pref": pref}
-                        st["pref"] = pref
-                        st_chain = (st.get("chain") or "").lower()
-
-                        if tg_chain != "all":
-                            if tg_chain == "conbini" and st_chain not in ["seven", "lawson", "familymart", "ministop"]:
-                                continue
-                            elif tg_chain == "specialty" and st_chain != "specialty":
-                                continue
-                            elif tg_chain == "electronics" and st_chain not in ['geo', 'joshin', 'edion', 'aeon', 'yamada', 'ks', 'toysrus', 'biccamera', 'yodobashi']:
-                                continue
-                            elif tg_chain not in ["conbini", "specialty", "electronics"] and st_chain != tg_chain:
-                                continue
-
-                        print(f"  [TelegramDaemon] ⚡ DISPATCHING NEW REPORT for {st.get('name')} (ts={ts}, code={code})")
-                        send_telegram_alert(st, parsed, notif_cfg, is_test=False)
+                        # 2. Dispatch alert (unified logic with freshness, activation threshold, and deduplication)
+                        maybe_dispatch_telegram_alert(
+                            store_id=sid,
+                            status_code=code,
+                            timestamp=ts,
+                            onsite=onsite,
+                            packs=packs,
+                            formatted_time=rep_time,
+                            source="poketan"
+                        )
                 except Exception as pe:
                     pass
 
@@ -593,7 +675,19 @@ async def record_report_endpoint(request: Request):
         if is_new and status_code == "i":
             threading.Thread(target=_backfill_store_history_safe, args=(store_id,), daemon=True).start()
 
-        return JSONResponse(content={"status": "ok", "is_new": is_new, "report": rep})
+        # Real-time Telegram alert dispatch
+        tg_res = maybe_dispatch_telegram_alert(
+            store_id=store_id,
+            status_code=status_code,
+            timestamp=timestamp,
+            onsite=onsite,
+            packs=packs,
+            note=note,
+            formatted_time=formatted_time,
+            source=source
+        )
+
+        return JSONResponse(content={"status": "ok", "is_new": is_new, "report": rep, "telegram": tg_res})
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "error": str(e)})
 

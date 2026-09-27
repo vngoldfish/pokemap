@@ -2491,15 +2491,21 @@ def render_map_page() -> str:
                 const confVal = data[k + '_c'] || '';
                 const isGps = typeof confVal === 'string' && confVal.includes('g');
 
+                let isChanged = false;
                 if (storesDict[sid]) {
                   const st = storesDict[sid];
                   if (st.status !== code || (st.last_timestamp || 0) < ts) {
                     st.status = code;
                     st.last_timestamp = ts;
                     st.onsite = isGps;
+                    isChanged = true;
                   }
+                } else {
+                  isChanged = true;
                 }
-                syncReportToBackend(sid, v, confVal);
+                if (isChanged) {
+                  syncReportToBackend(sid, v, confVal);
+                }
               }
               renderMapMarkers();
             }
@@ -3989,15 +3995,21 @@ def render_thongbao_page() -> str:
                 const confVal = data[k + '_c'] || '';
                 const isGps = typeof confVal === 'string' && confVal.includes('g');
 
+                let isChanged = false;
                 if (storesDict[sid]) {
                   const st = storesDict[sid];
                   if (st.status !== code || (st.last_timestamp || 0) < ts) {
                     st.status = code;
                     st.last_timestamp = ts;
                     st.onsite = isGps;
+                    isChanged = true;
                   }
+                } else {
+                  isChanged = true;
                 }
-                syncReportToBackend(sid, v, confVal);
+                if (isChanged) {
+                  syncReportToBackend(sid, v, confVal);
+                }
               }
               const q = document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '';
               renderStoreList(q);
