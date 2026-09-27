@@ -230,18 +230,24 @@ def send_telegram_alert(store: dict, info: dict, notif_cfg: dict, is_test: bool 
             pass
     dist_display = f"~{dist_str} (từ {ref_name})" if dist_str else "Chưa rõ toạ độ"
 
-    # 5. Địa chỉ (+ Link Google Maps trực tiếp)
+    # 5. Link vị trí trong PokéMap (pokemap.bawui.com) -> từ đó ấn nút ra Google Maps
+    store_id = store.get("id") or info.get("store_id") or ""
+    clean_id = store_id[:-2] if store_id.endswith("_c") else store_id
+    pokemap_params = []
+    if clean_id:
+        pokemap_params.append(f"focus={clean_id}")
+    if st_lat is not None and st_lng is not None:
+        pokemap_params.append(f"lat={st_lat}&lng={st_lng}")
+
+    query_str = ("?" + "&".join(pokemap_params)) if pokemap_params else ""
+    pokemap_url = f"https://pokemap.bawui.com/{query_str}"
+
     store_addr = store.get('address') or 'Khu vực đang chọn'
-    maps_query = urllib.parse.quote_plus(f"{store_name} {store_addr}".strip())
-    maps_url = f"https://www.google.com/maps/search/?api=1&query={maps_query}" if maps_query else ""
-    if maps_url:
-        addr_display = f"<a href=\"{maps_url}\">{store_addr}</a> (📍 <a href=\"{maps_url}\">Google Maps</a>)"
-    else:
-        addr_display = store_addr
+    addr_display = f"<a href=\"{pokemap_url}\">{store_addr}</a> (🗺️ <a href=\"{pokemap_url}\">Mở PokéMap</a>)"
 
     test_prefix = "🧪 <b>[TEST]</b> " if is_test else ""
     msg_lines = [
-        f"{test_prefix}🏪 <b>Cửa hàng:</b> {store_name}{chain_tag}",
+        f"{test_prefix}🏪 <b>Cửa hàng:</b> <a href=\"{pokemap_url}\">{store_name}</a>{chain_tag}",
         f"⏱ <b>Thời gian:</b> {time_display}",
         f"📊 <b>Trạng thái:</b> {status_label}",
         f"📍 <b>Khoảng cách:</b> {dist_display}",

@@ -1901,7 +1901,7 @@ def render_map_page() -> str:
           ${time}
           ${packs}
           <div class="popup-actions-grid">
-            <a href="${mapsUrl}" target="_blank" class="btn-popup-maps">🗺️ Chỉ đường ↗</a>
+            <a href="${mapsUrl}" target="_blank" class="btn-popup-maps">🗺️ Google Maps chỉ đường ↗</a>
             <button type="button" class="btn-popup-hist" onclick="openStoreHistoryModal('${store.id}')">📜 Lịch sử</button>
           </div>
         </div>
@@ -2117,7 +2117,7 @@ def render_map_page() -> str:
             updateGpsBtnState();
           }
           const urlParams = new URLSearchParams(window.location.search);
-          if (autoFly && !urlParams.get('focus') && urlParams.get('hunt') !== '1') {
+          if (autoFly && !urlParams.get('focus') && !urlParams.get('store') && !urlParams.get('lat') && urlParams.get('hunt') !== '1') {
             map.flyTo([userLat, userLng], 15, { duration: 1.0 });
           }
         },
@@ -2369,22 +2369,66 @@ def render_map_page() -> str:
         updateMapFilterUI();
         renderMapMarkers();
 
-        // Check URL Query String: ?focus=store_id or ?hunt=1
+        // Check URL Query String: ?focus=store_id or ?store=... or ?lat=...&lng=... or ?hunt=1
         const urlParams = new URLSearchParams(window.location.search);
-        const focusId = urlParams.get('focus');
+        const rawFocusId = urlParams.get('focus') || urlParams.get('store');
+        const qLat = parseFloat(urlParams.get('lat'));
+        const qLng = parseFloat(urlParams.get('lng'));
         const isHunt = urlParams.get('hunt');
 
-        if (focusId && storesDict[focusId]) {
+        if (rawFocusId || (!isNaN(qLat) && !isNaN(qLng))) {
           isFollowingUser = false;
           updateGpsBtnState();
-          const s = storesDict[focusId];
-          map.flyTo([s.lat, s.lng], 16, { duration: 0.8 });
-          setTimeout(() => {
-            stockLayer.eachLayer(m => {
-              const ll = m.getLatLng();
-              if (Math.abs(ll.lat - s.lat) < 0.0001 && Math.abs(ll.lng - s.lng) < 0.0001) m.openPopup();
-            });
-          }, 850);
+
+          let targetStore = null;
+          if (rawFocusId) {
+            const cleanId = rawFocusId.endsWith('_c') ? rawFocusId.slice(0, -2) : rawFocusId;
+            targetStore = storesDict[rawFocusId] || storesDict[cleanId];
+          }
+
+          let tLat = !isNaN(qLat) ? qLat : (targetStore ? targetStore.lat : null);
+          let tLng = !isNaN(qLng) ? qLng : (targetStore ? targetStore.lng : null);
+
+          if (!targetStore && tLat !== null && tLng !== null) {
+            for (const s of Object.values(storesDict)) {
+              if (Math.abs(s.lat - tLat) < 0.001 && Math.abs(s.lng - tLng) < 0.001) {
+                targetStore = s;
+                break;
+              }
+            }
+          }
+
+          if (targetStore) {
+            tLat = targetStore.lat;
+            tLng = targetStore.lng;
+          }
+
+          if (tLat !== null && tLng !== null) {
+            map.setView([tLat, tLng], 17);
+            setTimeout(() => {
+              if (targetStore) {
+                const sInfo = getStoreStatusInfo(targetStore);
+                L.popup({ maxWidth: 320, autoClose: false, closeOnClick: false })
+                  .setLatLng([tLat, tLng])
+                  .setContent(createPopupHtml(targetStore, sInfo))
+                  .openOn(map);
+              } else {
+                const navMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${tLat},${tLng}`;
+                L.popup({ maxWidth: 320, autoClose: false, closeOnClick: false })
+                  .setLatLng([tLat, tLng])
+                  .setContent(`
+                    <div style="padding:6px 2px;">
+                      <div class="popup-store-title">📍 Vị trí cửa hàng</div>
+                      <div style="font-size:0.75rem; color:#64748b; margin-top:4px;">Toạ độ: ${tLat.toFixed(5)}, ${tLng.toFixed(5)}</div>
+                      <div class="popup-actions-grid" style="margin-top:10px;">
+                        <a href="${navMapsUrl}" target="_blank" class="btn-popup-maps">🗺️ Google Maps chỉ đường ↗</a>
+                      </div>
+                    </div>
+                  `)
+                  .openOn(map);
+              }
+            }, 350);
+          }
         } else if (isHunt === '1') {
           isFollowingUser = false;
           updateGpsBtnState();
@@ -2463,7 +2507,7 @@ def render_map_page() -> str:
         updateUserMarker(userLat, userLng, 25);
       }
       const urlParams = new URLSearchParams(window.location.search);
-      const shouldAutoFly = !urlParams.get('focus') && urlParams.get('hunt') !== '1';
+      const shouldAutoFly = !urlParams.get('focus') && !urlParams.get('store') && !urlParams.get('lat') && urlParams.get('hunt') !== '1';
       startGpsTracking(shouldAutoFly);
     });
   </script>
