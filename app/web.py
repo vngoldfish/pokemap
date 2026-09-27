@@ -43,6 +43,7 @@ from .db import (
     get_report_counts as db_get_report_counts
 )
 import threading
+from concurrent.futures import ThreadPoolExecutor
 
 # Initialize local SQLite database and populate stores on startup
 init_db()
@@ -152,16 +153,16 @@ from typing import Optional, List, Dict, Any
 from concurrent.futures import ThreadPoolExecutor
 
 # All available prefectures on PokéTan
-ALL_PREFS = ["osaka", "aichi", "kanagawa", "gifu", "mie"]
+ALL_PREFS = ["osaka", "tokyo", "kanagawa", "aichi", "gifu", "mie"]
 
 # Defined 3 core regions + all (matching user specification)
 REGION_PREFS = {
     "osaka": ["osaka"],
-    "tokyo": ["kanagawa"],
+    "tokyo": ["tokyo", "kanagawa"],
     "kanagawa": ["kanagawa"],
     "nagoya": ["aichi", "gifu", "mie"],
     "aichi": ["aichi", "gifu", "mie"],
-    "all": ["osaka", "aichi", "kanagawa", "gifu", "mie"],
+    "all": ["osaka", "tokyo", "kanagawa", "aichi", "gifu", "mie"],
 }
 
 _recent_notified_keys = {}
@@ -369,7 +370,8 @@ async def send_webhook_notification(request: Request):
                 note=info.get("note") or "",
                 user=info.get("user") or "匿名トレーナー",
                 formatted_time=info.get("reported_at") or "",
-                source="webhook" if is_test else "poketan"
+                source="webhook" if is_test else "poketan",
+                pref=store.get("pref") or "osaka"
             )
 
         # 6. Deduplication: do not spam the exact same report within 2 hours
@@ -391,13 +393,13 @@ async def send_webhook_notification(request: Request):
         return JSONResponse(status_code=500, content={"status": "error", "error": str(e)})
 
 
-def _backfill_store_history_safe(store_id: str):
+def _backfill_store_history_safe(store_id: str, pref: str = "osaka"):
     """Safely fetch full history from PokéTan and save to SQLite in background."""
     clean_id = store_id[:-2] if store_id.endswith("_c") else store_id
     try:
         remote_hist = fetch_store_history(clean_id)
         if remote_hist:
-            save_bulk_history(clean_id, remote_hist, source="poketan")
+            save_bulk_history(clean_id, remote_hist, source="poketan", pref=pref)
     except Exception as e:
         print(f"  [DB] Background history backfill error for {clean_id}: {e}")
 
@@ -427,11 +429,20 @@ def telegram_background_watcher():
 
             now_sec = time.time()
 
-            # Poll all active prefectures to ingest real-time reports into SQLite database
-            for pref in ALL_PREFS:
-                try:
-                    hot_data = fetch_realtime_status(pref, include_cold=False)
-                    for k, raw in hot_data.items():
+            # Poll all active prefectures concurrently for ultra-fast background sync (~0.4s)
+            pref_data_map = {}
+            try:
+                with ThreadPoolExecutor(max_workers=min(6, len(ALL_PREFS))) as executor:
+                    futs = {executor.submit(fetch_realtime_status, p, False): p for p in ALL_PREFS}
+                    pref_data_map = {p: f.result() for f, p in futs.items()}
+            except Exception:
+                pass
+
+            for pref, hot_data in pref_data_map.items():
+                if not hot_data:
+                    continue
+                for k, raw in hot_data.items():
+                    try:
                         if k.endswith("_c"):
                             continue
                         sid = k
@@ -443,6 +454,7 @@ def telegram_background_watcher():
                         ts = parsed.get("timestamp") or 0
                         code = parsed.get("status_code") or "u"
                         onsite = bool(parsed.get("onsite", False))
+                        confirms = parsed.get("confirms") or 1
                         packs = parsed.get("packs") or []
                         rep_time = parsed.get("reported_at") or ""
 
@@ -452,15 +464,17 @@ def telegram_background_watcher():
                             status_code=code,
                             timestamp=ts,
                             onsite=onsite,
+                            confirms=confirms,
                             packs=packs,
                             formatted_time=rep_time,
-                            source="poketan"
+                            source="poketan",
+                            pref=pref
                         )
 
                         report_key = f"{sid}_{ts}_{code}"
                         if is_new and code == "i":
                             # Backfill rich history with notes/packs in background
-                            threading.Thread(target=_backfill_store_history_safe, args=(sid,), daemon=True).start()
+                            threading.Thread(target=_backfill_store_history_safe, args=(sid, pref), daemon=True).start()
 
                         if is_first_scan:
                             _recent_notified_keys[report_key] = now_sec
@@ -496,13 +510,32 @@ def telegram_background_watcher():
                                 _recent_notified_keys[report_key] = now_sec
                                 print(f"  [TelegramDaemon] Auto-dispatching Telegram alert for {st.get('name')}")
                                 send_telegram_alert(st, parsed, notif_cfg, is_test=False)
-                except Exception as pe:
-                    pass
+                    except Exception as pe:
+                        continue
 
             is_first_scan = False
         except Exception as e:
             pass
-        time.sleep(35)
+        time.sleep(12)
+
+
+_watcher_thread = None
+_watcher_lock = threading.Lock()
+
+def start_background_watcher():
+    """Start background watcher daemon thread if not already running."""
+    global _watcher_thread
+    with _watcher_lock:
+        if _watcher_thread is None or not _watcher_thread.is_alive():
+            _watcher_thread = threading.Thread(target=telegram_background_watcher, daemon=True)
+            _watcher_thread.start()
+            return _watcher_thread
+    return _watcher_thread
+
+
+@app.on_event("startup")
+def startup_event():
+    start_background_watcher()
 
 
 @app.post("/api/record_report")
@@ -528,22 +561,39 @@ async def record_report_endpoint(request: Request):
         who = body.get("who") or ""
         formatted_time = body.get("formatted_time")
         source = body.get("source") or "poketan"
+        confirms = int(body.get("confirms") or 1)
+        conf_raw = body.get("conf_raw") or body.get("conf")
+        if conf_raw:
+            try:
+                parsed = parse_store_status(f"{status_code}{timestamp}", str(conf_raw))
+                if parsed:
+                    onsite = parsed.get("onsite", onsite)
+                    confirms = parsed.get("confirms", confirms)
+                    if not packs and parsed.get("packs"):
+                        packs = parsed.get("packs")
+            except Exception:
+                pass
+
+        existing_s = db_get_store_by_id(store_id)
+        store_pref = existing_s.get("pref") if existing_s else "osaka"
 
         is_new, rep = record_new_report(
             store_id=store_id,
             status_code=status_code,
             timestamp=timestamp,
             onsite=onsite,
+            confirms=confirms,
             packs=packs,
             note=note,
             user=user,
             who=who,
             formatted_time=formatted_time,
-            source=source
+            source=source,
+            pref=store_pref
         )
 
         if is_new and status_code == "i":
-            threading.Thread(target=_backfill_store_history_safe, args=(store_id,), daemon=True).start()
+            threading.Thread(target=_backfill_store_history_safe, args=(store_id, store_pref), daemon=True).start()
 
         return JSONResponse(content={"status": "ok", "is_new": is_new, "report": rep})
     except Exception as e:
@@ -640,14 +690,16 @@ def get_hot_status(region: Optional[str] = None, pref: Optional[str] = None):
 def get_store_history(store_id: str):
     clean_id = store_id[:-2] if store_id.endswith("_c") else store_id
     try:
-        local_hist = db_get_store_history(clean_id, limit=30)
+        local_hist = db_get_store_history(clean_id, limit=100)
         # If fewer than 2 records, backfill from PokéTan and save into SQLite
         if len(local_hist) < 2:
             try:
+                existing_s = db_get_store_by_id(clean_id)
+                store_pref = existing_s.get("pref") if existing_s else "osaka"
                 remote_hist = fetch_store_history(clean_id)
                 if remote_hist:
-                    save_bulk_history(clean_id, remote_hist, source="poketan")
-                    local_hist = db_get_store_history(clean_id, limit=30)
+                    save_bulk_history(clean_id, remote_hist, source="poketan", pref=store_pref)
+                    local_hist = db_get_store_history(clean_id, limit=100)
             except Exception as e:
                 print(f"[DB] Error backfilling history for {clean_id}: {e}")
         return JSONResponse(content=local_hist)
@@ -668,12 +720,37 @@ def get_report_counts(region: Optional[str] = None, pref: Optional[str] = None):
         return JSONResponse(content={})
 
 
+@app.get("/api/analytics/store/{store_id}")
+def get_store_analytics(store_id: str):
+    clean_id = store_id[:-2] if store_id.endswith("_c") else store_id
+    try:
+        from .db import get_store_restock_analytics
+        data = get_store_restock_analytics(clean_id)
+        return JSONResponse(content=data)
+    except Exception as e:
+        print(f"Error fetching analytics for {clean_id}:", e)
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+
+
+@app.get("/api/latest_reports")
+def get_latest_reports_route(since: int = 0, limit: int = 50):
+    try:
+        from .db import get_recent_reports
+        reports = get_recent_reports(since_created_at=since, limit=limit)
+        return JSONResponse(content=reports)
+    except Exception as e:
+        print("[DB] Error fetching latest reports:", e)
+        return JSONResponse(content=[])
+
+
 
 @app.get("/api/config")
 def get_config():
+    import time
     user_settings = load_user_settings()
     notif = user_settings.get("notifications", {})
     return {
+        "serverTime": int(time.time()),
         "apiKey": FIREBASE_API_KEY,
         "projectId": PROJECT_ID,
         "chainNames": CHAIN_NAMES,
@@ -741,9 +818,7 @@ def main():
     print("=================================================================")
 
     # Start 24/7 background Telegram stock watcher daemon
-    import threading
-    watcher_thread = threading.Thread(target=telegram_background_watcher, daemon=True)
-    watcher_thread.start()
+    start_background_watcher()
 
     uvicorn.run("app.web:app", host="0.0.0.0", port=port, reload=False)
 

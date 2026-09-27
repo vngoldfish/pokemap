@@ -78,8 +78,10 @@ def parse_store_status(val: str, conf_val: Optional[str] = None) -> Optional[Dic
     status_meta = STATUS_CODE_MAP[code]
     timestamp = int(ts_str)
     try:
-        report_dt = datetime.fromtimestamp(timestamp)
-        report_time_str = report_dt.strftime("%Y-%m-%d %H:%M:%S")
+        from datetime import timezone, timedelta
+        JST = timezone(timedelta(hours=9))
+        report_dt = datetime.fromtimestamp(timestamp, tz=JST)
+        report_time_str = report_dt.strftime("%H:%M %d/%m/%Y")
     except Exception:
         report_time_str = str(timestamp)
 
