@@ -11,7 +11,7 @@ import os
 import json
 import time
 from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional, Tuple, Callable
 
 JST = timezone(timedelta(hours=9))
 
@@ -452,6 +452,17 @@ def get_store_history(store_id: str, limit: int = 30) -> List[Dict[str, Any]]:
         return history
 
 
+_on_report_added_callbacks: List[Callable[[Dict[str, Any]], None]] = []
+
+def register_on_report_added(callback: Callable[[Dict[str, Any]], None]) -> None:
+    """
+    Register an event hook to be triggered immediately whenever a brand-new report
+    is added and committed into the SQLite CSDL database.
+    """
+    if callback not in _on_report_added_callbacks:
+        _on_report_added_callbacks.append(callback)
+
+
 def record_new_report(
     store_id: str,
     status_code: str,
@@ -468,6 +479,7 @@ def record_new_report(
     Record a new report into SQLite store_history and update stores table.
     Ensures idempotency (no duplicate entries for the same store, timestamp, and status).
     Returns (is_new, report_dict).
+    When is_new is True, automatically triggers registered CSDL event hooks.
     """
     clean_id = store_id[:-2] if store_id.endswith("_c") else store_id
     if not clean_id or not status_code or timestamp <= 0:
@@ -566,6 +578,14 @@ def record_new_report(
         "formatted_time": formatted_time,
         "source": source
     }
+
+    # Database Event: A brand-new report has been officially added to CSDL!
+    for cb in _on_report_added_callbacks:
+        try:
+            cb(entry)
+        except Exception as cb_err:
+            print(f"  [CSDL Event Error] Failed executing callback: {cb_err}")
+
     return True, entry
 
 

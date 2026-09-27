@@ -40,7 +40,8 @@ from .db import (
     get_store_history as db_get_store_history,
     record_new_report,
     save_bulk_history,
-    get_report_counts as db_get_report_counts
+    get_report_counts as db_get_report_counts,
+    register_on_report_added
 )
 import threading
 
@@ -420,22 +421,53 @@ def maybe_dispatch_telegram_alert(
         "reported_at": formatted_time or ""
     }
 
-    print(f"  [TelegramAlert] ⚡ DISPATCHING TELEGRAM ALERT: {st.get('name')} (pref={store_pref}, ts={ts}, code={code})")
+    print(f"  [CSDL -> Telegram] ⚡ BẢN GHI MỚI VỪA ADD VÀO CSDL: {st.get('name')} (pref={store_pref}, ts={ts}, code={code})")
     res = send_telegram_alert(st, info_payload, notif_cfg, is_test=force_test)
-    print(f"  [TelegramAlert] Dispatch result: {res}")
+    print(f"  [CSDL -> Telegram] Kết quả gửi: {res}")
     return res
+
+
+def on_csdl_report_added(entry: dict):
+    """
+    Event listener triggered ONLY when a report is newly committed into SQLite CSDL.
+    External data fetching is purely to add data into CSDL; notifications are triggered from CSDL.
+    """
+    store_id = entry.get("store_id")
+    status_code = entry.get("status_code") or "u"
+    timestamp = entry.get("timestamp") or 0
+    onsite = bool(entry.get("onsite", False))
+    packs = entry.get("packs") or []
+    note = entry.get("note") or ""
+    formatted_time = entry.get("formatted_time") or ""
+    source = entry.get("source") or "csdl"
+
+    # Safely backfill full history in background if in-stock
+    if status_code == "i" and store_id:
+        threading.Thread(target=_backfill_store_history_safe, args=(store_id,), daemon=True).start()
+
+    # Trigger Telegram alert check & dispatch for the new CSDL entry
+    maybe_dispatch_telegram_alert(
+        store_id=store_id,
+        status_code=status_code,
+        timestamp=timestamp,
+        onsite=onsite,
+        packs=packs,
+        note=note,
+        formatted_time=formatted_time,
+        source=source
+    )
+
+# Register the CSDL hook immediately
+register_on_report_added(on_csdl_report_added)
 
 
 @app.post("/api/notify/webhook")
 async def send_webhook_notification(request: Request):
     """
-    Dispatch in-stock notifications to Telegram Bot and Discord Webhook.
-    Strictly applies exact user settings (Region, Status Filter, Time Window, Deduplication).
+    Test or manual webhook notification endpoint.
+    If is_test is True, directly validates Telegram bot credentials and sends a test message.
+    Otherwise ingests report into SQLite CSDL.
     """
-    import urllib.request
-    import urllib.parse
-    import time
-    
     try:
         body = await request.json()
         store = body.get("store") or {}
@@ -444,83 +476,27 @@ async def send_webhook_notification(request: Request):
         
         user_settings = load_user_settings()
         notif_cfg = user_settings.get("notifications", {})
-        results = {}
+        
+        if is_test:
+            tg_res = send_telegram_alert(store, info, notif_cfg, is_test=True)
+            return JSONResponse(content={"status": "ok", "results": {"telegram": tg_res.get("status", "error")}})
 
-        # 1. Telegram Enabled Check
-        tg_enabled = notif_cfg.get("telegramEnabled", False) or is_test
-        if not tg_enabled:
-            return JSONResponse(content={"status": "disabled", "reason": "telegram notifications disabled in settings"})
-
-        # 2. Telegram Region Check
-        tg_region = notif_cfg.get("telegramRegion", "osaka")
-        if not is_test and tg_region != "all":
-            allowed_prefs = REGION_PREFS.get(tg_region, ["osaka"])
-            store_pref = (store.get("pref") or "").strip().lower()
-            if not store_pref:
-                sid = store.get("id")
-                for p_name in ALL_PREFS:
-                    if sid in get_stores_by_pref(p_name):
-                        store_pref = p_name.lower()
-                        break
-            if not store_pref or store_pref not in allowed_prefs:
-                return JSONResponse(content={"status": "filtered", "reason": f"pref '{store_pref}' not in telegram region '{tg_region}'"})
-
-        # 3. Telegram Status Filter Check
-        status_code = info.get("status_code") or info.get("code") or "i"
-        tg_status = notif_cfg.get("telegramStatus", "in")
-        if not is_test:
-            if tg_status == "in" and status_code != "i":
-                return JSONResponse(content={"status": "filtered", "reason": f"status '{status_code}' does not match telegramStatus '{tg_status}'"})
-            if tg_status == "onsite" and (status_code != "i" or not info.get("onsite")):
-                return JSONResponse(content={"status": "filtered", "reason": "not onsite in-stock"})
-            if tg_status == "recent" and (status_code != "i" and not (info.get("timestamp", 0) > 0 and status_code != "n")):
-                return JSONResponse(content={"status": "filtered", "reason": "not recent or in-stock"})
-
-        # 4. Telegram Chain Filter Check
-        tg_chain = notif_cfg.get("telegramChain", "all")
-        store_chain = (store.get("chain") or "").lower()
-        if not is_test and tg_chain != "all":
-            if tg_chain == "conbini" and store_chain not in ["seven", "lawson", "familymart", "ministop"]:
-                return JSONResponse(content={"status": "filtered", "reason": f"chain '{store_chain}' not in conbini"})
-            elif tg_chain == "specialty" and store_chain != "specialty":
-                return JSONResponse(content={"status": "filtered", "reason": f"chain '{store_chain}' not specialty"})
-            elif tg_chain == "electronics" and store_chain not in ['geo', 'joshin', 'edion', 'aeon', 'yamada', 'ks', 'toysrus', 'biccamera', 'yodobashi']:
-                return JSONResponse(content={"status": "filtered", "reason": f"chain '{store_chain}' not electronics"})
-            elif tg_chain not in ["conbini", "specialty", "electronics"] and store_chain != tg_chain:
-                return JSONResponse(content={"status": "filtered", "reason": f"chain '{store_chain}' does not match '{tg_chain}'"})
-
-        # Ingest into SQLite database
+        # Normal webhook: Ingest into SQLite CSDL (CSDL handles new report notification event automatically)
         sid = store.get("id") or info.get("store_id")
         if sid:
-            status_code_raw = info.get("status_code") or info.get("code") or "i"
-            timestamp_raw = info.get("timestamp") or int(time.time())
             record_new_report(
                 store_id=sid,
-                status_code=status_code_raw,
-                timestamp=timestamp_raw,
+                status_code=info.get("status_code") or info.get("code") or "i",
+                timestamp=info.get("timestamp") or int(time.time()),
                 onsite=bool(info.get("onsite", False)),
                 packs=info.get("packs") or [],
                 note=info.get("note") or "",
                 user=info.get("user") or "匿名トレーナー",
                 formatted_time=info.get("reported_at") or "",
-                source="webhook" if is_test else "poketan"
+                source="webhook"
             )
 
-        # 6. Deduplication: do not spam the exact same report within 2 hours
-        global _recent_notified_keys
-        now_t = time.time()
-        report_key = f"{store.get('id')}_{info.get('timestamp') or int(now_t // 300)}"
-        if not is_test:
-            if report_key in _recent_notified_keys and (now_t - _recent_notified_keys[report_key] < 7200):
-                return JSONResponse(content={"status": "duplicate", "message": "Already notified recently"})
-            _recent_notified_keys[report_key] = now_t
-            _recent_notified_keys = {k: v for k, v in _recent_notified_keys.items() if now_t - v < 7200}
-
-        # 7. Send notification
-        tg_res = send_telegram_alert(store, info, notif_cfg, is_test=is_test)
-        results["telegram"] = tg_res.get("status", "error")
-
-        return JSONResponse(content={"status": "ok", "results": results})
+        return JSONResponse(content={"status": "ok"})
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "error": str(e)})
 
@@ -536,18 +512,22 @@ def _backfill_store_history_safe(store_id: str):
         print(f"  [DB] Background history backfill error for {clean_id}: {e}")
 
 
-def telegram_background_watcher():
-    """Background thread to continuously ingest hot reports from PokéTan into SQLite and dispatch Telegram alerts."""
+def background_data_sync_daemon():
+    """
+    24/7 background worker running on VPS.
+    Purpose: Continuously ingest external data into local SQLite CSDL.
+    Completely decoupled from notifications - it ONLY adds new reports to CSDL.
+    CSDL commit triggers notifications automatically via register_on_report_added.
+    """
     import time
-    import threading
-    global _recent_notified_keys, _daemon_start_time, _tg_enabled_since, _last_tg_enabled
+    global _daemon_start_time, _recent_notified_keys
     time.sleep(3)
 
     _daemon_start_time = time.time()
-    print(f"  [DataSync & TelegramDaemon] Background daemon started at {_daemon_start_time} (monitoring real-time alerts)")
+    print(f"  [DataSync] 24/7 External data ingestion started at {_daemon_start_time} (saving to SQLite CSDL)...")
 
-    # 1. Warm-up phase: Seed ALL current reports from all prefectures so that ZERO preexisting reports are ever sent
-    print("  [TelegramDaemon] Initializing baseline scan: silencing all existing reports...")
+    # Baseline scan: silence existing reports so only new ones arriving from now on are notified
+    print("  [DataSync] Initializing baseline scan: silencing all existing reports...")
     for pref in ALL_PREFS:
         try:
             init_hot = fetch_realtime_status(pref, include_cold=False)
@@ -561,25 +541,11 @@ def telegram_background_watcher():
                     _recent_notified_keys[f"{k}_{p_ts}_{p_code}"] = _daemon_start_time
         except Exception:
             pass
-    print(f"  [TelegramDaemon] Baseline initialized with {len(_recent_notified_keys)} existing reports silenced. Only reports newly created AFTER this moment will be notified.")
-
-    settings = load_user_settings()
-    _last_tg_enabled = bool(settings.get("notifications", {}).get("telegramEnabled", False))
-    _tg_enabled_since = _daemon_start_time
+    print(f"  [DataSync] Baseline scan complete ({len(_recent_notified_keys)} reports initialized).")
 
     while True:
         try:
-            settings = load_user_settings()
-            notif_cfg = settings.get("notifications", {})
-            tg_enabled = bool(notif_cfg.get("telegramEnabled", False))
             now_sec = time.time()
-
-            if tg_enabled and not _last_tg_enabled:
-                _tg_enabled_since = now_sec
-                print(f"  [TelegramDaemon] Telegram notifications activated at {now_sec}. Only new reports from now on will be sent.")
-            _last_tg_enabled = tg_enabled
-
-            # Poll active prefectures to ingest real-time reports into SQLite database
             for pref in ALL_PREFS:
                 try:
                     hot_data = fetch_realtime_status(pref, include_cold=False)
@@ -598,8 +564,10 @@ def telegram_background_watcher():
                         packs = parsed.get("packs") or []
                         rep_time = parsed.get("reported_at") or ""
 
-                        # 1. Ingest report into SQLite database
-                        is_new, rep = record_new_report(
+                        # ONLY PURPOSE: Ingest into SQLite CSDL!
+                        # When a report is newly added to CSDL (is_new == True),
+                        # CSDL automatically triggers on_csdl_report_added callback.
+                        record_new_report(
                             store_id=sid,
                             status_code=code,
                             timestamp=ts,
@@ -608,31 +576,15 @@ def telegram_background_watcher():
                             formatted_time=rep_time,
                             source="poketan"
                         )
-
-                        if is_new and code == "i":
-                            # Backfill rich history with notes/packs in background
-                            threading.Thread(target=_backfill_store_history_safe, args=(sid,), daemon=True).start()
-
-                        # 2. Dispatch alert (unified logic with freshness, activation threshold, and deduplication)
-                        maybe_dispatch_telegram_alert(
-                            store_id=sid,
-                            status_code=code,
-                            timestamp=ts,
-                            onsite=onsite,
-                            packs=packs,
-                            formatted_time=rep_time,
-                            source="poketan"
-                        )
-                except Exception as pe:
+                except Exception:
                     pass
 
-            # Prune deduplication cache (keep within last 2 hours)
             if len(_recent_notified_keys) > 1000:
                 _recent_notified_keys = {k: v for k, v in _recent_notified_keys.items() if now_sec - v < 7200}
 
         except Exception as e:
             pass
-        time.sleep(30)
+        time.sleep(15)
 
 
 @app.post("/api/record_report")
@@ -640,9 +592,8 @@ async def record_report_endpoint(request: Request):
     """
     Ingest a newly observed report into local SQLite store_history and update store status.
     Called when Firestore onSnapshot fires on the client or via external reporting.
+    External data is only added to CSDL. CSDL automatically triggers notification hooks.
     """
-    import time
-    import threading
     try:
         body = await request.json()
         store_id = body.get("store_id")
@@ -672,22 +623,7 @@ async def record_report_endpoint(request: Request):
             source=source
         )
 
-        if is_new and status_code == "i":
-            threading.Thread(target=_backfill_store_history_safe, args=(store_id,), daemon=True).start()
-
-        # Real-time Telegram alert dispatch
-        tg_res = maybe_dispatch_telegram_alert(
-            store_id=store_id,
-            status_code=status_code,
-            timestamp=timestamp,
-            onsite=onsite,
-            packs=packs,
-            note=note,
-            formatted_time=formatted_time,
-            source=source
-        )
-
-        return JSONResponse(content={"status": "ok", "is_new": is_new, "report": rep, "telegram": tg_res})
+        return JSONResponse(content={"status": "ok", "is_new": is_new, "report": rep})
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "error": str(e)})
 
@@ -857,6 +793,17 @@ def thongbao_page():
     return HTMLResponse(content=render_thongbao_page())
 
 
+_data_sync_started = False
+
+@app.on_event("startup")
+def startup_event():
+    global _data_sync_started
+    if not _data_sync_started:
+        _data_sync_started = True
+        import threading
+        threading.Thread(target=background_data_sync_daemon, daemon=True).start()
+
+
 def main():
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
@@ -881,10 +828,8 @@ def main():
     print(f"👉 Mở trình duyệt tại: http://localhost:{port}")
     print("=================================================================")
 
-    # Start 24/7 background Telegram stock watcher daemon
-    import threading
-    watcher_thread = threading.Thread(target=telegram_background_watcher, daemon=True)
-    watcher_thread.start()
+    # Start 24/7 background external data ingestion worker
+    startup_event()
 
     uvicorn.run("app.web:app", host="0.0.0.0", port=port, reload=False)
 
