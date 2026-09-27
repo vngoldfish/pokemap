@@ -3063,21 +3063,37 @@ def render_map_page() -> str:
           window._dbPollInterval = setInterval(pollDatabaseUpdates, 5000);
         }
 
-        // Check URL Query String: ?focus=store_id or ?hunt=1
+        // Check URL Query String: ?focus=store_id or ?store_id=... or ?hunt=1
         const urlParams = new URLSearchParams(window.location.search);
-        const focusId = urlParams.get('focus');
+        const focusId = urlParams.get('focus') || urlParams.get('store_id');
         const isHunt = urlParams.get('hunt');
+        const targetLat = parseFloat(urlParams.get('lat'));
+        const targetLng = parseFloat(urlParams.get('lng'));
 
         if (focusId && storesDict[focusId]) {
           isFollowingUser = false;
           updateGpsBtnState();
           const s = storesDict[focusId];
-          map.flyTo([s.lat, s.lng], 16, { duration: 0.8 });
+          const flyLat = (!isNaN(targetLat) && targetLat) ? targetLat : s.lat;
+          const flyLng = (!isNaN(targetLng) && targetLng) ? targetLng : s.lng;
+          map.flyTo([flyLat, flyLng], 17, { duration: 0.8 });
           setTimeout(() => {
+            let opened = false;
             stockLayer.eachLayer(m => {
               const ll = m.getLatLng();
-              if (Math.abs(ll.lat - s.lat) < 0.0001 && Math.abs(ll.lng - s.lng) < 0.0001) m.openPopup();
+              if (Math.abs(ll.lat - s.lat) < 0.0002 && Math.abs(ll.lng - s.lng) < 0.0002) {
+                m.openPopup();
+                opened = true;
+              }
             });
+            if (!opened && circleLayer) {
+              circleLayer.eachLayer(m => {
+                const ll = m.getLatLng();
+                if (Math.abs(ll.lat - s.lat) < 0.0002 && Math.abs(ll.lng - s.lng) < 0.0002) {
+                  m.openPopup();
+                }
+              });
+            }
           }, 850);
         } else if (isHunt === '1') {
           isFollowingUser = false;
@@ -3100,7 +3116,7 @@ def render_map_page() -> str:
         updateUserMarker(userLat, userLng, 25);
       }
       const urlParams = new URLSearchParams(window.location.search);
-      const shouldAutoFly = !urlParams.get('focus') && urlParams.get('hunt') !== '1';
+      const shouldAutoFly = !urlParams.get('focus') && !urlParams.get('store_id') && urlParams.get('hunt') !== '1';
       startGpsTracking(shouldAutoFly);
     });
   </script>

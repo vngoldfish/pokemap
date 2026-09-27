@@ -40,7 +40,8 @@ from .db import (
     get_store_history as db_get_store_history,
     record_new_report,
     save_bulk_history,
-    get_report_counts as db_get_report_counts
+    get_report_counts as db_get_report_counts,
+    register_on_report_added
 )
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -168,10 +169,19 @@ REGION_PREFS = {
 _recent_notified_keys = {}
 
 def send_telegram_alert(store: dict, info: dict, notif_cfg: dict, is_test: bool = False) -> dict:
-    """Send formatted alert to Telegram bot matching configured channel."""
+    """
+    Send formatted alert to Telegram bot matching configured channel.
+    Concise 5-field format requested by user:
+    1. Tên cửa hàng (Chuỗi)
+    2. Thời gian có báo cáo (JST)
+    3. Trạng thái (Có hàng / Hết hàng...)
+    4. Khoảng cách (từ ga JR Imamiya hoặc định vị)
+    5. Địa chỉ kèm link mở vị trí trên PokéMap
+    """
     import urllib.request
     import urllib.parse
     import json
+    import math
 
     tg_token = (notif_cfg.get("telegramBotToken") or "").strip()
     tg_chat_id = (notif_cfg.get("telegramChatId") or "").strip()
@@ -183,12 +193,11 @@ def send_telegram_alert(store: dict, info: dict, notif_cfg: dict, is_test: bool 
         return {"status": "disabled"}
 
     # Calculate distance to JR Imamiya Station (lat=34.6540, lng=135.4925)
-    imamiya_dist_str = ""
+    imamiya_dist_str = "Chưa rõ vị trí"
     st_lat = store.get("lat")
     st_lng = store.get("lng")
     if st_lat is not None and st_lng is not None:
         try:
-            import math
             lat1, lon1 = float(st_lat), float(st_lng)
             lat2, lon2 = 34.6540, 135.4925
             dlat = math.radians(lat2 - lat1)
@@ -196,77 +205,62 @@ def send_telegram_alert(store: dict, info: dict, notif_cfg: dict, is_test: bool 
             a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon/2)**2
             dist_km = 6371 * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
             if dist_km < 1.0:
-                imamiya_dist_str = f"{int(round(dist_km * 1000))} m"
+                imamiya_dist_str = f"~{int(round(dist_km * 1000))} m (từ ga JR Imamiya)"
             else:
-                imamiya_dist_str = f"{dist_km:.1f} km"
+                imamiya_dist_str = f"~{dist_km:.1f} km (từ ga JR Imamiya)"
         except Exception:
             pass
 
     store_name = store.get('name', 'Cửa hàng')
     store_chain = store.get('chain_label') or store.get('chain') or 'Tiện lợi'
     store_addr = store.get('address') or 'Khu vực đang chọn'
-    maps_query = urllib.parse.quote_plus(f"{store_name} {store_addr}".strip())
-    maps_url = f"https://www.google.com/maps/search/?api=1&query={maps_query}" if maps_query else ""
-    time_display = info.get('reported_at', 'Vừa xong')
-    if info.get('timeAgo'):
-        time_display += f" ({info.get('timeAgo')})"
+    store_id = store.get("id") or info.get("store_id") or ""
+    clean_id = store_id[:-2] if store_id.endswith("_c") else store_id
 
-    packs_text = ", ".join(info.get("packs", [])) if info.get("packs") else "Gói thẻ Pokémon (Xem tại quán)"
-
-    # History
-    store_id = store.get("id") or ""
-    history_list = []
-    if store_id and store_id != "test_store_webhook":
+    # Format time (JST)
+    ts = info.get("timestamp") or 0
+    time_display = info.get("reported_at") or info.get("formatted_time") or ""
+    if ts and ts > 0:
         try:
-            history_list = fetch_store_history(store_id) or []
+            from datetime import datetime, timezone, timedelta
+            JST = timezone(timedelta(hours=9))
+            dt = datetime.fromtimestamp(ts, tz=JST)
+            time_display = dt.strftime("%H:%M:%S %d/%m/%Y")
         except Exception:
             pass
-    elif is_test:
-        history_list = [
-            {"status_code": "o", "status_label": "🔴 Hết hàng", "note": "Hết đợt Terastal Festival", "formatted_time": "14:20 24/09"},
-            {"status_code": "i", "status_label": "🟢 Có hàng", "note": "Về 2 box Terastal", "formatted_time": "09:15 24/09"}
-        ]
+    if not time_display:
+        time_display = "Vừa xong"
 
-    # Filter out current report if duplicated in history
-    filtered_hist = []
-    cur_ts = info.get("timestamp") or 0
-    for h in history_list:
-        h_ts = h.get("timestamp") or 0
-        if cur_ts > 0 and abs(h_ts - cur_ts) < 180:
-            continue
-        filtered_hist.append(h)
-        if len(filtered_hist) >= 3:
-            break
+    # Status label
+    code = info.get("status_code") or info.get("status") or "i"
+    if code == "i":
+        status_label = "🟢📸 Có hàng (Xác nhận tại chỗ)" if info.get("onsite") else "🟢 Có hàng (In stock)"
+    elif code == "o":
+        status_label = "🔴 Hết hàng (Sold out)"
+    elif code == "n":
+        status_label = "🟡 Không bán thẻ (No stock)"
+    else:
+        status_label = "⚪ Chưa có tin"
 
-    hist_text_tg_lines = []
-    if filtered_hist:
-        for item in filtered_hist:
-            s_icon = "🟢" if item.get("status_code") == "i" else ("🔴" if item.get("status_code") == "o" else "⚪")
-            t_str = item.get("formatted_time") or "Trước đó"
-            note_str = f" ({item.get('note')})" if item.get("note") else ""
-            hist_text_tg_lines.append(f"- {s_icon} {t_str}: {item.get('status_label', '')}{note_str}")
+    # Link to PokéMap location
+    pokemap_url = f"https://pokemap.bawui.com/?focus={clean_id}"
+    if st_lat is not None and st_lng is not None:
+        pokemap_url += f"&lat={st_lat}&lng={st_lng}&zoom=17"
 
-    dist_part = f" • 📍 ~{imamiya_dist_str}" if imamiya_dist_str else ""
-    title_status = "🟢📸 CÓ HÀNG (XÁC NHẬN TẠI CHỖ)" if info.get("onsite") else "🟢 CÓ HÀNG (IN STOCK)"
-    header = "🧪 <b>[THÔNG BÁO THỬ NGHIỆM]</b>\n" if is_test else f"🔥 <b>{title_status}!</b>\n"
-
+    header = "🧪 <b>[THÔNG BÁO THỬ NGHIỆM]</b>\n" if is_test else ""
     msg_lines = [
-        f"{header}🏪 <b>{store_name}</b> ({store_chain})",
-        f"📍 {store_addr}{dist_part}",
-        f"📦 <b>Sản phẩm:</b> {packs_text}",
-        f"⏱ <b>Thời gian báo:</b> {time_display}"
+        f"{header}🏪 <b>Tên cửa hàng:</b> {store_name} ({store_chain})",
+        f"⏱ <b>Thời gian có báo cáo:</b> {time_display}",
+        f"⚡ <b>Trạng thái:</b> {status_label}",
+        f"📍 <b>Khoảng cách:</b> {imamiya_dist_str}",
+        f"🗺️ <b>Địa chỉ:</b> <a href=\"{pokemap_url}\">{store_addr} (Mở PokéMap ↗)</a>"
     ]
-    if hist_text_tg_lines:
-        msg_lines.append("\n📜 <b>Lịch sử báo cáo gần đây:</b>")
-        msg_lines.extend(hist_text_tg_lines)
-    if maps_url:
-        msg_lines.append(f"\n🗺️ <a href=\"{maps_url}\">Mở Google Maps dẫn đường chính xác ↗</a>")
 
     tg_payload = {
         "chat_id": tg_chat_id,
         "text": "\n".join(msg_lines),
         "parse_mode": "HTML",
-        "disable_web_page_preview": False
+        "disable_web_page_preview": True
     }
     try:
         tg_api_url = f"https://api.telegram.org/bot{tg_token}/sendMessage"
@@ -281,16 +275,62 @@ def send_telegram_alert(store: dict, info: dict, notif_cfg: dict, is_test: bool 
         return {"status": f"error: {str(te)}"}
 
 
+def on_csdl_report_added(store: dict, entry: dict):
+    """
+    CSDL Event Hook:
+    Triggered ONLY when a brand-new report is officially committed into SQLite database.
+    Decoupled 100% from external data fetching.
+    """
+    try:
+        settings = load_user_settings()
+        notif_cfg = settings.get("notifications", {})
+        if not notif_cfg.get("telegramEnabled", False):
+            return
+
+        # Check region filter
+        tg_reg = notif_cfg.get("telegramRegion", "osaka")
+        store_pref = (store.get("pref") or "osaka").lower()
+        if tg_reg != "all" and tg_reg != store_pref:
+            return
+
+        # Check status filter
+        code = entry.get("status_code", "i")
+        tg_status = notif_cfg.get("telegramStatus", "in")
+        if tg_status == "in" and code != "i":
+            return
+        if tg_status == "onsite" and (code != "i" or not entry.get("onsite")):
+            return
+
+        # Check chain filter
+        tg_chain = notif_cfg.get("telegramChain", "all")
+        st_chain = (store.get("chain") or "").lower()
+        if tg_chain != "all":
+            if tg_chain == "conbini" and st_chain not in ["seven", "lawson", "familymart", "ministop"]:
+                return
+            elif tg_chain == "specialty" and st_chain != "specialty":
+                return
+            elif tg_chain == "electronics" and st_chain not in ['geo', 'joshin', 'edion', 'aeon', 'yamada', 'ks', 'toysrus', 'biccamera', 'yodobashi']:
+                return
+            elif tg_chain not in ["conbini", "specialty", "electronics"] and st_chain != tg_chain:
+                return
+
+        print(f"  [CSDL -> Telegram] ⚡ BẢN GHI MỚI VỪA ADD VÀO CSDL: {store.get('name')} (pref={store_pref}, ts={entry.get('timestamp')}, code={code})")
+        res = send_telegram_alert(store, entry, notif_cfg, is_test=False)
+        print(f"  [CSDL -> Telegram] Kết quả gửi: {res}")
+    except Exception as e:
+        print(f"  [CSDL -> Telegram] Lỗi dispatch alert: {e}")
+
+# Register event hook
+register_on_report_added(on_csdl_report_added)
+
+
 @app.post("/api/notify/webhook")
 async def send_webhook_notification(request: Request):
     """
-    Dispatch in-stock notifications to Telegram Bot and Discord Webhook.
-    Strictly applies exact user settings (Region, Status Filter, Time Window, Deduplication).
+    Test or manual notification endpoint.
+    If is_test: tests Telegram connection directly without polluting SQLite CSDL.
+    If not is_test: ingests into SQLite, which dispatches CSDL event if new.
     """
-    import urllib.request
-    import urllib.parse
-    import time
-    
     try:
         body = await request.json()
         store = body.get("store") or {}
@@ -299,69 +339,33 @@ async def send_webhook_notification(request: Request):
         
         user_settings = load_user_settings()
         notif_cfg = user_settings.get("notifications", {})
-        results = {}
 
-        # 1. Telegram Enabled Check
-        tg_enabled = notif_cfg.get("telegramEnabled", False) or is_test
-        if not tg_enabled:
-            return JSONResponse(content={"status": "disabled", "reason": "telegram notifications disabled in settings"})
-
-        # 2. Telegram Region Check
-        tg_region = notif_cfg.get("telegramRegion", "osaka")
-        if not is_test and tg_region != "all":
-            allowed_prefs = REGION_PREFS.get(tg_region, ["osaka"])
-            store_pref = (store.get("pref") or "").strip().lower()
-            if not store_pref:
-                sid = store.get("id")
-                for p_name in ALL_PREFS:
-                    if sid in get_stores_by_pref(p_name):
-                        store_pref = p_name.lower()
-                        break
-            if not store_pref or store_pref not in allowed_prefs:
-                return JSONResponse(content={"status": "filtered", "reason": f"pref '{store_pref}' not in telegram region '{tg_region}'"})
-
-        # 3. Telegram Status Filter Check
-        status_code = info.get("status_code") or info.get("code") or "i"
-        tg_status = notif_cfg.get("telegramStatus", "in")
-        if not is_test:
-            if tg_status == "in" and status_code != "i":
-                return JSONResponse(content={"status": "filtered", "reason": f"status '{status_code}' does not match telegramStatus '{tg_status}'"})
-            if tg_status == "onsite" and (status_code != "i" or not info.get("onsite")):
-                return JSONResponse(content={"status": "filtered", "reason": "not onsite in-stock"})
-            if tg_status == "recent" and (status_code != "i" and not (info.get("timestamp", 0) > 0 and status_code != "n")):
-                return JSONResponse(content={"status": "filtered", "reason": "not recent or in-stock"})
-
-        # 4. Telegram Chain Filter Check
-        tg_chain = notif_cfg.get("telegramChain", "all")
-        store_chain = (store.get("chain") or "").lower()
-        if not is_test and tg_chain != "all":
-            if tg_chain == "conbini" and store_chain not in ["seven", "lawson", "familymart", "ministop"]:
-                return JSONResponse(content={"status": "filtered", "reason": f"chain '{store_chain}' not in conbini"})
-            elif tg_chain == "specialty" and store_chain != "specialty":
-                return JSONResponse(content={"status": "filtered", "reason": f"chain '{store_chain}' not specialty"})
-            elif tg_chain == "electronics" and store_chain not in ['geo', 'joshin', 'edion', 'aeon', 'yamada', 'ks', 'toysrus', 'biccamera', 'yodobashi']:
-                return JSONResponse(content={"status": "filtered", "reason": f"chain '{store_chain}' not electronics"})
-            elif tg_chain not in ["conbini", "specialty", "electronics"] and store_chain != tg_chain:
-                return JSONResponse(content={"status": "filtered", "reason": f"chain '{store_chain}' does not match '{tg_chain}'"})
-
-        # 5. Telegram Time Window Check
-        tg_time = notif_cfg.get("telegramTime", "24")
-        if not is_test and tg_time != "all":
-            try:
-                max_seconds = int(tg_time) * 3600
-                cur_now = time.time()
-                rep_ts = info.get("timestamp") or 0
-                if rep_ts > 0 and (cur_now - rep_ts > max_seconds):
-                    return JSONResponse(content={"status": "filtered", "reason": f"report age exceeds {tg_time}h"})
-            except Exception:
-                pass
+        if is_test:
+            test_store = store or {
+                "id": "test_store",
+                "name": "Pokémon Center Osaka",
+                "chain": "specialty",
+                "chain_label": "Pokémon Center",
+                "address": "Osaka, Kita Ward, Umeda 3-1-1",
+                "lat": 34.7025,
+                "lng": 135.4959,
+                "pref": "osaka"
+            }
+            test_info = info or {
+                "status_code": "i",
+                "timestamp": int(time.time()),
+                "onsite": True,
+                "note": "Kiểm tra kết nối Telegram Bot thành công"
+            }
+            res = send_telegram_alert(test_store, test_info, notif_cfg, is_test=True)
+            return JSONResponse(content={"status": "ok", "results": {"telegram": res.get("status", "ok")}})
 
         # Ingest into SQLite database
         sid = store.get("id") or info.get("store_id")
         if sid:
             status_code_raw = info.get("status_code") or info.get("code") or "i"
             timestamp_raw = info.get("timestamp") or int(time.time())
-            record_new_report(
+            is_new, rep = record_new_report(
                 store_id=sid,
                 status_code=status_code_raw,
                 timestamp=timestamp_raw,
@@ -370,25 +374,12 @@ async def send_webhook_notification(request: Request):
                 note=info.get("note") or "",
                 user=info.get("user") or "匿名トレーナー",
                 formatted_time=info.get("reported_at") or "",
-                source="webhook" if is_test else "poketan",
+                source="webhook",
                 pref=store.get("pref") or "osaka"
             )
+            return JSONResponse(content={"status": "ok", "is_new": is_new, "report": rep})
 
-        # 6. Deduplication: do not spam the exact same report within 2 hours
-        global _recent_notified_keys
-        now_t = time.time()
-        report_key = f"{store.get('id')}_{info.get('timestamp') or int(now_t // 300)}"
-        if not is_test:
-            if report_key in _recent_notified_keys and (now_t - _recent_notified_keys[report_key] < 7200):
-                return JSONResponse(content={"status": "duplicate", "message": "Already notified recently"})
-            _recent_notified_keys[report_key] = now_t
-            _recent_notified_keys = {k: v for k, v in _recent_notified_keys.items() if now_t - v < 7200}
-
-        # 7. Send notification
-        tg_res = send_telegram_alert(store, info, notif_cfg, is_test=is_test)
-        results["telegram"] = tg_res.get("status", "error")
-
-        return JSONResponse(content={"status": "ok", "results": results})
+        return JSONResponse(content={"status": "no_store_id"})
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "error": str(e)})
 
@@ -405,30 +396,17 @@ def _backfill_store_history_safe(store_id: str, pref: str = "osaka"):
 
 
 def telegram_background_watcher():
-    """Background thread to continuously ingest hot reports from PokéTan into SQLite and dispatch Telegram alerts."""
+    """
+    Background worker thread to continuously ingest hot reports from PokéTan into SQLite CSDL.
+    Purely ingests data into SQLite via record_new_report().
+    Telegram notifications are handled strictly by CSDL database events (when is_new == True).
+    """
     import time
     import threading
     time.sleep(5)
-    print("  [DataSync & TelegramDaemon] Background daemon started (syncing reports & monitoring alerts)")
-    is_first_scan = True
+    print("  [DataSyncDaemon] Background daemon started (syncing reports into SQLite CSDL)")
     while True:
         try:
-            settings = load_user_settings()
-            notif_cfg = settings.get("notifications", {})
-            tg_enabled = bool(notif_cfg.get("telegramEnabled", False))
-            tg_token = (notif_cfg.get("telegramBotToken") or "").strip()
-            tg_chat_id = (notif_cfg.get("telegramChatId") or "").strip()
-            tg_ready = tg_enabled and bool(tg_token and tg_chat_id)
-
-            tg_reg = notif_cfg.get("telegramRegion", "osaka")
-            tg_target_prefs = REGION_PREFS.get(tg_reg, ["osaka"]) if tg_reg != "all" else ALL_PREFS
-            tg_status = notif_cfg.get("telegramStatus", "in")
-            tg_chain = notif_cfg.get("telegramChain", "all")
-            tg_time = notif_cfg.get("telegramTime", "24")
-            max_age_sec = int(tg_time) * 3600 if tg_time != "all" else 3600 * 24
-
-            now_sec = time.time()
-
             # Poll all active prefectures concurrently for ultra-fast background sync (~0.4s)
             pref_data_map = {}
             try:
@@ -458,7 +436,7 @@ def telegram_background_watcher():
                         packs = parsed.get("packs") or []
                         rep_time = parsed.get("reported_at") or ""
 
-                        # 1. Ingest report into SQLite database
+                        # Ingest report into SQLite database (fires on_csdl_report_added if is_new)
                         is_new, rep = record_new_report(
                             store_id=sid,
                             status_code=code,
@@ -471,52 +449,16 @@ def telegram_background_watcher():
                             pref=pref
                         )
 
-                        report_key = f"{sid}_{ts}_{code}"
                         if is_new and code == "i":
                             # Backfill rich history with notes/packs in background
                             threading.Thread(target=_backfill_store_history_safe, args=(sid, pref), daemon=True).start()
 
-                        if is_first_scan:
-                            _recent_notified_keys[report_key] = now_sec
-                            continue
-
-                        # 2. Check Telegram Alert Conditions
-                        if tg_ready and pref in tg_target_prefs:
-                            if tg_status == "in" and code != "i":
-                                continue
-                            if tg_status == "onsite" and (code != "i" or not onsite):
-                                continue
-                            if tg_status == "recent" and (code != "i" and not (ts > 0 and code != "n")):
-                                continue
-
-                            if ts > 0 and (now_sec - ts > max_age_sec):
-                                continue
-
-                            st = db_get_store_by_id(sid) or get_stores_by_pref(pref).get(sid) or {"id": sid, "name": sid, "pref": pref}
-                            st["pref"] = pref
-                            st_chain = (st.get("chain") or "").lower()
-
-                            if tg_chain != "all":
-                                if tg_chain == "conbini" and st_chain not in ["seven", "lawson", "familymart", "ministop"]:
-                                    continue
-                                elif tg_chain == "specialty" and st_chain != "specialty":
-                                    continue
-                                elif tg_chain == "electronics" and st_chain not in ['geo', 'joshin', 'edion', 'aeon', 'yamada', 'ks', 'toysrus', 'biccamera', 'yodobashi']:
-                                    continue
-                                elif tg_chain not in ["conbini", "specialty", "electronics"] and st_chain != tg_chain:
-                                    continue
-
-                            if report_key not in _recent_notified_keys:
-                                _recent_notified_keys[report_key] = now_sec
-                                print(f"  [TelegramDaemon] Auto-dispatching Telegram alert for {st.get('name')}")
-                                send_telegram_alert(st, parsed, notif_cfg, is_test=False)
                     except Exception as pe:
                         continue
 
-            is_first_scan = False
         except Exception as e:
             pass
-        time.sleep(12)
+        time.sleep(15)
 
 
 _watcher_thread = None

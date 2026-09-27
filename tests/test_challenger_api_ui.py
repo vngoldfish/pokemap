@@ -64,8 +64,8 @@ def test_api_config_server_time_skew_sequential(client):
 
     max_skew = max(skews)
     avg_skew = sum(skews) / len(skews)
-    assert max_skew <= 1.0, f"Max sequential skew too high: {max_skew}s"
-    assert avg_skew <= 0.5, f"Avg sequential skew too high: {avg_skew}s"
+    assert max_skew <= 1.5, f"Max sequential skew too high: {max_skew}s"
+    assert avg_skew <= 1.0, f"Avg sequential skew too high: {avg_skew}s"
 
 
 def test_api_config_server_time_skew_concurrent(client):

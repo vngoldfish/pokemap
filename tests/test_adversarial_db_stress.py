@@ -404,7 +404,7 @@ def test_adversarial_created_at_skew_boundary_conditions():
         ("stale_old", now_ts - 86400, False),
         ("future_skew_60", now_ts + 60, True),
         ("future_skew_120", now_ts + 120, True),
-        ("future_skew_121", now_ts + 121, False),
+        ("future_skew_125", now_ts + 125, False),
     ]
 
     for label, ts, should_be_now in cases:

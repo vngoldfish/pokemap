@@ -589,6 +589,20 @@ def get_store_history(store_id: str, limit: int = 100) -> List[Dict[str, Any]]:
         return history
 
 
+_on_report_added_callbacks: List[Any] = []
+
+def register_on_report_added(callback: Any) -> None:
+    """
+    Register an event hook to be triggered immediately whenever a brand-new report
+    is added and committed into the SQLite CSDL database.
+    Deduplicates by qualname to avoid duplicate registration.
+    """
+    cb_name = getattr(callback, "__qualname__", str(callback))
+    existing_names = [getattr(cb, "__qualname__", str(cb)) for cb in _on_report_added_callbacks]
+    if cb_name not in existing_names:
+        _on_report_added_callbacks.append(callback)
+
+
 def record_new_report(
     store_id: str,
     status_code: str,
@@ -714,6 +728,26 @@ def record_new_report(
         "formatted_time": formatted_time,
         "source": source
     }
+
+    # Database Event: A brand-new report has been officially committed into SQLite CSDL!
+    if _on_report_added_callbacks:
+        store_dict = {"id": clean_id, "name": clean_id, "pref": pref}
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM stores WHERE id = ?;", (clean_id,))
+                s_row = cursor.fetchone()
+                if s_row:
+                    store_dict = dict(s_row)
+        except Exception:
+            pass
+
+        for cb in list(_on_report_added_callbacks):
+            try:
+                cb(store_dict, entry)
+            except Exception as cb_err:
+                print(f"  [CSDL Event Error] Failed executing callback: {cb_err}")
+
     return True, entry
 
 
