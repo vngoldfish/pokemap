@@ -82,7 +82,7 @@ DEFAULT_SETTINGS = {
         "telegramEnabled": False,     # Bật gửi Telegram khi có hàng
         "telegramStatus": "in",       # 'in' (chỉ có hàng), 'onsite' (tại quán), 'recent', 'all'
         "telegramChain": "all",       # 'all', 'conbini', 'seven', ...
-        "telegramTime": "24",         # '1', '3', '6', '24', 'all'
+        "telegramTime": "realtime",   # 'realtime' (30p), '1' (1h), '2' (2h)
         "telegramRegion": "osaka",    # 'osaka', 'tokyo', 'nagoya', 'all'
         "notifyPrefs": ["osaka", "aichi", "kanagawa", "gifu", "mie"]  # Các tỉnh nhận thông báo
     },
@@ -343,17 +343,22 @@ async def send_webhook_notification(request: Request):
             elif tg_chain not in ["conbini", "specialty", "electronics"] and store_chain != tg_chain:
                 return JSONResponse(content={"status": "filtered", "reason": f"chain '{store_chain}' does not match '{tg_chain}'"})
 
-        # 5. Telegram Time Window Check
-        tg_time = notif_cfg.get("telegramTime", "24")
-        if not is_test and tg_time != "all":
-            try:
-                max_seconds = int(tg_time) * 3600
-                cur_now = time.time()
-                rep_ts = info.get("timestamp") or 0
-                if rep_ts > 0 and (cur_now - rep_ts > max_seconds):
-                    return JSONResponse(content={"status": "filtered", "reason": f"report age exceeds {tg_time}h"})
-            except Exception:
-                pass
+        # 5. Telegram Time Window Check (Real-time default)
+        tg_time = str(notif_cfg.get("telegramTime", "realtime")).strip().lower()
+        if not is_test:
+            if tg_time in ["realtime", "0", "now"]:
+                max_seconds = 1800  # 30 phút tức thì
+            elif tg_time == "1":
+                max_seconds = 3600  # 1 giờ
+            elif tg_time == "2":
+                max_seconds = 7200  # 2 giờ
+            else:
+                max_seconds = 1800  # Mặc định an toàn 30 phút
+
+            cur_now = time.time()
+            rep_ts = info.get("timestamp") or 0
+            if rep_ts > 0 and (cur_now - rep_ts > max_seconds):
+                return JSONResponse(content={"status": "filtered", "reason": f"report age exceeds {max_seconds//60}m limit"})
 
         # Ingest into SQLite database
         sid = store.get("id") or info.get("store_id")
@@ -422,8 +427,15 @@ def telegram_background_watcher():
             tg_target_prefs = REGION_PREFS.get(tg_reg, ["osaka"]) if tg_reg != "all" else ALL_PREFS
             tg_status = notif_cfg.get("telegramStatus", "in")
             tg_chain = notif_cfg.get("telegramChain", "all")
-            tg_time = notif_cfg.get("telegramTime", "24")
-            max_age_sec = int(tg_time) * 3600 if tg_time != "all" else 3600 * 24
+            tg_time = str(notif_cfg.get("telegramTime", "realtime")).strip().lower()
+            if tg_time in ["realtime", "0", "now"]:
+                max_age_sec = 1800  # 30 phút: Chỉ gửi báo động tức thì thời gian thực
+            elif tg_time == "1":
+                max_age_sec = 3600  # 1 giờ
+            elif tg_time == "2":
+                max_age_sec = 7200  # 2 giờ
+            else:
+                max_age_sec = 1800  # Mặc định an toàn 30 phút
 
             now_sec = time.time()
 

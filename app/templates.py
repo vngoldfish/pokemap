@@ -677,10 +677,15 @@ SHARED_MODALS_HTML = """
               <span style="font-weight:800; font-size:0.92rem; color:#0369a1;">Thông báo Telegram 24/7</span>
             </div>
             <!-- Switch toggle -->
-            <label style="position:relative; display:inline-block; width:44px; height:24px; margin:0; flex-shrink:0;">
-              <input type="checkbox" id="tg-cfg-enabled" onchange="onTelegramToggleChange(this.checked)" style="opacity:0; width:0; height:0;">
-              <span style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background:#cbd5e1; transition:.3s; border-radius:24px;" id="tg-cfg-slider"></span>
-            </label>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span id="tg-status-badge-text" style="font-size:0.7rem; font-weight:800; padding:3px 8px; border-radius:12px; background:#fee2e2; color:#b91c1c;">ĐANG TẮT</span>
+              <label style="position:relative; display:inline-block; width:48px; height:26px; margin:0; flex-shrink:0; cursor:pointer;">
+                <input type="checkbox" id="tg-cfg-enabled" onchange="onTelegramToggleChange(this.checked)" style="opacity:0; width:0; height:0; position:absolute;">
+                <span style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background:#cbd5e1; transition:.25s ease-in-out; border-radius:26px; box-shadow:inset 0 1px 3px rgba(0,0,0,0.15);" id="tg-cfg-slider">
+                  <span id="tg-cfg-knob" style="position:absolute; content:''; height:20px; width:20px; left:3px; bottom:3px; background:white; transition:.25s ease-in-out; border-radius:50%; box-shadow:0 2px 4px rgba(0,0,0,0.2);"></span>
+                </span>
+              </label>
+            </div>
           </div>
 
           <div style="font-size:0.72rem; color:#0369a1; margin-bottom:12px; line-height:1.4;">
@@ -742,15 +747,16 @@ SHARED_MODALS_HTML = """
               </div>
 
               <div>
-                <label style="font-size:0.7rem; font-weight:700; color:#475569; display:block; margin-bottom:3px;">⏱️ Độ mới:</label>
+                <label style="font-size:0.7rem; font-weight:700; color:#475569; display:block; margin-bottom:3px;">⚡ Gửi tin nhắn khi:</label>
                 <select id="tg-cfg-time" style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:6px 8px; font-size:0.75rem; font-weight:700; color:#1e293b; background:#ffffff;">
-                  <option value="1">⚡ Trong vòng 1 giờ</option>
-                  <option value="3">⏱ Trong vòng 3 giờ</option>
-                  <option value="6">⏱ Trong vòng 6 giờ</option>
-                  <option value="24" selected>📅 Trong vòng 24 giờ</option>
-                  <option value="all">⏳ Toàn bộ thời gian</option>
+                  <option value="realtime" selected>⚡ Báo tức thì khi có tin mới (Khuyên dùng)</option>
+                  <option value="1">⏱ Tin mới trong vòng 1 giờ</option>
+                  <option value="2">⏱ Tin mới trong vòng 2 giờ</option>
                 </select>
               </div>
+            </div>
+            <div style="font-size:0.68rem; color:#64748b; margin-top:6px; line-height:1.35;">
+              💡 <i>Chế độ chuẩn: Bot sẽ gửi tin nhắn ngay lập tức khi phát hiện có hàng mới trong thời gian thực. Không gửi lại các tin cũ đã qua nhiều giờ.</i>
             </div>
           </div>
 
@@ -2199,7 +2205,15 @@ def render_map_page() -> str:
     // 10. MODALS: TELEGRAM & SETTINGS, HISTORY, BULLETIN
     function onTelegramToggleChange(checked) {
       const slider = document.getElementById('tg-cfg-slider');
-      if (slider) slider.style.background = checked ? '#0284c7' : '#cbd5e1';
+      const knob = document.getElementById('tg-cfg-knob');
+      const badge = document.getElementById('tg-status-badge-text');
+      if (slider) slider.style.background = checked ? '#16a34a' : '#cbd5e1';
+      if (knob) knob.style.transform = checked ? 'translateX(22px)' : 'translateX(0)';
+      if (badge) {
+        badge.innerText = checked ? '🟢 ĐÃ BẬT' : '🔴 ĐANG TẮT';
+        badge.style.background = checked ? '#dcfce7' : '#fee2e2';
+        badge.style.color = checked ? '#15803d' : '#b91c1c';
+      }
     }
 
     function openTelegramModal() {
@@ -2226,7 +2240,10 @@ def render_map_page() -> str:
       }
       if (statusEl) statusEl.value = configData.telegramStatus || 'in';
       if (chainEl) chainEl.value = configData.telegramChain || 'all';
-      if (timeEl) timeEl.value = String(configData.telegramTime || '24');
+      if (timeEl) {
+        const tVal = String(configData.telegramTime || 'realtime');
+        timeEl.value = ['realtime', '1', '2'].includes(tVal) ? tVal : 'realtime';
+      }
       if (regionEl) regionEl.value = configData.telegramRegion || 'osaka';
 
       const rad = document.querySelector(`input[name="set-region-radio"][value="${currentRegion}"]`);
@@ -2247,7 +2264,7 @@ def render_map_page() -> str:
       const enabled = document.getElementById('tg-cfg-enabled') ? document.getElementById('tg-cfg-enabled').checked : false;
       const status = document.getElementById('tg-cfg-status') ? document.getElementById('tg-cfg-status').value : 'in';
       const chain = document.getElementById('tg-cfg-chain') ? document.getElementById('tg-cfg-chain').value : 'all';
-      const time = document.getElementById('tg-cfg-time') ? document.getElementById('tg-cfg-time').value : '24';
+      const time = document.getElementById('tg-cfg-time') ? document.getElementById('tg-cfg-time').value : 'realtime';
       const region = document.getElementById('tg-cfg-region') ? document.getElementById('tg-cfg-region').value : 'osaka';
 
       configData.telegramBotToken = token;
@@ -3678,7 +3695,15 @@ def render_thongbao_page() -> str:
 
     function onTelegramToggleChange(checked) {
       const slider = document.getElementById('tg-cfg-slider');
-      if (slider) slider.style.background = checked ? '#0284c7' : '#cbd5e1';
+      const knob = document.getElementById('tg-cfg-knob');
+      const badge = document.getElementById('tg-status-badge-text');
+      if (slider) slider.style.background = checked ? '#16a34a' : '#cbd5e1';
+      if (knob) knob.style.transform = checked ? 'translateX(22px)' : 'translateX(0)';
+      if (badge) {
+        badge.innerText = checked ? '🟢 ĐÃ BẬT' : '🔴 ĐANG TẮT';
+        badge.style.background = checked ? '#dcfce7' : '#fee2e2';
+        badge.style.color = checked ? '#15803d' : '#b91c1c';
+      }
     }
 
     function openTelegramModal() {
@@ -3705,7 +3730,10 @@ def render_thongbao_page() -> str:
       }
       if (statusEl) statusEl.value = configData.telegramStatus || 'in';
       if (chainEl) chainEl.value = configData.telegramChain || 'all';
-      if (timeEl) timeEl.value = String(configData.telegramTime || '24');
+      if (timeEl) {
+        const tVal = String(configData.telegramTime || 'realtime');
+        timeEl.value = ['realtime', '1', '2'].includes(tVal) ? tVal : 'realtime';
+      }
       if (regionEl) regionEl.value = configData.telegramRegion || 'osaka';
 
       const rad = document.querySelector(`input[name="set-region-radio"][value="${currentRegion}"]`);
@@ -3726,7 +3754,7 @@ def render_thongbao_page() -> str:
       const enabled = document.getElementById('tg-cfg-enabled') ? document.getElementById('tg-cfg-enabled').checked : false;
       const status = document.getElementById('tg-cfg-status') ? document.getElementById('tg-cfg-status').value : 'in';
       const chain = document.getElementById('tg-cfg-chain') ? document.getElementById('tg-cfg-chain').value : 'all';
-      const time = document.getElementById('tg-cfg-time') ? document.getElementById('tg-cfg-time').value : '24';
+      const time = document.getElementById('tg-cfg-time') ? document.getElementById('tg-cfg-time').value : 'realtime';
       const region = document.getElementById('tg-cfg-region') ? document.getElementById('tg-cfg-region').value : 'osaka';
 
       configData.telegramBotToken = token;
