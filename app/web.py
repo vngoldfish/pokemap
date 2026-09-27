@@ -82,7 +82,6 @@ DEFAULT_SETTINGS = {
         "telegramEnabled": False,     # Bật gửi Telegram khi có hàng
         "telegramStatus": "in",       # 'in' (chỉ có hàng), 'onsite' (tại quán), 'recent', 'all'
         "telegramChain": "all",       # 'all', 'conbini', 'seven', ...
-        "telegramTime": "realtime",   # 'realtime' (30p), '1' (1h), '2' (2h)
         "telegramRegion": "osaka",    # 'osaka', 'tokyo', 'nagoya', 'all'
         "notifyPrefs": ["osaka", "aichi", "kanagawa", "gifu", "mie"]  # Các tỉnh nhận thông báo
     },
@@ -343,23 +342,6 @@ async def send_webhook_notification(request: Request):
             elif tg_chain not in ["conbini", "specialty", "electronics"] and store_chain != tg_chain:
                 return JSONResponse(content={"status": "filtered", "reason": f"chain '{store_chain}' does not match '{tg_chain}'"})
 
-        # 5. Telegram Time Window Check (Real-time default)
-        tg_time = str(notif_cfg.get("telegramTime", "realtime")).strip().lower()
-        if not is_test:
-            if tg_time in ["realtime", "0", "now"]:
-                max_seconds = 1800  # 30 phút tức thì
-            elif tg_time == "1":
-                max_seconds = 3600  # 1 giờ
-            elif tg_time == "2":
-                max_seconds = 7200  # 2 giờ
-            else:
-                max_seconds = 1800  # Mặc định an toàn 30 phút
-
-            cur_now = time.time()
-            rep_ts = info.get("timestamp") or 0
-            if rep_ts > 0 and (cur_now - rep_ts > max_seconds):
-                return JSONResponse(content={"status": "filtered", "reason": f"report age exceeds {max_seconds//60}m limit"})
-
         # Ingest into SQLite database
         sid = store.get("id") or info.get("store_id")
         if sid:
@@ -427,15 +409,6 @@ def telegram_background_watcher():
             tg_target_prefs = REGION_PREFS.get(tg_reg, ["osaka"]) if tg_reg != "all" else ALL_PREFS
             tg_status = notif_cfg.get("telegramStatus", "in")
             tg_chain = notif_cfg.get("telegramChain", "all")
-            tg_time = str(notif_cfg.get("telegramTime", "realtime")).strip().lower()
-            if tg_time in ["realtime", "0", "now"]:
-                max_age_sec = 1800  # 30 phút: Chỉ gửi báo động tức thì thời gian thực
-            elif tg_time == "1":
-                max_age_sec = 3600  # 1 giờ
-            elif tg_time == "2":
-                max_age_sec = 7200  # 2 giờ
-            else:
-                max_age_sec = 1800  # Mặc định an toàn 30 phút
 
             now_sec = time.time()
 
@@ -485,9 +458,6 @@ def telegram_background_watcher():
                             if tg_status == "onsite" and (code != "i" or not onsite):
                                 continue
                             if tg_status == "recent" and (code != "i" and not (ts > 0 and code != "n")):
-                                continue
-
-                            if ts > 0 and (now_sec - ts > max_age_sec):
                                 continue
 
                             st = db_get_store_by_id(sid) or get_stores_by_pref(pref).get(sid) or {"id": sid, "name": sid, "pref": pref}
@@ -698,7 +668,6 @@ def get_config():
         "telegramChatIdSet": bool(notif.get("telegramChatId")),
         "telegramStatus": notif.get("telegramStatus", "in"),
         "telegramChain": notif.get("telegramChain", "all"),
-        "telegramTime": str(notif.get("telegramTime", "24")),
         "telegramRegion": notif.get("telegramRegion", "osaka"),
         "currentRegion": user_settings.get("currentRegion", "osaka"),
         "activeFilter": user_settings.get("activeFilter", "all"),

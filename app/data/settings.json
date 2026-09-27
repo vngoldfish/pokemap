@@ -24,7 +24,6 @@
     "telegramEnabled": true,
     "telegramStatus": "in",
     "telegramChain": "all",
-    "telegramTime": "realtime",
     "telegramRegion": "osaka",
     "notifyPrefs": [
       "osaka",

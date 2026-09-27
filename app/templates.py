@@ -732,31 +732,22 @@ SHARED_MODALS_HTML = """
                 </select>
               </div>
 
-              <div>
-                <label style="font-size:0.7rem; font-weight:700; color:#475569; display:block; margin-bottom:3px;">🏢 Chuỗi:</label>
+              <div style="grid-column: span 2;">
+                <label style="font-size:0.7rem; font-weight:700; color:#475569; display:block; margin-bottom:3px;">🏢 Chuỗi cửa hàng:</label>
                 <select id="tg-cfg-chain" style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:6px 8px; font-size:0.75rem; font-weight:700; color:#1e293b; background:#ffffff;">
-                  <option value="all">🏢 Tất cả các chuỗi</option>
-                  <option value="conbini">🏪 Tất cả Conbini</option>
+                  <option value="all">🏢 Tất cả các chuỗi (Card shop, Conbini, Điện máy...)</option>
+                  <option value="conbini">🏪 Tất cả Conbini (7-11, Lawson, Famima, Ministop)</option>
                   <option value="seven">🏪 7-Eleven</option>
                   <option value="lawson">🏪 Lawson</option>
                   <option value="familymart">🏪 FamilyMart</option>
                   <option value="ministop">🏪 Ministop</option>
-                  <option value="specialty">🃏 Card Shop chuyên</option>
-                  <option value="electronics">🎮 Điện máy, GEO</option>
-                </select>
-              </div>
-
-              <div>
-                <label style="font-size:0.7rem; font-weight:700; color:#475569; display:block; margin-bottom:3px;">⚡ Gửi tin nhắn khi:</label>
-                <select id="tg-cfg-time" style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:6px 8px; font-size:0.75rem; font-weight:700; color:#1e293b; background:#ffffff;">
-                  <option value="realtime" selected>⚡ Báo tức thì khi có tin mới (Khuyên dùng)</option>
-                  <option value="1">⏱ Tin mới trong vòng 1 giờ</option>
-                  <option value="2">⏱ Tin mới trong vòng 2 giờ</option>
+                  <option value="specialty">🃏 Card Shop chuyên biệt (Ota Road, Nipponbashi...)</option>
+                  <option value="electronics">🎮 Điện máy, GEO, Joshin, Edion, Bic, Yodobashi</option>
                 </select>
               </div>
             </div>
-            <div style="font-size:0.68rem; color:#64748b; margin-top:6px; line-height:1.35;">
-              💡 <i>Chế độ chuẩn: Bot sẽ gửi tin nhắn ngay lập tức khi phát hiện có hàng mới trong thời gian thực. Không gửi lại các tin cũ đã qua nhiều giờ.</i>
+            <div style="font-size:0.72rem; color:#0369a1; background:#e0f2fe; border:1px solid #bae6fd; border-radius:8px; padding:8px 10px; margin-top:8px; line-height:1.45;">
+              ⚡ <b>Nguyên lý thông báo:</b> Cứ khi nào có báo cáo <b>MỚI PHÁT SINH</b> từ cộng đồng khớp với bộ lọc trên, Bot sẽ tự động gửi tin nhắn báo tức thì vào Telegram ngay lập tức!
             </div>
           </div>
 
@@ -2240,10 +2231,6 @@ def render_map_page() -> str:
       }
       if (statusEl) statusEl.value = configData.telegramStatus || 'in';
       if (chainEl) chainEl.value = configData.telegramChain || 'all';
-      if (timeEl) {
-        const tVal = String(configData.telegramTime || 'realtime');
-        timeEl.value = ['realtime', '1', '2'].includes(tVal) ? tVal : 'realtime';
-      }
       if (regionEl) regionEl.value = configData.telegramRegion || 'osaka';
 
       const rad = document.querySelector(`input[name="set-region-radio"][value="${currentRegion}"]`);
@@ -2264,7 +2251,6 @@ def render_map_page() -> str:
       const enabled = document.getElementById('tg-cfg-enabled') ? document.getElementById('tg-cfg-enabled').checked : false;
       const status = document.getElementById('tg-cfg-status') ? document.getElementById('tg-cfg-status').value : 'in';
       const chain = document.getElementById('tg-cfg-chain') ? document.getElementById('tg-cfg-chain').value : 'all';
-      const time = document.getElementById('tg-cfg-time') ? document.getElementById('tg-cfg-time').value : 'realtime';
       const region = document.getElementById('tg-cfg-region') ? document.getElementById('tg-cfg-region').value : 'osaka';
 
       configData.telegramBotToken = token;
@@ -2272,7 +2258,7 @@ def render_map_page() -> str:
       configData.telegramEnabled = enabled;
       configData.telegramStatus = status;
       configData.telegramChain = chain;
-      configData.telegramTime = time;
+      configData.telegramTime = 'realtime';
       configData.telegramRegion = region;
 
       await fetch('/api/settings', {
@@ -2281,7 +2267,7 @@ def render_map_page() -> str:
         body: JSON.stringify({
           notifications: {
             telegramBotToken: token, telegramChatId: chatId, telegramEnabled: enabled,
-            telegramStatus: status, telegramChain: chain, telegramTime: time, telegramRegion: region
+            telegramStatus: status, telegramChain: chain, telegramTime: 'realtime', telegramRegion: region
           }
         })
       });
@@ -3730,10 +3716,6 @@ def render_thongbao_page() -> str:
       }
       if (statusEl) statusEl.value = configData.telegramStatus || 'in';
       if (chainEl) chainEl.value = configData.telegramChain || 'all';
-      if (timeEl) {
-        const tVal = String(configData.telegramTime || 'realtime');
-        timeEl.value = ['realtime', '1', '2'].includes(tVal) ? tVal : 'realtime';
-      }
       if (regionEl) regionEl.value = configData.telegramRegion || 'osaka';
 
       const rad = document.querySelector(`input[name="set-region-radio"][value="${currentRegion}"]`);
@@ -3754,7 +3736,6 @@ def render_thongbao_page() -> str:
       const enabled = document.getElementById('tg-cfg-enabled') ? document.getElementById('tg-cfg-enabled').checked : false;
       const status = document.getElementById('tg-cfg-status') ? document.getElementById('tg-cfg-status').value : 'in';
       const chain = document.getElementById('tg-cfg-chain') ? document.getElementById('tg-cfg-chain').value : 'all';
-      const time = document.getElementById('tg-cfg-time') ? document.getElementById('tg-cfg-time').value : 'realtime';
       const region = document.getElementById('tg-cfg-region') ? document.getElementById('tg-cfg-region').value : 'osaka';
 
       configData.telegramBotToken = token;
@@ -3762,7 +3743,7 @@ def render_thongbao_page() -> str:
       configData.telegramEnabled = enabled;
       configData.telegramStatus = status;
       configData.telegramChain = chain;
-      configData.telegramTime = time;
+      configData.telegramTime = 'realtime';
       configData.telegramRegion = region;
 
       await fetch('/api/settings', {
@@ -3771,7 +3752,7 @@ def render_thongbao_page() -> str:
         body: JSON.stringify({
           notifications: {
             telegramBotToken: token, telegramChatId: chatId, telegramEnabled: enabled,
-            telegramStatus: status, telegramChain: chain, telegramTime: time, telegramRegion: region
+            telegramStatus: status, telegramChain: chain, telegramTime: 'realtime', telegramRegion: region
           }
         })
       });
