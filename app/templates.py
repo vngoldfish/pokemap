@@ -26,13 +26,6 @@ def get_shared_head(title: str, include_leaflet: bool = False) -> str:
   {leaflet_tags}
   <!-- Font Inter -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  
-  <!-- Firebase JS SDK for real-time Firestore sync -->
-  <script type="module">
-    import {{ initializeApp }} from 'https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js';
-    import {{ initializeFirestore, doc, onSnapshot }} from 'https://www.gstatic.com/firebasejs/11.4.0/firebase-firestore.js';
-    window.FirebaseInit = {{ initializeApp, initializeFirestore, doc, onSnapshot }};
-  </script>
 """
 
 
@@ -545,7 +538,109 @@ SHARED_BASE_CSS = """
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
     }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    /* COMPACT PILL TOAST (POKETAN BANNER STYLE) */
+    .poketan-pill-toast {
+      pointer-events: auto;
+      background: rgba(255, 255, 255, 0.98);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(0, 0, 0, 0.12);
+      border-radius: 9999px;
+      padding: 6px 14px 6px 12px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.06);
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 0.8rem;
+      color: #334155;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      animation: pillSlideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      max-width: 95vw;
+      box-sizing: border-box;
+      white-space: nowrap;
+    }
+    .poketan-pill-toast:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.16);
+    }
+    .poketan-pill-toast.stock-pill {
+      border-color: rgba(34, 197, 94, 0.5);
+      background: rgba(255, 255, 255, 0.98);
+      box-shadow: 0 4px 16px rgba(34, 197, 94, 0.25), 0 1px 3px rgba(0, 0, 0, 0.06);
+    }
+    @keyframes pillSlideDown {
+      from { opacity: 0; transform: translateY(-12px) scale(0.96); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .pill-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      display: inline-block;
+    }
+    .pill-dot.dot-in {
+      background: #16a34a;
+      box-shadow: 0 0 6px rgba(22, 163, 74, 0.6);
+    }
+    .pill-dot.dot-out {
+      background: #dc2626;
+      box-shadow: 0 0 6px rgba(220, 38, 38, 0.5);
+    }
+    .pill-dot.dot-not {
+      background: #f59e0b;
+      box-shadow: 0 0 6px rgba(245, 158, 11, 0.5);
+    }
+    .pill-store-name {
+      font-weight: 700;
+      color: #0f172a;
+      max-width: 160px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .pill-text {
+      color: #64748b;
+      font-weight: 500;
+    }
+    .pill-status {
+      font-weight: 800;
+    }
+    .pill-status.status-in {
+      color: #16a34a;
+    }
+    .pill-status.status-out {
+      color: #dc2626;
+    }
+    .pill-status.status-not {
+      color: #d97706;
+    }
+    .pill-time {
+      color: #64748b;
+      font-size: 0.74rem;
+      font-weight: 500;
+    }
+    .pill-close-btn {
+      border: none;
+      background: transparent;
+      color: #94a3b8;
+      font-size: 14px;
+      line-height: 1;
+      padding: 2px 4px;
+      margin-left: 4px;
+      cursor: pointer;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+    }
+    .pill-close-btn:hover {
+      color: #1e293b;
+      background: #e2e8f0;
+    }
   </style>
 """
 
@@ -677,15 +772,10 @@ SHARED_MODALS_HTML = """
               <span style="font-weight:800; font-size:0.92rem; color:#0369a1;">Thông báo Telegram 24/7</span>
             </div>
             <!-- Switch toggle -->
-            <div style="display:flex; align-items:center; gap:8px;">
-              <span id="tg-status-badge-text" style="font-size:0.7rem; font-weight:800; padding:3px 8px; border-radius:12px; background:#fee2e2; color:#b91c1c;">ĐANG TẮT</span>
-              <label style="position:relative; display:inline-block; width:48px; height:26px; margin:0; flex-shrink:0; cursor:pointer;">
-                <input type="checkbox" id="tg-cfg-enabled" onchange="onTelegramToggleChange(this.checked)" style="opacity:0; width:0; height:0; position:absolute;">
-                <span style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background:#cbd5e1; transition:.25s ease-in-out; border-radius:26px; box-shadow:inset 0 1px 3px rgba(0,0,0,0.15);" id="tg-cfg-slider">
-                  <span id="tg-cfg-knob" style="position:absolute; content:''; height:20px; width:20px; left:3px; bottom:3px; background:white; transition:.25s ease-in-out; border-radius:50%; box-shadow:0 2px 4px rgba(0,0,0,0.2);"></span>
-                </span>
-              </label>
-            </div>
+            <label style="position:relative; display:inline-block; width:44px; height:24px; margin:0; flex-shrink:0;">
+              <input type="checkbox" id="tg-cfg-enabled" onchange="onTelegramToggleChange(this.checked)" style="opacity:0; width:0; height:0;">
+              <span style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background:#cbd5e1; transition:.3s; border-radius:24px;" id="tg-cfg-slider"></span>
+            </label>
           </div>
 
           <div style="font-size:0.72rem; color:#0369a1; margin-bottom:12px; line-height:1.4;">
@@ -732,22 +822,30 @@ SHARED_MODALS_HTML = """
                 </select>
               </div>
 
-              <div style="grid-column: span 2;">
-                <label style="font-size:0.7rem; font-weight:700; color:#475569; display:block; margin-bottom:3px;">🏢 Chuỗi cửa hàng:</label>
+              <div>
+                <label style="font-size:0.7rem; font-weight:700; color:#475569; display:block; margin-bottom:3px;">🏢 Chuỗi:</label>
                 <select id="tg-cfg-chain" style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:6px 8px; font-size:0.75rem; font-weight:700; color:#1e293b; background:#ffffff;">
-                  <option value="all">🏢 Tất cả các chuỗi (Card shop, Conbini, Điện máy...)</option>
-                  <option value="conbini">🏪 Tất cả Conbini (7-11, Lawson, Famima, Ministop)</option>
+                  <option value="all">🏢 Tất cả các chuỗi</option>
+                  <option value="conbini">🏪 Tất cả Conbini</option>
                   <option value="seven">🏪 7-Eleven</option>
                   <option value="lawson">🏪 Lawson</option>
                   <option value="familymart">🏪 FamilyMart</option>
                   <option value="ministop">🏪 Ministop</option>
-                  <option value="specialty">🃏 Card Shop chuyên biệt (Ota Road, Nipponbashi...)</option>
-                  <option value="electronics">🎮 Điện máy, GEO, Joshin, Edion, Bic, Yodobashi</option>
+                  <option value="specialty">🃏 Card Shop chuyên</option>
+                  <option value="electronics">🎮 Điện máy, GEO</option>
                 </select>
               </div>
-            </div>
-            <div style="font-size:0.72rem; color:#0369a1; background:#e0f2fe; border:1px solid #bae6fd; border-radius:8px; padding:8px 10px; margin-top:8px; line-height:1.45;">
-              ⚡ <b>Nguyên lý thông báo:</b> Cứ khi nào có báo cáo <b>MỚI PHÁT SINH</b> từ cộng đồng khớp với bộ lọc trên, Bot sẽ tự động gửi tin nhắn báo tức thì vào Telegram ngay lập tức!
+
+              <div>
+                <label style="font-size:0.7rem; font-weight:700; color:#475569; display:block; margin-bottom:3px;">⏱️ Độ mới:</label>
+                <select id="tg-cfg-time" style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:6px 8px; font-size:0.75rem; font-weight:700; color:#1e293b; background:#ffffff;">
+                  <option value="1">⚡ Trong vòng 1 giờ</option>
+                  <option value="3">⏱ Trong vòng 3 giờ</option>
+                  <option value="6">⏱ Trong vòng 6 giờ</option>
+                  <option value="24" selected>📅 Trong vòng 24 giờ</option>
+                  <option value="all">⏳ Toàn bộ thời gian</option>
+                </select>
+              </div>
             </div>
           </div>
 
@@ -807,18 +905,38 @@ SHARED_MODALS_HTML = """
     </div>
   </div>
 
-  <!-- 9. STORE HISTORY MODAL (📜 入荷履歴 / Lịch sử báo cáo quán) -->
+  <!-- 9. STORE HISTORY MODAL (📜 入荷履歴 / Lịch sử báo cáo & Phân tích) -->
   <div id="store-history-modal" class="modal-overlay" onclick="if(event.target===this) closeStoreHistoryModal()">
-    <div class="modal-card" style="max-width:440px;">
-      <div class="modal-header">
-        <h3 id="hist-modal-title">📜 Lịch sử báo cáo cửa hàng</h3>
+    <div class="modal-card" style="max-width:500px; width:95%; max-height:85vh; display:flex; flex-direction:column; padding:0; overflow:hidden;">
+      <div class="modal-header" style="padding:14px 16px; border-bottom:1px solid #f1f5f9; flex-shrink:0;">
+        <h3 id="hist-modal-title" style="font-size:0.95rem; font-weight:800; display:flex; align-items:center; gap:6px; margin:0;">
+          <span>📜</span> <span id="hist-modal-store-name">Lịch sử & Phân tích quy luật</span>
+        </h3>
         <button class="modal-close-btn" onclick="closeStoreHistoryModal()">✕</button>
       </div>
-      <div class="modal-body" style="font-size:0.82rem; max-height:75vh; overflow-y:auto;" id="hist-modal-body">
+      
+      <!-- Sub-tabs for switching between History List and Restock Analytics -->
+      <div style="display:flex; border-bottom:1px solid #e2e8f0; background:#f8fafc; padding:0 12px; gap:8px; flex-shrink:0;">
+        <button type="button" id="tab-btn-hist-list" onclick="switchHistTab('list')" style="padding:10px 14px; font-weight:700; font-size:0.8rem; border:none; background:none; cursor:pointer; border-bottom:2px solid #ef4444; color:#ef4444; display:flex; align-items:center; gap:5px;">
+          <span>📜</span> Lịch sử báo cáo
+        </button>
+        <button type="button" id="tab-btn-hist-analytics" onclick="switchHistTab('analytics')" style="padding:10px 14px; font-weight:600; font-size:0.8rem; border:none; background:none; cursor:pointer; border-bottom:2px solid transparent; color:#64748b; display:flex; align-items:center; gap:5px;">
+          <span>📊</span> Phân tích giờ & ngày hàng về
+        </button>
+      </div>
+
+      <div class="modal-body" style="font-size:0.82rem; overflow-y:auto; flex:1; padding:12px;" id="hist-modal-body">
         <div style="text-align:center; padding:20px; color:#64748b;">Đang tải lịch sử...</div>
+      </div>
+
+      <div class="modal-body" style="font-size:0.82rem; overflow-y:auto; flex:1; padding:12px; display:none;" id="hist-modal-analytics">
+        <div style="text-align:center; padding:20px; color:#64748b;">Đang phân tích quy luật hàng về...</div>
       </div>
     </div>
   </div>
+
+  <!-- Real-time Live Toast Container for Database updates -->
+  <div id="live-report-toast-container" style="position:fixed; top:68px; left:50%; transform:translateX(-50%); z-index:9999; display:flex; flex-direction:column; align-items:center; gap:6px; pointer-events:none; width:max-content; max-width:calc(100vw - 20px);"></div>
 """
 
 
@@ -828,73 +946,189 @@ SHARED_MODALS_HTML = """
 
 MAP_PAGE_CSS = """
   <style>
-    /* FLOATING FILTER BAR ON MAP */
-    #filter-bar-container {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      right: 10px;
-      z-index: 1000;
-      pointer-events: none;
+    /* TOP HEADER: BỘ LỌC BẢN ĐỒ & THỐNG KÊ TRẠNG THÁI */
+    #poketan-header.map-top-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 1100;
+      background: rgba(15, 23, 42, 0.92);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 4px 22px rgba(0, 0, 0, 0.35);
+      padding: 0 12px;
+      height: 52px;
       display: flex;
-      flex-direction: column;
-      gap: 6px;
+      align-items: center;
+      box-sizing: border-box;
+      touch-action: pan-x;
     }
-    .filter-chips-scroll {
+
+    .map-top-bar-inner {
+      width: 100%;
       display: flex;
-      gap: 6px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
       overflow-x: auto;
       scrollbar-width: none;
       -webkit-overflow-scrolling: touch;
-      pointer-events: auto;
-      padding-bottom: 2px;
     }
-    .filter-chips-scroll::-webkit-scrollbar {
+    .map-top-bar-inner::-webkit-scrollbar {
       display: none;
     }
-    .poketan-chip {
-      height: 36px;
-      padding: 0 12px;
-      background: #ffffff;
-      border: 1px solid #cbd5e1;
-      border-radius: 9999px;
-      font-size: 0.74rem;
-      font-weight: 700;
-      color: #334155;
+
+    .map-header-filter-group {
       display: inline-flex;
       align-items: center;
-      gap: 5px;
-      white-space: nowrap;
-      cursor: pointer;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.12);
-      transition: all 0.15s ease;
+      gap: 6px;
       flex-shrink: 0;
     }
-    .poketan-chip:hover {
-      background: #f8fafc;
-      border-color: #94a3b8;
-    }
-    .poketan-chip.active {
-      background: #eff6ff;
-      border-color: #3b82f6;
-      color: #1d4ed8;
-      box-shadow: 0 2px 10px rgba(59, 130, 246, 0.28);
-    }
-    .poketan-chip.chip-main-filter {
-      background: #0f172a;
+
+    /* PREMIUM BỘ LỌC BẢN ĐỒ BUTTON (地図フィルター) */
+    .btn-map-filter-premium {
+      height: 36px;
+      padding: 0 14px;
+      background: linear-gradient(135deg, #1e293b, #0f172a);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      border-radius: 9999px;
       color: #ffffff;
-      border-color: #0f172a;
+      font-size: 0.78rem;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      white-space: nowrap;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    .poketan-chip.chip-main-filter:hover {
-      background: #1e293b;
+    .btn-map-filter-premium:hover {
+      background: linear-gradient(135deg, #334155, #1e293b);
+      border-color: #38bdf8;
+      box-shadow: 0 0 14px rgba(56, 189, 248, 0.4);
+      transform: translateY(-1px);
     }
-    .filter-count-pill {
+    .btn-map-filter-premium:active {
+      transform: translateY(1px);
+    }
+    .mft-icon {
+      font-size: 0.95rem;
+    }
+    .mft-title {
+      color: #f8fafc;
+      letter-spacing: -0.2px;
+    }
+    .mft-jp {
+      font-size: 0.65rem;
+      color: #94a3b8;
+      background: rgba(255, 255, 255, 0.08);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-weight: 500;
+    }
+    .mft-badge {
       background: #38bdf8;
       color: #0f172a;
-      font-size: 0.65rem;
+      font-size: 0.68rem;
       font-weight: 800;
       padding: 1px 6px;
-      border-radius: 99px;
+      border-radius: 9999px;
+      box-shadow: 0 0 8px rgba(56, 189, 248, 0.7);
+    }
+
+    /* CLEAR FILTER BUTTON */
+    .btn-map-clear-premium {
+      height: 32px;
+      padding: 0 10px;
+      background: rgba(239, 68, 68, 0.16);
+      border: 1px solid rgba(239, 68, 68, 0.45);
+      color: #fca5a5;
+      font-size: 0.72rem;
+      font-weight: 700;
+      border-radius: 9999px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+    }
+    .btn-map-clear-premium:hover {
+      background: rgba(239, 68, 68, 0.3);
+      color: #ffffff;
+      border-color: #ef4444;
+    }
+
+    /* PREMIUM STATUS BREAKDOWN COUNTER PILL (EXACTLY MATCHING USER'S PHOTO) */
+    .map-header-stats-group {
+      display: inline-flex;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .map-counter-pill-premium {
+      height: 36px;
+      padding: 0 14px;
+      background: rgba(30, 41, 59, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 9999px;
+      color: #f8fafc;
+      font-size: 0.76rem;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
+      white-space: nowrap;
+      user-select: none;
+    }
+
+    .stat-seg {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      padding: 2px 5px;
+      border-radius: 6px;
+      transition: background 0.15s ease;
+    }
+    .stat-seg:hover {
+      background: rgba(255, 255, 255, 0.12);
+    }
+    .stat-seg b {
+      font-weight: 800;
+    }
+    .stat-sep {
+      color: rgba(255, 255, 255, 0.3);
+      font-size: 0.75rem;
+      pointer-events: none;
+    }
+
+    .stat-total { color: #f8fafc; }
+    .stat-in { color: #4ade80; }
+    .stat-in b { color: #22c55e; }
+    .stat-out { color: #f87171; }
+    .stat-out b { color: #ef4444; }
+    .stat-not { color: #fbbf24; }
+    .stat-not b { color: #f59e0b; }
+    .stat-unk { color: #cbd5e1; }
+    .stat-unk b { color: #e2e8f0; }
+
+    /* LEAFLET CONTROLS OFFSET BELOW HEADER */
+    .leaflet-top {
+      top: 60px !important;
+    }
+    #live-report-toast-container {
+      top: 62px !important;
+    }
+    #region-load-toast {
+      position: fixed;
+      top: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1500;
     }
 
     /* SELECT CHIP */
@@ -1160,27 +1394,6 @@ MAP_PAGE_CSS = """
       opacity: 0.85;
     }
 
-    /* MAP COUNTER PILL */
-    .map-counter-pill {
-      position: absolute;
-      bottom: 22px;
-      left: 14px;
-      z-index: 1000;
-      background: rgba(15, 23, 42, 0.88);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      color: #f8fafc;
-      font-size: 0.74rem;
-      font-weight: 700;
-      padding: 6px 14px;
-      border-radius: 9999px;
-      box-shadow: 0 3px 12px rgba(0,0,0,0.3);
-      border: 1px solid rgba(255,255,255,0.18);
-      pointer-events: none;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-    }
 
     /* LEAFLET POPUP */
     .leaflet-popup-content-wrapper {
@@ -1277,7 +1490,6 @@ MAP_PAGE_CSS = """
 
 def render_map_page() -> str:
     head = get_shared_head("ポケ探 - ポケモンカード在庫マップ", include_leaflet=True)
-    header = render_shared_header()
     footer = render_shared_footer("map")
 
     map_filter_modal = """
@@ -1422,34 +1634,40 @@ def render_map_page() -> str:
       店舗データを読み込み中...
     </div>
   </div>
-""" + header + """
-  <!-- MAP PAGE MAIN VIEW -->
-  <div id="filter-bar-container">
-    <div class="filter-chips-scroll">
-      <!-- Nút mở Modal Bộ lọc Bản đồ -->
-      <button class="poketan-chip chip-main-filter" id="btn-map-filter" onclick="openMapFilterModal()" title="Mở bộ lọc bản đồ">
-        <span>⚙️ Bộ lọc</span>
-        <span id="map-filter-badge" class="filter-count-pill" style="display:none;">0</span>
-      </button>
+  <!-- TOP HEADER (BỘ LỌC BẢN ĐỒ & THỐNG KÊ TRẠNG THÁI) -->
+  <header id="poketan-header" class="map-top-bar">
+    <div class="map-top-bar-inner">
+      <!-- LEFT: Bộ lọc Bản đồ (地図フィルター) -->
+      <div class="map-header-filter-group">
+        <button type="button" class="btn-map-filter-premium" id="btn-map-filter" onclick="openMapFilterModal()" title="Bộ lọc Bản đồ (地図フィルター)">
+          <span class="mft-icon">⚙️</span>
+          <span class="mft-title">Bộ lọc Bản đồ</span>
+          <span class="mft-jp">地図フィルター</span>
+          <span id="map-filter-badge" class="mft-badge" style="display:none;">0</span>
+        </button>
 
-      <!-- Nút xóa nhanh bộ lọc khi đang áp dụng -->
-      <button class="poketan-chip" id="btn-map-filter-clear" onclick="resetAndClearMapFilters()" style="display:none; color:#ef4444; border-color:#fca5a5;" title="Xóa bộ lọc">
-        ✕ Xóa lọc
-      </button>
-    </div>
+        <button type="button" class="btn-map-clear-premium" id="btn-map-filter-clear" onclick="resetAndClearMapFilters()" style="display:none;" title="Xóa bộ lọc (リセット)">
+          ✕ Xóa lọc
+        </button>
+      </div>
 
-    <!-- Region loading & switch toast -->
-    <div id="region-load-toast" style="display:none;">
-      <span id="region-load-icon">⚡</span>
-      <span id="region-load-text">Đang chuyển vùng...</span>
+      <!-- RIGHT: Thanh thống kê trạng thái (Display chuẩn theo thiết kế người dùng yêu cầu) -->
+      <div class="map-header-stats-group">
+        <div id="map-counter-pill" class="map-counter-pill-premium" title="Thống kê trạng thái cửa hàng">
+          <span class="stat-seg stat-total"><b>...</b> quán</span>
+        </div>
+      </div>
     </div>
+  </header>
+
+  <!-- Region loading toast -->
+  <div id="region-load-toast" style="display:none;">
+    <span id="region-load-icon">⚡</span>
+    <span id="region-load-text">Đang chuyển vùng...</span>
   </div>
 
   <main id="app-main">
     <div id="map"></div>
-    <div id="map-counter-pill" class="map-counter-pill">
-      Đang tải dữ liệu...
-    </div>
     <button id="gps-btn" class="tracking" onclick="locateUser(true)" title="現在地を表示">
       📍
     </button>
@@ -1459,9 +1677,9 @@ def render_map_page() -> str:
     // 1. APP STATE & REGIONS
     const REGIONS = {
       'osaka': { id: 'osaka', name: '大阪・関西', center: [34.6937, 135.5023], zoom: 13, defaultCity: 'なんば', prefs: ['osaka'] },
-      'tokyo': { id: 'tokyo', name: '東京・神奈川', center: [35.4437, 139.6380], zoom: 13, defaultCity: '横浜', prefs: ['kanagawa'] },
+      'tokyo': { id: 'tokyo', name: '東京・神奈川', center: [35.6895, 139.6917], zoom: 13, defaultCity: '横浜', prefs: ['tokyo', 'kanagawa'] },
       'nagoya': { id: 'nagoya', name: '名古屋・東海', center: [35.1815, 136.9066], zoom: 13, defaultCity: '名古屋駅', prefs: ['aichi', 'gifu', 'mie'] },
-      'all': { id: 'all', name: '全エリア (全国)', center: [34.6937, 135.5023], zoom: 10, defaultCity: '全エリア', prefs: ['osaka', 'aichi', 'kanagawa', 'gifu', 'mie'] }
+      'all': { id: 'all', name: '全エリア (全国)', center: [34.6937, 135.5023], zoom: 10, defaultCity: '全エリア', prefs: ['osaka', 'tokyo', 'kanagawa', 'aichi', 'gifu', 'mie'] }
     };
 
     let currentRegion = localStorage.getItem('poketan_selected_region') || 'osaka';
@@ -1472,6 +1690,11 @@ def render_map_page() -> str:
     let hotStatus = {};
     let coldStatus = {};
     let configData = {};
+    let serverTimeOffset = 0; // seconds: serverNow - browserNow
+
+    function getServerNowSec() {
+      return Math.floor(Date.now() / 1000) + serverTimeOffset;
+    }
 
     let mapRegionFilter = currentRegion;
     let mapStatusFilter = localStorage.getItem('poketan_map_status') || 'all';
@@ -1582,30 +1805,18 @@ def render_map_page() -> str:
 
     function getStoreStatusInfo(store) {
       let code = (store.status || 'u').toLowerCase();
-      let timestamp = store.last_timestamp || 0;
+      let timestamp = Number(store.last_timestamp) || 0;
       let onsite = !!store.onsite;
-      let packs = store.packs || [];
+      let packs = Array.isArray(store.packs) ? store.packs : [];
       let reported_at = store.last_reported_at || '';
-
-      const raw = hotStatus[store.id] || coldStatus[store.id];
-      if (raw && typeof raw === 'string') {
-        const decoded = decodeStatus(raw);
-        if (decoded.timestamp > timestamp) {
-          code = decoded.code;
-          timestamp = decoded.timestamp;
-          onsite = decoded.onsite;
-          packs = decoded.packs;
-          reported_at = decoded.reported_at;
-        }
-      }
 
       let timeAgo = '';
       if (timestamp > 0) {
-        const d = new Date(timestamp * 1000);
         if (!reported_at) {
-          reported_at = `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')} (${d.getMonth()+1}/${d.getDate()})`;
+          const jstDate = new Date((timestamp + 9 * 3600) * 1000);
+          reported_at = `${String(jstDate.getUTCHours()).padStart(2, '0')}:${String(jstDate.getUTCMinutes()).padStart(2, '0')} (${jstDate.getUTCMonth()+1}/${jstDate.getUTCDate()})`;
         }
-        const diffSec = Math.floor(Date.now() / 1000 - timestamp);
+        const diffSec = Math.max(0, getServerNowSec() - timestamp);
         if (diffSec < 60) timeAgo = 'たった今';
         else if (diffSec < 3600) timeAgo = `${Math.floor(diffSec / 60)}分前`;
         else if (diffSec < 86400) timeAgo = `${Math.floor(diffSec / 3600)}時間前`;
@@ -1765,15 +1976,16 @@ def render_map_page() -> str:
         const info = getStoreStatusInfo(store);
         const reportAge = (info.timestamp > 0) ? (now - info.timestamp) : Infinity;
 
-        // Fresh stock filter if time filter applied
-        // ONLY in-stock stores reported within maxSec get the pulsing green pin + time badge!
-        const isFreshStock = (info.code === 'i') && (maxSec === null || (info.timestamp > 0 && reportAge <= maxSec));
+        // Time filter: if user selected a time filter (e.g. 1h, 3h, 6h, 12h, 24h), hide stores older than maxSec
+        if (maxSec !== null && info.timestamp > 0 && reportAge > maxSec) {
+          continue;
+        }
 
         // Status filter
         if (mapStatusFilter === 'in') {
-          if (!isFreshStock) continue;
+          if (info.code !== 'i') continue;
         } else if (mapStatusFilter === 'onsite') {
-          if (!info.onsite || !isFreshStock) continue;
+          if (!info.onsite || info.code !== 'i') continue;
         } else if (mapStatusFilter === 'out') {
           if (info.code !== 'o') continue;
         } else if (mapStatusFilter === 'n') {
@@ -1784,49 +1996,38 @@ def render_map_page() -> str:
         } else if (mapStatusFilter === 'unknown') {
           if (info.code !== 'u' && info.timestamp > 0) continue;
         }
-        // If mapStatusFilter === 'all', all stores remain on map!
 
         // Chain filter
         if (!matchesChainFilter(store.chain, mapChainFilter)) continue;
 
         visibleCount++;
-        if (isFreshStock) inStockVisibleCount++;
-        else if (info.code === 'i') inStockVisibleCount++;
+        if (info.code === 'i') inStockVisibleCount++;
         else if (info.code === 'o') outCount++;
         else if (info.code === 'n') notCount++;
         else unkCount++;
 
-        if (isFreshStock && info.timestamp > maxTimestamp) {
+        if (info.code === 'i' && info.timestamp > maxTimestamp) {
           maxTimestamp = info.timestamp;
           newestInStore = store;
         }
 
         const currentZoom = map.getZoom();
-        const chainKey = (store.chain || '').toLowerCase();
-        const meta = CHAIN_META[chainKey] || CHAIN_META['other'];
 
-        if (isFreshStock) {
-          // 🟢 MÀU XANH LÁ: CÓ HÀNG (あった) - Concentric target circle chớp chớp + time pill
+        // 🟢 CÓ HÀNG (i): TẤT CẢ CỬA HÀNG CÓ HÀNG TRONG CSDL ĐỀU HIỆN VÒNG TRÒN MỤC TIÊU CHỚP NHÁY + THANH THỜI GIAN NỔI!
+        if (info.code === 'i') {
           const pinIcon = createStockPinIcon(info.timeAgo);
-          if (currentZoom >= 12 || mapStatusFilter === 'in') {
-            const m = L.marker([store.lat, store.lng], { icon: pinIcon, zIndexOffset: 3000 });
-            m.bindPopup(() => createPopupHtml(store, info), { maxWidth: 300 });
-            stockLayer.addLayer(m);
-          } else {
-            const cm = L.marker([store.lat, store.lng], { icon: pinIcon, hasStock: true, zIndexOffset: 3000 });
-            cm.bindPopup(() => createPopupHtml(store, info), { maxWidth: 300 });
-            clusterBatch.push(cm);
-          }
+          const m = L.marker([store.lat, store.lng], { icon: pinIcon, zIndexOffset: 3000 });
+          m.bindPopup(() => createPopupHtml(store, info), { maxWidth: 300 });
+          stockLayer.addLayer(m);
         } else {
-          // 🔴 ĐỎ: KHÔNG CÓ | 🟡 VÀNG: KHÔNG BÁN | ⚪ XÁM: CHƯA CÓ BÁO CÁO (Chấm tròn 100%)
+          // 🔴 ĐỎ: HẾT HÀNG (o) | 🟡 VÀNG: KHÔNG BÁN THẺ (n) | ⚪ XÁM: CHƯA CÓ BÁO CÁO (u)
           let pin;
           if (currentZoom >= 16 || mapChainFilter !== 'all') {
-            pin = createChainPinIcon(store, info, isFreshStock);
+            pin = createChainPinIcon(store, info, false);
           } else if (currentZoom >= 14) {
-            pin = createMiniChainPinIcon(store, info, isFreshStock);
+            pin = createMiniChainPinIcon(store, info, false);
           } else {
-            if (info.code === 'i') pin = greenDotIcon;
-            else if (info.code === 'o') pin = redDotIcon;
+            if (info.code === 'o') pin = redDotIcon;
             else if (info.code === 'n') pin = yellowDotIcon;
             else pin = grayDotIcon;
           }
@@ -1838,23 +2039,23 @@ def render_map_page() -> str:
 
       if (clusterBatch.length > 0) clusterGroup.addLayers(clusterBatch);
 
-      // Update counter pill with clear breakdown
+      // Update counter pill with clear breakdown exactly matching user's design
       const counterEl = document.getElementById('map-counter-pill');
       if (counterEl) {
-        let label = `<b>${visibleCount.toLocaleString()}</b> quán`;
+        let html = `<span class="stat-seg stat-total" onclick="quickFilterMapStatus('all')" title="Xem tất cả"><b>${visibleCount.toLocaleString()}</b> quán</span>`;
         if (inStockVisibleCount > 0) {
-          label += ` • <span style="color:#4ade80;">🟢 <b>${inStockVisibleCount}</b> có</span>`;
+          html += `<span class="stat-sep">•</span><span class="stat-seg stat-in" onclick="quickFilterMapStatus('in')" title="Lọc: Có hàng">🟢 <b>${inStockVisibleCount}</b> có</span>`;
         }
         if (outCount > 0) {
-          label += ` • <span style="color:#f87171;">🔴 <b>${outCount}</b> hết</span>`;
+          html += `<span class="stat-sep">•</span><span class="stat-seg stat-out" onclick="quickFilterMapStatus('out')" title="Lọc: Hết hàng">🔴 <b>${outCount}</b> hết</span>`;
         }
         if (notCount > 0) {
-          label += ` • <span style="color:#fbbf24;">🟡 <b>${notCount}</b> ko bán</span>`;
+          html += `<span class="stat-sep">•</span><span class="stat-seg stat-not" onclick="quickFilterMapStatus('n')" title="Lọc: Không bán thẻ">🟡 <b>${notCount}</b> ko bán</span>`;
         }
         if (unkCount > 0) {
-          label += ` • <span style="color:#cbd5e1;">⚪ <b>${unkCount}</b> chưa tin</span>`;
+          html += `<span class="stat-sep">•</span><span class="stat-seg stat-unk" onclick="quickFilterMapStatus('unknown')" title="Lọc: Chưa rõ">⚪ <b>${unkCount}</b> chưa tin</span>`;
         }
-        counterEl.innerHTML = label;
+        counterEl.innerHTML = html;
       }
 
       // Update footer unread notifications badge
@@ -1901,7 +2102,7 @@ def render_map_page() -> str:
           ${time}
           ${packs}
           <div class="popup-actions-grid">
-            <a href="${mapsUrl}" target="_blank" class="btn-popup-maps">🗺️ Google Maps chỉ đường ↗</a>
+            <a href="${mapsUrl}" target="_blank" class="btn-popup-maps">🗺️ Chỉ đường ↗</a>
             <button type="button" class="btn-popup-hist" onclick="openStoreHistoryModal('${store.id}')">📜 Lịch sử</button>
           </div>
         </div>
@@ -1966,16 +2167,6 @@ def render_map_page() -> str:
         const btn = document.getElementById(`map-chip-${st}`);
         if (btn) btn.classList.toggle('active', mapStatusFilter === st);
       });
-      const selChain = document.getElementById('map-chain-select');
-      if (selChain) {
-        selChain.value = mapChainFilter;
-        selChain.classList.toggle('active', mapChainFilter !== 'all');
-      }
-      const selTime = document.getElementById('map-time-select');
-      if (selTime) {
-        selTime.value = mapTimeFilter;
-        selTime.classList.toggle('active', mapTimeFilter !== 'all');
-      }
       let count = 0;
       if (mapStatusFilter !== 'all') count++;
       if (mapChainFilter !== 'all') count++;
@@ -1995,6 +2186,17 @@ def render_map_page() -> str:
       mapStatusFilter = 'all';
       mapChainFilter = 'all';
       mapTimeFilter = 'all';
+      saveMapFiltersToStorage();
+      updateMapFilterUI();
+      renderMapMarkers();
+    }
+
+    function quickFilterMapStatus(status) {
+      if (mapStatusFilter === status) {
+        mapStatusFilter = 'all';
+      } else {
+        mapStatusFilter = status;
+      }
       saveMapFiltersToStorage();
       updateMapFilterUI();
       renderMapMarkers();
@@ -2042,6 +2244,7 @@ def render_map_page() -> str:
       syncMapFilterModalUI();
     }
     function applyAndCloseMapFilterModal() {
+      const regionChanged = (mapModalTempRegion !== mapRegionFilter);
       mapRegionFilter = mapModalTempRegion;
       mapStatusFilter = mapModalTempStatus;
       mapChainFilter = mapModalTempChain;
@@ -2049,6 +2252,9 @@ def render_map_page() -> str:
       saveMapFiltersToStorage();
       closeMapFilterModal();
       updateMapFilterUI();
+      if (regionChanged && REGIONS[mapRegionFilter]) {
+        map.flyTo(REGIONS[mapRegionFilter].center, REGIONS[mapRegionFilter].zoom || 13, { duration: 1.0 });
+      }
       renderMapMarkers();
     }
 
@@ -2117,7 +2323,7 @@ def render_map_page() -> str:
             updateGpsBtnState();
           }
           const urlParams = new URLSearchParams(window.location.search);
-          if (autoFly && !urlParams.get('focus') && !urlParams.get('store') && !urlParams.get('lat') && urlParams.get('hunt') !== '1') {
+          if (autoFly && !urlParams.get('focus') && urlParams.get('hunt') !== '1') {
             map.flyTo([userLat, userLng], 15, { duration: 1.0 });
           }
         },
@@ -2174,8 +2380,6 @@ def render_map_page() -> str:
       isFollowingUser = false;
       updateGpsBtnState();
       try { localStorage.setItem('poketan_selected_region', pref); } catch(e) {}
-      const headerLoc = document.getElementById('header-loc-name');
-      if (headerLoc) headerLoc.innerText = `${cityName}周辺`;
       if (lat && lng) map.flyTo([lat, lng], zoom || 14, { duration: 1.0 });
       closePrefModal();
       renderMapMarkers();
@@ -2196,15 +2400,7 @@ def render_map_page() -> str:
     // 10. MODALS: TELEGRAM & SETTINGS, HISTORY, BULLETIN
     function onTelegramToggleChange(checked) {
       const slider = document.getElementById('tg-cfg-slider');
-      const knob = document.getElementById('tg-cfg-knob');
-      const badge = document.getElementById('tg-status-badge-text');
-      if (slider) slider.style.background = checked ? '#16a34a' : '#cbd5e1';
-      if (knob) knob.style.transform = checked ? 'translateX(22px)' : 'translateX(0)';
-      if (badge) {
-        badge.innerText = checked ? '🟢 ĐÃ BẬT' : '🔴 ĐANG TẮT';
-        badge.style.background = checked ? '#dcfce7' : '#fee2e2';
-        badge.style.color = checked ? '#15803d' : '#b91c1c';
-      }
+      if (slider) slider.style.background = checked ? '#0284c7' : '#cbd5e1';
     }
 
     function openTelegramModal() {
@@ -2220,6 +2416,7 @@ def render_map_page() -> str:
       const enabledEl = document.getElementById('tg-cfg-enabled');
       const statusEl = document.getElementById('tg-cfg-status');
       const chainEl = document.getElementById('tg-cfg-chain');
+      const timeEl = document.getElementById('tg-cfg-time');
       const regionEl = document.getElementById('tg-cfg-region');
 
       if (tokenEl) tokenEl.value = configData.telegramBotToken || '';
@@ -2230,19 +2427,63 @@ def render_map_page() -> str:
       }
       if (statusEl) statusEl.value = configData.telegramStatus || 'in';
       if (chainEl) chainEl.value = configData.telegramChain || 'all';
+      if (timeEl) timeEl.value = String(configData.telegramTime || '24');
       if (regionEl) regionEl.value = configData.telegramRegion || 'osaka';
 
       const rad = document.querySelector(`input[name="set-region-radio"][value="${currentRegion}"]`);
       if (rad) rad.checked = true;
 
       const soundCheck = document.getElementById('set-sound-check');
-      if (soundCheck && configData.notifications) {
-        soundCheck.checked = !!configData.notifications.soundEnabled;
+      if (soundCheck) {
+        if (configData.notifications && typeof configData.notifications.soundEnabled !== 'undefined') {
+          soundCheck.checked = !!configData.notifications.soundEnabled;
+        } else if (typeof configData.soundEnabled !== 'undefined') {
+          soundCheck.checked = !!configData.soundEnabled;
+        } else {
+          soundCheck.checked = true;
+        }
       }
 
       document.getElementById('settings-modal').classList.add('open');
     }
     function closeSettingsModal() { document.getElementById('settings-modal').classList.remove('open'); }
+
+    function updateSettings(key, val) {
+      if (!configData.notifications) configData.notifications = {};
+      configData.notifications[key] = val;
+      configData[key] = val;
+      try { localStorage.setItem('poketan_config', JSON.stringify(configData)); } catch(e) {}
+      try {
+        fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ notifications: { [key]: val } })
+        }).catch(() => {});
+      } catch(e) {}
+    }
+
+    function selectRegion(pref) {
+      currentRegion = pref;
+      try { localStorage.setItem('poketan_selected_region', pref); } catch(e) {}
+      try {
+        fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ currentRegion: pref })
+        }).catch(() => {});
+      } catch(e) {}
+      mapRegionFilter = pref;
+      if (typeof REGIONS !== 'undefined' && REGIONS[pref] && window.map) {
+        map.flyTo(REGIONS[pref].center, REGIONS[pref].zoom || 13, { duration: 1.0 });
+      }
+      updateMapFilterUI();
+      renderMapMarkers();
+      closeSettingsModal();
+    }
+
+    function refreshData() {
+      if (typeof initData === 'function') initData();
+    }
 
     async function saveTelegramConfig() {
       const token = (document.getElementById('tg-cfg-token') ? document.getElementById('tg-cfg-token').value : '').trim();
@@ -2250,6 +2491,7 @@ def render_map_page() -> str:
       const enabled = document.getElementById('tg-cfg-enabled') ? document.getElementById('tg-cfg-enabled').checked : false;
       const status = document.getElementById('tg-cfg-status') ? document.getElementById('tg-cfg-status').value : 'in';
       const chain = document.getElementById('tg-cfg-chain') ? document.getElementById('tg-cfg-chain').value : 'all';
+      const time = document.getElementById('tg-cfg-time') ? document.getElementById('tg-cfg-time').value : '24';
       const region = document.getElementById('tg-cfg-region') ? document.getElementById('tg-cfg-region').value : 'osaka';
 
       configData.telegramBotToken = token;
@@ -2257,7 +2499,7 @@ def render_map_page() -> str:
       configData.telegramEnabled = enabled;
       configData.telegramStatus = status;
       configData.telegramChain = chain;
-      configData.telegramTime = 'realtime';
+      configData.telegramTime = time;
       configData.telegramRegion = region;
 
       await fetch('/api/settings', {
@@ -2266,7 +2508,7 @@ def render_map_page() -> str:
         body: JSON.stringify({
           notifications: {
             telegramBotToken: token, telegramChatId: chatId, telegramEnabled: enabled,
-            telegramStatus: status, telegramChain: chain, telegramTime: 'realtime', telegramRegion: region
+            telegramStatus: status, telegramChain: chain, telegramTime: time, telegramRegion: region
           }
         })
       });
@@ -2307,11 +2549,176 @@ def render_map_page() -> str:
     function closeBulletinModal() { document.getElementById('bulletin-modal').classList.remove('open'); }
     function openSearchModal() { openPrefModal(); }
 
+    function switchHistTab(tab) {
+      const btnList = document.getElementById('tab-btn-hist-list');
+      const btnAnalytics = document.getElementById('tab-btn-hist-analytics');
+      const bodyList = document.getElementById('hist-modal-body');
+      const bodyAnalytics = document.getElementById('hist-modal-analytics');
+      if (!btnList || !btnAnalytics || !bodyList || !bodyAnalytics) return;
+
+      if (tab === 'analytics') {
+        btnAnalytics.style.borderBottom = '2px solid #ef4444';
+        btnAnalytics.style.color = '#ef4444';
+        btnAnalytics.style.fontWeight = '700';
+        btnList.style.borderBottom = '2px solid transparent';
+        btnList.style.color = '#64748b';
+        btnList.style.fontWeight = '600';
+        bodyList.style.display = 'none';
+        bodyAnalytics.style.display = 'block';
+      } else {
+        btnList.style.borderBottom = '2px solid #ef4444';
+        btnList.style.color = '#ef4444';
+        btnList.style.fontWeight = '700';
+        btnAnalytics.style.borderBottom = '2px solid transparent';
+        btnAnalytics.style.color = '#64748b';
+        btnAnalytics.style.fontWeight = '600';
+        bodyList.style.display = 'block';
+        bodyAnalytics.style.display = 'none';
+      }
+    }
+
+    const storeAnalyticsCache = {};
+
+    function renderAnalyticsHtml(data) {
+      if (!data || data.total_reports === 0) {
+        return '<div style="text-align:center; padding:30px 15px; color:#64748b;">Chưa có dữ liệu thống kê báo cáo nào cho cửa hàng này.</div>';
+      }
+
+      const totalRep = data.total_reports || 0;
+      const inRep = data.in_stock_reports || 0;
+      const ratePct = data.in_stock_rate_pct || 0;
+      const peakHours = data.peak_hours || [];
+      const peakDays = data.peak_weekdays || [];
+      const hourly = data.hourly_distribution || [];
+      const weekday = data.weekday_distribution || [];
+      const topPacks = data.top_packs || [];
+
+      let maxHrCount = 1;
+      hourly.forEach(h => { if (h.count > maxHrCount) maxHrCount = h.count; });
+
+      const hourlyBarsHtml = hourly.map(h => {
+        const heightPct = Math.round((h.count / maxHrCount) * 100);
+        const isPeak = heightPct >= 70 && h.count > 0;
+        const barColor = isPeak ? '#ef4444' : (h.count > 0 ? '#10b981' : '#e2e8f0');
+        return `
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; min-width:11px;" title="${h.hour}:00 JST - ${h.count} lần có hàng">
+            <div style="font-size:0.55rem; color:${isPeak ? '#ef4444' : '#64748b'}; font-weight:700; height:12px;">${h.count > 0 ? h.count : ''}</div>
+            <div style="width:100%; max-width:10px; height:60px; background:#f1f5f9; border-radius:3px; display:flex; align-items:flex-end; overflow:hidden;">
+              <div style="width:100%; height:${heightPct}%; background:${barColor}; border-radius:2px; transition:height 0.3s;"></div>
+            </div>
+            <div style="font-size:0.55rem; color:#94a3b8; margin-top:3px;">${parseInt(h.hour)}</div>
+          </div>
+        `;
+      }).join('');
+
+      let maxWdCount = 1;
+      weekday.forEach(w => { if (w.count > maxWdCount) maxWdCount = w.count; });
+
+      const weekdayBarsHtml = weekday.map(w => {
+        const widthPct = Math.round((w.count / maxWdCount) * 100);
+        const isPeak = widthPct >= 75 && w.count > 0;
+        const barColor = isPeak ? '#ef4444' : (w.count > 0 ? '#3b82f6' : '#cbd5e1');
+        return `
+          <div style="margin-bottom:6px;">
+            <div style="display:flex; justify-content:space-between; font-size:0.72rem; font-weight:700; margin-bottom:2px;">
+              <span style="color:${isPeak ? '#ef4444' : '#334155'};">${w.day}</span>
+              <span style="color:#64748b;">${w.count} lần có hàng</span>
+            </div>
+            <div style="width:100%; height:8px; background:#f1f5f9; border-radius:4px; overflow:hidden;">
+              <div style="width:${widthPct}%; height:100%; background:${barColor}; border-radius:4px; transition:width 0.3s;"></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      const peakHoursHtml = peakHours.length > 0 
+        ? peakHours.map(ph => `<span style="background:#fee2e2; color:#b91c1c; border:1px solid #fecaca; font-weight:700; font-size:0.72rem; padding:3px 8px; border-radius:6px; display:inline-flex; align-items:center; gap:3px;">🔥 ${ph}</span>`).join(' ')
+        : '<span style="color:#94a3b8; font-size:0.75rem;">Chưa có đủ mẫu</span>';
+
+      const peakDaysHtml = peakDays.length > 0
+        ? peakDays.map(pd => `<span style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; font-weight:700; font-size:0.72rem; padding:3px 8px; border-radius:6px; display:inline-flex; align-items:center; gap:3px;">📅 ${pd}</span>`).join(' ')
+        : '<span style="color:#94a3b8; font-size:0.75rem;">Chưa có đủ mẫu</span>';
+
+      const topPacksHtml = topPacks.length > 0
+        ? topPacks.map(tp => `<span style="background:#fef3c7; color:#92400e; border:1px solid #fde68a; font-weight:700; font-size:0.7rem; padding:2px 7px; border-radius:4px;">🎁 ${escapeHtml(tp)}</span>`).join(' ')
+        : '<span style="color:#94a3b8; font-size:0.75rem;">Chưa ghi nhận mã pack</span>';
+
+      return `
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+            <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:10px; text-align:center;">
+              <div style="font-size:0.68rem; color:#166534; font-weight:600; text-transform:uppercase;">Tỉ lệ có hàng</div>
+              <div style="font-size:1.4rem; font-weight:900; color:#15803d; line-height:1.2; margin-top:2px;">${ratePct}%</div>
+              <div style="font-size:0.68rem; color:#166534; font-weight:600; margin-top:2px;">${inRep} / ${totalRep} báo cáo</div>
+            </div>
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px; text-align:center;">
+              <div style="font-size:0.68rem; color:#64748b; font-weight:600; text-transform:uppercase;">Có hàng gần nhất</div>
+              <div style="font-size:0.85rem; font-weight:800; color:#1e293b; line-height:1.3; margin-top:6px;">${data.last_in_stock_time || 'Chưa có'}</div>
+              <div style="font-size:0.65rem; color:#94a3b8; margin-top:2px;">(Giờ Nhật Bản JST)</div>
+            </div>
+          </div>
+
+          <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:10px 12px;">
+            <div style="font-size:0.75rem; font-weight:800; color:#1e293b; margin-bottom:6px; display:flex; align-items:center; gap:5px;">
+              <span>⚡</span> Khung giờ vàng hàng về (Peak Hours JST):
+            </div>
+            <div style="display:flex; flex-wrap:wrap; gap:6px;">
+              ${peakHoursHtml}
+            </div>
+
+            <div style="font-size:0.75rem; font-weight:800; color:#1e293b; margin-top:10px; margin-bottom:6px; display:flex; align-items:center; gap:5px;">
+              <span>🗓️</span> Ngày trong tuần hay có hàng nhất:
+            </div>
+            <div style="display:flex; flex-wrap:wrap; gap:6px;">
+              ${peakDaysHtml}
+            </div>
+          </div>
+
+          <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:10px 12px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <span style="font-size:0.75rem; font-weight:800; color:#1e293b;">🕒 Phân bố giờ có hàng (0h - 23h JST)</span>
+              <span style="font-size:0.65rem; color:#64748b;">(Cột càng cao = Hàng về càng nhiều)</span>
+            </div>
+            <div style="display:flex; gap:2px; align-items:flex-end; height:75px; padding:0 2px; border-bottom:1px solid #e2e8f0;">
+              ${hourlyBarsHtml}
+            </div>
+            <div style="text-align:center; font-size:0.62rem; color:#94a3b8; margin-top:4px;">0h = Nửa đêm • 12h = Trưa • 23h = Đêm (Giờ JST)</div>
+          </div>
+
+          <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:10px 12px;">
+            <div style="font-size:0.75rem; font-weight:800; color:#1e293b; margin-bottom:8px;">
+              📅 Phân bố ngày trong tuần (Thứ Hai → Chủ Nhật)
+            </div>
+            ${weekdayBarsHtml}
+          </div>
+
+          <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:10px 12px;">
+            <div style="font-size:0.75rem; font-weight:800; color:#1e293b; margin-bottom:6px;">
+              🎁 Các gói thẻ ghi nhận từng về tại quán:
+            </div>
+            <div style="display:flex; flex-wrap:wrap; gap:5px;">
+              ${topPacksHtml}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
     async function openStoreHistoryModal(storeId) {
       const modal = document.getElementById('store-history-modal');
       const bodyEl = document.getElementById('hist-modal-body');
+      const analyticsEl = document.getElementById('hist-modal-analytics');
+      const nameEl = document.getElementById('hist-modal-store-name');
+
+      switchHistTab('list');
       modal.classList.add('open');
       bodyEl.innerHTML = '<div style="text-align:center; padding:20px; color:#64748b;">⏳ Đang tải lịch sử báo cáo...</div>';
+      analyticsEl.innerHTML = '<div style="text-align:center; padding:20px; color:#64748b;">⏳ Đang phân tích quy luật hàng về...</div>';
+
+      const stName = (typeof storesDict !== 'undefined' && storesDict[storeId]) ? storesDict[storeId].name : 'Cửa hàng';
+      if (nameEl) nameEl.textContent = stName;
+
+      // 1. Fetch History List
       try {
         let history = storeHistoryCache[storeId];
         if (!history) {
@@ -2321,129 +2728,378 @@ def render_map_page() -> str:
         }
         if (!history || history.length === 0) {
           bodyEl.innerHTML = '<div style="text-align:center; padding:20px; color:#64748b;">Chưa có lịch sử báo cáo nào.</div>';
-          return;
-        }
+        } else {
+          // Synchronize storeCountsCache with distinct counts from history
+          let countIn = 0, countOut = 0;
+          const seenInTs = new Set(), seenOutTs = new Set();
+          history.forEach(item => {
+            const ts = item.timestamp || item.formatted_time;
+            if (item.status_code === 'i') {
+              if (!seenInTs.has(ts)) { seenInTs.add(ts); countIn++; }
+            } else if (item.status_code === 'o') {
+              if (!seenOutTs.has(ts)) { seenOutTs.add(ts); countOut++; }
+            }
+          });
+          storeCountsCache[storeId] = { in: countIn, out: countOut };
 
-        // Propagate newest history record to local store object and refresh map marker
-        if (typeof storesDict !== 'undefined' && storesDict[storeId]) {
-          const newest = history[0];
-          const st = storesDict[storeId];
-          const histTs = Number(newest.timestamp) || 0;
-          if (histTs >= (st.last_timestamp || 0) || st.status === 'u') {
-            st.status = newest.status_code || newest.status || 'u';
-            st.last_timestamp = histTs;
-            st.last_reported_at = newest.formatted_time || '';
-            st.onsite = !!newest.onsite;
-            st.packs = newest.packs || [];
-            if (typeof renderMapMarkers === 'function') {
-              renderMapMarkers();
+          // Propagate newest history record to local store object and refresh map marker
+          if (typeof storesDict !== 'undefined' && storesDict[storeId]) {
+            const newest = history[0];
+            const st = storesDict[storeId];
+            const histTs = Number(newest.timestamp) || 0;
+            if (histTs >= (st.last_timestamp || 0) || st.status === 'u') {
+              st.status = newest.status_code || newest.status || 'u';
+              st.last_timestamp = histTs;
+              st.last_reported_at = newest.formatted_time || '';
+              st.onsite = !!newest.onsite;
+              st.packs = newest.packs || [];
+              if (typeof renderMapMarkers === 'function') {
+                renderMapMarkers();
+              }
             }
           }
-        }
-        bodyEl.innerHTML = history.map(item => {
-          let timeDisplay = item.formatted_time || '';
-          if (item.timestamp && item.timestamp > 0) {
-            const d = new Date(item.timestamp * 1000);
-            timeDisplay = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')} ${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth()+1).padStart(2, '0')}/${d.getFullYear()}`;
-          }
-          return `
-          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px 10px; margin-bottom:8px;">
-            <div style="display:flex; justify-content:space-between; font-weight:800; font-size:0.78rem;">
-              <span style="color:${item.status_code === 'i' ? '#15803d' : '#b91c1c'};">${item.status_code === 'i' ? '🟢 Có hàng' : '🔴 Hết hàng'}</span>
-              <span style="color:#64748b; font-size:0.7rem;">🕒 ${escapeHtml(timeDisplay)}</span>
+          bodyEl.innerHTML = history.map(item => {
+            let histColor = '#64748b', histText = '⚪ Chưa rõ';
+            if (item.status_code === 'i') { histColor = '#15803d'; histText = '🟢 Có hàng'; }
+            else if (item.status_code === 'o') { histColor = '#b91c1c'; histText = '🔴 Hết hàng'; }
+            else if (item.status_code === 'n') { histColor = '#b45309'; histText = '🟡 Không bán thẻ'; }
+
+            const packsHtml = (item.packs && item.packs.length > 0)
+              ? `<div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:6px;">
+                  ${item.packs.map(p => `
+                    <span style="display:inline-flex; align-items:center; gap:3px; background:#fef3c7; color:#92400e; border:1px solid #fde68a; font-size:0.68rem; font-weight:700; padding:2px 7px; border-radius:4px;">
+                      🎁 ${escapeHtml(p)}
+                    </span>
+                  `).join('')}
+                </div>`
+              : '';
+
+            const onsiteHtml = item.onsite
+              ? `<span style="display:inline-flex; align-items:center; gap:2px; background:#dcfce7; color:#15803d; border:1px solid #86efac; font-size:0.65rem; font-weight:700; padding:2px 6px; border-radius:10px;">
+                  📍 Tại quán (GPS)
+                </span>`
+              : '';
+
+            const confirmsCount = Number(item.confirms) || 1;
+            const confirmsHtml = (confirmsCount > 1)
+              ? `<span style="display:inline-flex; align-items:center; gap:2px; background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; font-size:0.65rem; font-weight:700; padding:2px 6px; border-radius:10px;">
+                  👍 ${confirmsCount} xác nhận
+                </span>`
+              : '';
+
+            return `
+            <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:10px; padding:10px 12px; margin-bottom:8px; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+              <div style="display:flex; justify-content:space-between; align-items:center; font-weight:800; font-size:0.8rem;">
+                <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                  <span style="color:${histColor}; font-weight:800;">${histText}</span>
+                  ${onsiteHtml}
+                  ${confirmsHtml}
+                </div>
+                <span style="color:#64748b; font-size:0.7rem; font-weight:500;">🕒 ${escapeHtml(item.formatted_time || '')}</span>
+              </div>
+              ${packsHtml}
+              ${item.note ? `<div style="font-size:0.75rem; color:#1e293b; background:#f8fafc; border:1px solid #f1f5f9; border-radius:6px; padding:5px 8px; margin-top:6px;">💬 ${escapeHtml(item.note)}</div>` : ''}
+              <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.68rem; color:#94a3b8; margin-top:6px;">
+                <span>👤 Người báo: <b>${escapeHtml(item.user || 'Ẩn danh')}</b>${item.who ? ` <span style="font-size:0.62rem; color:#cbd5e1;">(#${escapeHtml(item.who)})</span>` : ''}</span>
+                ${item.source ? `<span style="font-size:0.62rem; color:#94a3b8; text-transform:uppercase;">[${escapeHtml(item.source)}]</span>` : ''}
+              </div>
             </div>
-            ${item.note ? `<div style="font-size:0.74rem; color:#1e293b; margin-top:3px;">📦 ${escapeHtml(item.note)}</div>` : ''}
-            <div style="font-size:0.68rem; color:#94a3b8; margin-top:3px;">👤 Người báo: <b>${escapeHtml(item.user || 'Ẩn danh')}</b></div>
-          </div>
           `;
-        }).join('');
+          }).join('');
+        }
       } catch(e) {
-        bodyEl.innerHTML = '<div style="color:#ef4444; padding:20px; text-align:center;">Lỗi tải dữ liệu.</div>';
+        bodyEl.innerHTML = '<div style="color:#ef4444; padding:20px; text-align:center;">Lỗi tải lịch sử.</div>';
+      }
+
+      // 2. Fetch Analytics
+      try {
+        let analytics = storeAnalyticsCache[storeId];
+        if (!analytics) {
+          const aRes = await fetch(`/api/analytics/store/${storeId}`);
+          analytics = await aRes.json();
+          storeAnalyticsCache[storeId] = analytics;
+        }
+        analyticsEl.innerHTML = renderAnalyticsHtml(analytics);
+      } catch(e) {
+        analyticsEl.innerHTML = '<div style="color:#ef4444; padding:20px; text-align:center;">Lỗi phân tích quy luật.</div>';
       }
     }
     function closeStoreHistoryModal() { document.getElementById('store-history-modal').classList.remove('open'); }
 
+    let audioCtx = null;
+    function playAudioAlert() {
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.12); // A5
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.45);
+        osc.start(audioCtx.currentTime);
+        osc.stop(audioCtx.currentTime + 0.45);
+      } catch(e) {}
+    }
+    document.addEventListener('click', () => {
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    }, { passive: true });
+
+
+    function formatTimeAgoJp(timestamp) {
+      if (!timestamp) return 'たった今';
+      const diffSec = getServerNowSec() - timestamp;
+      if (diffSec < 0) return 'たった今';
+      if (diffSec <= 120) return 'たった今';
+      if (diffSec < 3600) return `${Math.floor(diffSec / 60)}分前`;
+      if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}時間前`;
+      return `${Math.floor(diffSec / 86400)}日前`;
+    }
+
+    function showNewReportToast(rep) {
+      const container = document.getElementById('live-report-toast-container');
+      if (!container) return;
+
+      // 1. Remove any existing toast for this exact store so the store never appears twice
+      const existingSameStore = container.querySelector(`[data-store-id="${rep.store_id}"]`);
+      if (existingSameStore) {
+        existingSameStore.remove();
+      }
+
+      const st = storesDict[rep.store_id];
+      const name = st ? st.name : (rep.store_name || '店舗');
+      const isStock = rep.status_code === 'i';
+      const isOut = rep.status_code === 'o';
+
+      const dotClass = isStock ? 'dot-in' : (isOut ? 'dot-out' : 'dot-not');
+      const statusClass = isStock ? 'status-in' : (isOut ? 'status-out' : 'status-not');
+      const statusLabel = isStock ? '在庫あり' : (isOut ? '在庫なし' : '扱ってない');
+      const repTs = Number(rep.timestamp) || 0;
+      const repAgeSec = repTs > 0 ? (getServerNowSec() - repTs) : 0;
+      const timeAgo = (repTs > 0 && repAgeSec >= 0 && repAgeSec <= 120) ? 'たった今' : (repTs > 0 ? formatTimeAgoJp(repTs) : 'たった今');
+
+      const toast = document.createElement('div');
+      toast.className = `poketan-pill-toast ${isStock ? 'stock-pill' : ''}`;
+      toast.dataset.storeId = rep.store_id;
+      toast.dataset.ts = repTs;
+      toast.onclick = () => focusStoreOnMap(rep.store_id);
+      toast.innerHTML = `
+        <span class="pill-dot ${dotClass}"></span>
+        <span class="pill-store-name">${escapeHtml(name)}</span>
+        <span class="pill-text">で</span>
+        <span class="pill-status ${statusClass}">${statusLabel}</span>
+        <span class="pill-text">の報告</span>
+        <span class="pill-time">${escapeHtml(timeAgo)}</span>
+        <button type="button" class="pill-close-btn" onclick="event.stopPropagation(); this.closest('.poketan-pill-toast').remove();" title="閉じる">✕</button>
+      `;
+
+      // 2. Insert in strict chronological order: NEWEST (highest timestamp) at TOP, older below
+      const existingToasts = Array.from(container.children);
+      let inserted = false;
+      for (const existing of existingToasts) {
+        const existingTs = Number(existing.dataset.ts) || 0;
+        if (repTs >= existingTs) {
+          container.insertBefore(toast, existing);
+          inserted = true;
+          break;
+        }
+      }
+      if (!inserted) {
+        container.appendChild(toast);
+      }
+
+      // 3. Keep at most 3 visible toasts to keep screen clean and avoid covering UI
+      while (container.children.length > 3) {
+        container.lastElementChild.remove();
+      }
+
+      // 4. Auto-dismiss after 6 seconds
+      setTimeout(() => {
+        if (toast.parentElement) {
+          toast.style.opacity = '0';
+          toast.style.transform = 'translateY(-10px) scale(0.96)';
+          setTimeout(() => toast.remove(), 250);
+        }
+      }, 6000);
+    }
+
+    window.focusStoreOnMap = function(sid) {
+      const s = storesDict[sid];
+      if (!s || !s.lat || !s.lng) return;
+      map.flyTo([s.lat, s.lng], 16, { duration: 0.8 });
+      setTimeout(() => {
+        stockLayer.eachLayer(m => {
+          const ll = m.getLatLng();
+          if (Math.abs(ll.lat - s.lat) < 0.0001 && Math.abs(ll.lng - s.lng) < 0.0001) m.openPopup();
+        });
+      }, 850);
+    };
+
+    const seenToastKeys = new Set();
+    let lastDbPollTs = 0;
+
+    async function pollDatabaseUpdates() {
+      if (!lastDbPollTs) return;
+      try {
+        const res = await fetch(`/api/latest_reports?since=${lastDbPollTs}&limit=50`);
+        if (!res.ok) return;
+        const reports = await res.json();
+        if (Array.isArray(reports) && reports.length > 0) {
+          let hasNewStock = false;
+          let shouldReRender = false;
+          const nowSec = getServerNowSec();
+          const candidateStockReps = [];
+
+          for (const rep of reports) {
+            // Strictly advance polling timestamp using SQLite created_at
+            if (rep.created_at && rep.created_at > lastDbPollTs) {
+              lastDbPollTs = rep.created_at;
+            }
+
+            const sid = rep.store_id;
+            let st = storesDict[sid];
+            if (!st && rep.lat && rep.lng) {
+              storesDict[sid] = {
+                id: sid,
+                name: rep.store_name,
+                chain: rep.chain,
+                lat: rep.lat,
+                lng: rep.lng,
+                address: rep.address,
+                pref: rep.pref,
+                status: rep.status_code,
+                last_timestamp: rep.timestamp,
+                onsite: !!rep.onsite,
+                packs: rep.packs || [],
+                last_reported_at: rep.reported_at || rep.formatted_time || ''
+              };
+              st = storesDict[sid];
+              shouldReRender = true;
+            } else if (st) {
+              if (!st.last_timestamp || (rep.timestamp && rep.timestamp >= st.last_timestamp)) {
+                st.status = rep.status_code;
+                st.last_timestamp = rep.timestamp;
+                st.onsite = !!rep.onsite;
+                st.packs = rep.packs || [];
+                st.last_reported_at = rep.reported_at || rep.formatted_time || '';
+                shouldReRender = true;
+              }
+            }
+
+            // Real-time toast check:
+            // 1. Must be in-stock (i)
+            // 2. Deduplicate strictly by composite key (store_id, timestamp, status_code)
+            // 3. Must be genuinely real-time: reported within the last 120 seconds (2 minutes)
+            const toastKey = `${rep.store_id}_${rep.timestamp}_${rep.status_code}`;
+            const reportAgeSec = rep.timestamp > 0 ? (nowSec - rep.timestamp) : 0;
+            const isFreshRealtime = reportAgeSec >= 0 && reportAgeSec <= 120;
+
+            if (rep.status_code === 'i' && !seenToastKeys.has(toastKey) && isFreshRealtime) {
+              seenToastKeys.add(toastKey);
+              candidateStockReps.push(rep);
+            }
+          }
+
+          // Sort candidate stock reports strictly by timestamp DESC (newest first)
+          if (candidateStockReps.length > 0) {
+            candidateStockReps.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+            // Show at most 3 fresh toasts to avoid flooding screen
+            for (const rep of candidateStockReps.slice(0, 3)) {
+              hasNewStock = true;
+              showNewReportToast(rep);
+            }
+          }
+
+          if (hasNewStock && configData.soundEnabled) {
+            playAudioAlert();
+          }
+          if (shouldReRender) {
+            renderMapMarkers();
+          }
+        }
+      } catch (e) {
+        console.warn('DB Poll error:', e);
+      }
+    }
+
     // 11. INIT DATA & URL QUERY PARAMS
     async function initData() {
       try {
-        const [cfgRes, storesRes] = await Promise.all([
+        const [cfgRes, storesRes, countsRes] = await Promise.all([
           fetch('/api/config'),
-          fetch('/api/stores_data?region=all')
+          fetch('/api/stores_data?region=all'),
+          fetch('/api/report_counts').catch(() => null)
         ]);
         configData = await cfgRes.json();
         storesDict = await storesRes.json();
 
+        // Calibrate server time offset to correct browser clock drift
+        if (configData.serverTime) {
+          serverTimeOffset = configData.serverTime - Math.floor(Date.now() / 1000);
+        }
+
+        // Pre-fill seenToastKeys with all stores currently in stock so page load NEVER triggers old toast alerts!
+        for (const sid in storesDict) {
+          const s = storesDict[sid];
+          if (s && s.status === 'i' && s.last_timestamp) {
+            seenToastKeys.add(`${sid}_${s.last_timestamp}_i`);
+          }
+        }
+
+        if (countsRes && countsRes.ok) {
+          const countsData = await countsRes.json();
+          Object.assign(storeCountsCache, countsData);
+        }
+
         updateMapFilterUI();
         renderMapMarkers();
 
-        // Check URL Query String: ?focus=store_id or ?store=... or ?lat=...&lng=... or ?hunt=1
-        const urlParams = new URLSearchParams(window.location.search);
-        const rawFocusId = urlParams.get('focus') || urlParams.get('store');
-        const qLat = parseFloat(urlParams.get('lat'));
-        const qLng = parseFloat(urlParams.get('lng'));
-        const isHunt = urlParams.get('hunt');
+        // Initialize DB poll timestamp to current time so only future/real-time reports trigger alerts
+        lastDbPollTs = getServerNowSec();
+        if (!window._dbPollInterval) {
+          window._dbPollInterval = setInterval(pollDatabaseUpdates, 5000);
+        }
 
-        if (rawFocusId || (!isNaN(qLat) && !isNaN(qLng))) {
+        // Check URL Query String: ?focus=store_id or ?store_id=... or ?hunt=1
+        const urlParams = new URLSearchParams(window.location.search);
+        const focusId = urlParams.get('focus') || urlParams.get('store_id');
+        const isHunt = urlParams.get('hunt');
+        const targetLat = parseFloat(urlParams.get('lat'));
+        const targetLng = parseFloat(urlParams.get('lng'));
+
+        if (focusId && storesDict[focusId]) {
           isFollowingUser = false;
           updateGpsBtnState();
-
-          let targetStore = null;
-          if (rawFocusId) {
-            const cleanId = rawFocusId.endsWith('_c') ? rawFocusId.slice(0, -2) : rawFocusId;
-            targetStore = storesDict[rawFocusId] || storesDict[cleanId];
-          }
-
-          let tLat = !isNaN(qLat) ? qLat : (targetStore ? targetStore.lat : null);
-          let tLng = !isNaN(qLng) ? qLng : (targetStore ? targetStore.lng : null);
-
-          if (!targetStore && tLat !== null && tLng !== null) {
-            for (const s of Object.values(storesDict)) {
-              if (Math.abs(s.lat - tLat) < 0.001 && Math.abs(s.lng - tLng) < 0.001) {
-                targetStore = s;
-                break;
+          const s = storesDict[focusId];
+          const flyLat = (!isNaN(targetLat) && targetLat) ? targetLat : s.lat;
+          const flyLng = (!isNaN(targetLng) && targetLng) ? targetLng : s.lng;
+          map.flyTo([flyLat, flyLng], 17, { duration: 0.8 });
+          setTimeout(() => {
+            let opened = false;
+            stockLayer.eachLayer(m => {
+              const ll = m.getLatLng();
+              if (Math.abs(ll.lat - s.lat) < 0.0002 && Math.abs(ll.lng - s.lng) < 0.0002) {
+                m.openPopup();
+                opened = true;
               }
+            });
+            if (!opened && circleLayer) {
+              circleLayer.eachLayer(m => {
+                const ll = m.getLatLng();
+                if (Math.abs(ll.lat - s.lat) < 0.0002 && Math.abs(ll.lng - s.lng) < 0.0002) {
+                  m.openPopup();
+                }
+              });
             }
-          }
-
-          if (targetStore) {
-            tLat = targetStore.lat;
-            tLng = targetStore.lng;
-          }
-
-          if (tLat !== null && tLng !== null) {
-            map.setView([tLat, tLng], 17);
-            setTimeout(() => {
-              if (targetStore) {
-                const sInfo = getStoreStatusInfo(targetStore);
-                L.popup({ maxWidth: 320, autoClose: false, closeOnClick: false })
-                  .setLatLng([tLat, tLng])
-                  .setContent(createPopupHtml(targetStore, sInfo))
-                  .openOn(map);
-              } else {
-                const navMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${tLat},${tLng}`;
-                L.popup({ maxWidth: 320, autoClose: false, closeOnClick: false })
-                  .setLatLng([tLat, tLng])
-                  .setContent(`
-                    <div style="padding:6px 2px;">
-                      <div class="popup-store-title">📍 Vị trí cửa hàng</div>
-                      <div style="font-size:0.75rem; color:#64748b; margin-top:4px;">Toạ độ: ${tLat.toFixed(5)}, ${tLng.toFixed(5)}</div>
-                      <div class="popup-actions-grid" style="margin-top:10px;">
-                        <a href="${navMapsUrl}" target="_blank" class="btn-popup-maps">🗺️ Google Maps chỉ đường ↗</a>
-                      </div>
-                    </div>
-                  `)
-                  .openOn(map);
-              }
-            }, 350);
-          }
+          }, 850);
         } else if (isHunt === '1') {
           isFollowingUser = false;
           updateGpsBtnState();
           triggerGachiMeguri();
         }
-
-        // Realtime Firestore sync
-        setupRealtime();
       } catch(e) {
         console.error('Init error:', e);
       } finally {
@@ -2454,73 +3110,13 @@ def render_map_page() -> str:
       }
     }
 
-    function syncReportToBackend(storeId, statusVal, confVal) {
-      if (!storeId || !statusVal || typeof statusVal !== 'string') return;
-      const code = statusVal[0].toLowerCase();
-      const ts = parseInt(statusVal.slice(1)) || Math.floor(Date.now() / 1000);
-      const isGps = confVal && typeof confVal === 'string' && confVal.includes('g');
-      fetch('/api/record_report', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          store_id: storeId,
-          status_code: code,
-          timestamp: ts,
-          onsite: !!isGps,
-          source: 'poketan'
-        })
-      }).catch(() => {});
-    }
-
-    function setupRealtime() {
-      if (!window.FirebaseInit || !configData.apiKey) return;
-      try {
-        const { initializeApp, initializeFirestore, doc, onSnapshot } = window.FirebaseInit;
-        const app = initializeApp({ apiKey: configData.apiKey, projectId: configData.projectId });
-        const db = initializeFirestore(app, {});
-        ['osaka', 'kanagawa', 'aichi', 'gifu', 'mie'].forEach(p => {
-          onSnapshot(doc(db, 'status', p), (snap) => {
-            if (snap.exists()) {
-              const data = snap.data();
-              Object.assign(hotStatus, data);
-              for (const [k, v] of Object.entries(data)) {
-                if (k.endsWith('_c') || typeof v !== 'string' || v.length < 2) continue;
-                const sid = k;
-                const code = v[0].toLowerCase();
-                const ts = parseInt(v.slice(1)) || Math.floor(Date.now() / 1000);
-                const confVal = data[k + '_c'] || '';
-                const isGps = typeof confVal === 'string' && confVal.includes('g');
-
-                let isChanged = false;
-                if (storesDict[sid]) {
-                  const st = storesDict[sid];
-                  if (st.status !== code || (st.last_timestamp || 0) < ts) {
-                    st.status = code;
-                    st.last_timestamp = ts;
-                    st.onsite = isGps;
-                    isChanged = true;
-                  }
-                } else {
-                  isChanged = true;
-                }
-                if (isChanged) {
-                  syncReportToBackend(sid, v, confVal);
-                }
-              }
-              renderMapMarkers();
-            }
-          });
-        });
-      } catch(e) {}
-    }
-
     window.addEventListener('DOMContentLoaded', () => {
       initData();
       if (userLat !== null && userLng !== null) {
         updateUserMarker(userLat, userLng, 25);
       }
       const urlParams = new URLSearchParams(window.location.search);
-      const shouldAutoFly = !urlParams.get('focus') && !urlParams.get('store') && !urlParams.get('lat') && urlParams.get('hunt') !== '1';
+      const shouldAutoFly = !urlParams.get('focus') && !urlParams.get('store_id') && urlParams.get('hunt') !== '1';
       startGpsTracking(shouldAutoFly);
     });
   </script>
@@ -3088,7 +3684,10 @@ def render_thongbao_page() -> str:
       </div>
     </div>
 
-    <!-- Search row -->
+  <!-- Real-time Live Toast Container for Database updates -->
+  <div id="live-report-toast-container" style="position:fixed; top:68px; left:50%; transform:translateX(-50%); z-index:9999; display:flex; flex-direction:column; align-items:center; gap:6px; pointer-events:none; width:max-content; max-width:calc(100vw - 20px);"></div>
+
+  <!-- Search row -->
     <div class="list-search-row">
       <div class="list-search-box">
         <span class="icon">🔍</span>
@@ -3123,9 +3722,9 @@ def render_thongbao_page() -> str:
     // 1. APP STATE & REGIONS
     const REGIONS = {
       'osaka': { id: 'osaka', name: '大阪・関西', center: [34.6937, 135.5023], zoom: 13, defaultCity: 'なんば', prefs: ['osaka'] },
-      'tokyo': { id: 'tokyo', name: '東京・神奈川', center: [35.4437, 139.6380], zoom: 13, defaultCity: '横浜', prefs: ['kanagawa'] },
+      'tokyo': { id: 'tokyo', name: '東京・神奈川', center: [35.6895, 139.6917], zoom: 13, defaultCity: '横浜', prefs: ['tokyo', 'kanagawa'] },
       'nagoya': { id: 'nagoya', name: '名古屋・東海', center: [35.1815, 136.9066], zoom: 13, defaultCity: '名古屋駅', prefs: ['aichi', 'gifu', 'mie'] },
-      'all': { id: 'all', name: '全エリア (全国)', center: [34.6937, 135.5023], zoom: 10, defaultCity: '全エリア', prefs: ['osaka', 'aichi', 'kanagawa', 'gifu', 'mie'] }
+      'all': { id: 'all', name: '全エリア (全国)', center: [34.6937, 135.5023], zoom: 10, defaultCity: '全エリア', prefs: ['osaka', 'tokyo', 'kanagawa', 'aichi', 'gifu', 'mie'] }
     };
 
     let currentRegion = localStorage.getItem('poketan_selected_region') || 'osaka';
@@ -3138,6 +3737,11 @@ def render_thongbao_page() -> str:
     let configData = {};
     const storeHistoryCache = {};
     const storeCountsCache = {};
+    let serverTimeOffset = 0; // seconds: serverNow - browserNow
+
+    function getServerNowSec() {
+      return Math.floor(Date.now() / 1000) + serverTimeOffset;
+    }
 
     let listRegionFilter = currentRegion;
     let listStatusFilter = 'all';
@@ -3194,17 +3798,17 @@ def render_thongbao_page() -> str:
         const parsed = parseInt(rest.substring(0, 10), 10);
         if (!isNaN(parsed) && parsed > 0) {
           timestamp = parsed;
-          const d = new Date(parsed * 1000);
-          const hours = String(d.getHours()).padStart(2, '0');
-          const minutes = String(d.getMinutes()).padStart(2, '0');
-          const seconds = String(d.getSeconds()).padStart(2, '0');
-          const day = String(d.getDate()).padStart(2, '0');
-          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const jst = new Date((parsed + 9 * 3600) * 1000);
+          const hours = String(jst.getUTCHours()).padStart(2, '0');
+          const minutes = String(jst.getUTCMinutes()).padStart(2, '0');
+          const seconds = String(jst.getUTCSeconds()).padStart(2, '0');
+          const day = String(jst.getUTCDate()).padStart(2, '0');
+          const month = String(jst.getUTCMonth() + 1).padStart(2, '0');
           timeOnly = `${hours}:${minutes}:${seconds}`;
           dateOnly = `${day}/${month}`;
           dtStr = `${hours}:${minutes} (${day}/${month})`;
 
-          const diffSec = Math.floor(Date.now() / 1000 - parsed);
+          const diffSec = Math.max(0, getServerNowSec() - parsed);
           if (diffSec < 60) timeAgo = 'Vừa xong';
           else if (diffSec < 3600) timeAgo = `${Math.floor(diffSec / 60)} phút trước`;
           else if (diffSec < 86400) timeAgo = `${Math.floor(diffSec / 3600)} giờ trước`;
@@ -3217,36 +3821,24 @@ def render_thongbao_page() -> str:
 
     function getStoreStatusInfo(store) {
       let code = (store.status || 'u').toLowerCase();
-      let timestamp = store.last_timestamp || 0;
+      let timestamp = Number(store.last_timestamp) || 0;
       let onsite = !!store.onsite;
-      let packs = store.packs || [];
+      let packs = Array.isArray(store.packs) ? store.packs : [];
       let reported_at = store.last_reported_at || '';
-
-      const raw = hotStatus[store.id] || coldStatus[store.id];
-      if (raw && typeof raw === 'string') {
-        const decoded = decodeStatus(raw, hotStatus[store.id + '_c'] || coldStatus[store.id + '_c'] || '');
-        if (decoded.timestamp > timestamp) {
-          code = decoded.code;
-          timestamp = decoded.timestamp;
-          onsite = decoded.onsite;
-          packs = decoded.packs;
-          reported_at = decoded.reported_at;
-        }
-      }
 
       let dtStr = '', timeAgo = '', timeOnly = '', dateOnly = '';
       if (timestamp > 0) {
-        const d = new Date(timestamp * 1000);
-        const hours = String(d.getHours()).padStart(2, '0');
-        const minutes = String(d.getMinutes()).padStart(2, '0');
-        const seconds = String(d.getSeconds()).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const jst = new Date((timestamp + 9 * 3600) * 1000);
+        const hours = String(jst.getUTCHours()).padStart(2, '0');
+        const minutes = String(jst.getUTCMinutes()).padStart(2, '0');
+        const seconds = String(jst.getUTCSeconds()).padStart(2, '0');
+        const day = String(jst.getUTCDate()).padStart(2, '0');
+        const month = String(jst.getUTCMonth() + 1).padStart(2, '0');
         timeOnly = `${hours}:${minutes}:${seconds}`;
         dateOnly = `${day}/${month}`;
         if (!reported_at) reported_at = `${hours}:${minutes} (${day}/${month})`;
 
-        const diffSec = Math.floor(Date.now() / 1000 - timestamp);
+        const diffSec = Math.max(0, getServerNowSec() - timestamp);
         if (diffSec < 60) timeAgo = 'Vừa xong';
         else if (diffSec < 3600) timeAgo = `${Math.floor(diffSec / 60)} phút trước`;
         else if (diffSec < 86400) timeAgo = `${Math.floor(diffSec / 3600)} giờ trước`;
@@ -3717,8 +4309,6 @@ def render_thongbao_page() -> str:
       listRegionFilter = pref;
       listCurrentPage = 1;
       try { localStorage.setItem('poketan_selected_region', pref); } catch(e) {}
-      const headerLoc = document.getElementById('header-loc-name');
-      if (headerLoc) headerLoc.innerText = `${cityName}周辺`;
       closePrefModal();
       renderStoreList();
     }
@@ -3737,15 +4327,7 @@ def render_thongbao_page() -> str:
 
     function onTelegramToggleChange(checked) {
       const slider = document.getElementById('tg-cfg-slider');
-      const knob = document.getElementById('tg-cfg-knob');
-      const badge = document.getElementById('tg-status-badge-text');
-      if (slider) slider.style.background = checked ? '#16a34a' : '#cbd5e1';
-      if (knob) knob.style.transform = checked ? 'translateX(22px)' : 'translateX(0)';
-      if (badge) {
-        badge.innerText = checked ? '🟢 ĐÃ BẬT' : '🔴 ĐANG TẮT';
-        badge.style.background = checked ? '#dcfce7' : '#fee2e2';
-        badge.style.color = checked ? '#15803d' : '#b91c1c';
-      }
+      if (slider) slider.style.background = checked ? '#0284c7' : '#cbd5e1';
     }
 
     function openTelegramModal() {
@@ -3761,6 +4343,7 @@ def render_thongbao_page() -> str:
       const enabledEl = document.getElementById('tg-cfg-enabled');
       const statusEl = document.getElementById('tg-cfg-status');
       const chainEl = document.getElementById('tg-cfg-chain');
+      const timeEl = document.getElementById('tg-cfg-time');
       const regionEl = document.getElementById('tg-cfg-region');
 
       if (tokenEl) tokenEl.value = configData.telegramBotToken || '';
@@ -3771,19 +4354,62 @@ def render_thongbao_page() -> str:
       }
       if (statusEl) statusEl.value = configData.telegramStatus || 'in';
       if (chainEl) chainEl.value = configData.telegramChain || 'all';
+      if (timeEl) timeEl.value = String(configData.telegramTime || '24');
       if (regionEl) regionEl.value = configData.telegramRegion || 'osaka';
 
       const rad = document.querySelector(`input[name="set-region-radio"][value="${currentRegion}"]`);
       if (rad) rad.checked = true;
 
       const soundCheck = document.getElementById('set-sound-check');
-      if (soundCheck && configData.notifications) {
-        soundCheck.checked = !!configData.notifications.soundEnabled;
+      if (soundCheck) {
+        if (configData.notifications && typeof configData.notifications.soundEnabled !== 'undefined') {
+          soundCheck.checked = !!configData.notifications.soundEnabled;
+        } else if (typeof configData.soundEnabled !== 'undefined') {
+          soundCheck.checked = !!configData.soundEnabled;
+        } else {
+          soundCheck.checked = true;
+        }
       }
 
       document.getElementById('settings-modal').classList.add('open');
     }
     function closeSettingsModal() { document.getElementById('settings-modal').classList.remove('open'); }
+
+    function updateSettings(key, val) {
+      if (!configData.notifications) configData.notifications = {};
+      configData.notifications[key] = val;
+      configData[key] = val;
+      try { localStorage.setItem('poketan_config', JSON.stringify(configData)); } catch(e) {}
+      try {
+        fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ notifications: { [key]: val } })
+        }).catch(() => {});
+      } catch(e) {}
+    }
+
+    function selectRegion(pref) {
+      currentRegion = pref;
+      try { localStorage.setItem('poketan_selected_region', pref); } catch(e) {}
+      try {
+        fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ currentRegion: pref })
+        }).catch(() => {});
+      } catch(e) {}
+      listRegionFilter = pref;
+      listCurrentPage = 1;
+      updateListFilterBadgeUI();
+      const searchVal = document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '';
+      renderStoreList(searchVal);
+      closeSettingsModal();
+    }
+
+    function refreshData() {
+      if (typeof initData === 'function') initData();
+    }
 
     async function saveTelegramConfig() {
       const token = (document.getElementById('tg-cfg-token') ? document.getElementById('tg-cfg-token').value : '').trim();
@@ -3791,6 +4417,7 @@ def render_thongbao_page() -> str:
       const enabled = document.getElementById('tg-cfg-enabled') ? document.getElementById('tg-cfg-enabled').checked : false;
       const status = document.getElementById('tg-cfg-status') ? document.getElementById('tg-cfg-status').value : 'in';
       const chain = document.getElementById('tg-cfg-chain') ? document.getElementById('tg-cfg-chain').value : 'all';
+      const time = document.getElementById('tg-cfg-time') ? document.getElementById('tg-cfg-time').value : '24';
       const region = document.getElementById('tg-cfg-region') ? document.getElementById('tg-cfg-region').value : 'osaka';
 
       configData.telegramBotToken = token;
@@ -3798,7 +4425,7 @@ def render_thongbao_page() -> str:
       configData.telegramEnabled = enabled;
       configData.telegramStatus = status;
       configData.telegramChain = chain;
-      configData.telegramTime = 'realtime';
+      configData.telegramTime = time;
       configData.telegramRegion = region;
 
       await fetch('/api/settings', {
@@ -3807,7 +4434,7 @@ def render_thongbao_page() -> str:
         body: JSON.stringify({
           notifications: {
             telegramBotToken: token, telegramChatId: chatId, telegramEnabled: enabled,
-            telegramStatus: status, telegramChain: chain, telegramTime: 'realtime', telegramRegion: region
+            telegramStatus: status, telegramChain: chain, telegramTime: time, telegramRegion: region
           }
         })
       });
@@ -3848,11 +4475,176 @@ def render_thongbao_page() -> str:
     function closeBulletinModal() { document.getElementById('bulletin-modal').classList.remove('open'); }
     function openSearchModal() { openPrefModal(); }
 
+    function switchHistTab(tab) {
+      const btnList = document.getElementById('tab-btn-hist-list');
+      const btnAnalytics = document.getElementById('tab-btn-hist-analytics');
+      const bodyList = document.getElementById('hist-modal-body');
+      const bodyAnalytics = document.getElementById('hist-modal-analytics');
+      if (!btnList || !btnAnalytics || !bodyList || !bodyAnalytics) return;
+
+      if (tab === 'analytics') {
+        btnAnalytics.style.borderBottom = '2px solid #ef4444';
+        btnAnalytics.style.color = '#ef4444';
+        btnAnalytics.style.fontWeight = '700';
+        btnList.style.borderBottom = '2px solid transparent';
+        btnList.style.color = '#64748b';
+        btnList.style.fontWeight = '600';
+        bodyList.style.display = 'none';
+        bodyAnalytics.style.display = 'block';
+      } else {
+        btnList.style.borderBottom = '2px solid #ef4444';
+        btnList.style.color = '#ef4444';
+        btnList.style.fontWeight = '700';
+        btnAnalytics.style.borderBottom = '2px solid transparent';
+        btnAnalytics.style.color = '#64748b';
+        btnAnalytics.style.fontWeight = '600';
+        bodyList.style.display = 'block';
+        bodyAnalytics.style.display = 'none';
+      }
+    }
+
+    const storeAnalyticsCache = {};
+
+    function renderAnalyticsHtml(data) {
+      if (!data || data.total_reports === 0) {
+        return '<div style="text-align:center; padding:30px 15px; color:#64748b;">Chưa có dữ liệu thống kê báo cáo nào cho cửa hàng này.</div>';
+      }
+
+      const totalRep = data.total_reports || 0;
+      const inRep = data.in_stock_reports || 0;
+      const ratePct = data.in_stock_rate_pct || 0;
+      const peakHours = data.peak_hours || [];
+      const peakDays = data.peak_weekdays || [];
+      const hourly = data.hourly_distribution || [];
+      const weekday = data.weekday_distribution || [];
+      const topPacks = data.top_packs || [];
+
+      let maxHrCount = 1;
+      hourly.forEach(h => { if (h.count > maxHrCount) maxHrCount = h.count; });
+
+      const hourlyBarsHtml = hourly.map(h => {
+        const heightPct = Math.round((h.count / maxHrCount) * 100);
+        const isPeak = heightPct >= 70 && h.count > 0;
+        const barColor = isPeak ? '#ef4444' : (h.count > 0 ? '#10b981' : '#e2e8f0');
+        return `
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; min-width:11px;" title="${h.hour}:00 JST - ${h.count} lần có hàng">
+            <div style="font-size:0.55rem; color:${isPeak ? '#ef4444' : '#64748b'}; font-weight:700; height:12px;">${h.count > 0 ? h.count : ''}</div>
+            <div style="width:100%; max-width:10px; height:60px; background:#f1f5f9; border-radius:3px; display:flex; align-items:flex-end; overflow:hidden;">
+              <div style="width:100%; height:${heightPct}%; background:${barColor}; border-radius:2px; transition:height 0.3s;"></div>
+            </div>
+            <div style="font-size:0.55rem; color:#94a3b8; margin-top:3px;">${parseInt(h.hour)}</div>
+          </div>
+        `;
+      }).join('');
+
+      let maxWdCount = 1;
+      weekday.forEach(w => { if (w.count > maxWdCount) maxWdCount = w.count; });
+
+      const weekdayBarsHtml = weekday.map(w => {
+        const widthPct = Math.round((w.count / maxWdCount) * 100);
+        const isPeak = widthPct >= 75 && w.count > 0;
+        const barColor = isPeak ? '#ef4444' : (w.count > 0 ? '#3b82f6' : '#cbd5e1');
+        return `
+          <div style="margin-bottom:6px;">
+            <div style="display:flex; justify-content:space-between; font-size:0.72rem; font-weight:700; margin-bottom:2px;">
+              <span style="color:${isPeak ? '#ef4444' : '#334155'};">${w.day}</span>
+              <span style="color:#64748b;">${w.count} lần có hàng</span>
+            </div>
+            <div style="width:100%; height:8px; background:#f1f5f9; border-radius:4px; overflow:hidden;">
+              <div style="width:${widthPct}%; height:100%; background:${barColor}; border-radius:4px; transition:width 0.3s;"></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      const peakHoursHtml = peakHours.length > 0 
+        ? peakHours.map(ph => `<span style="background:#fee2e2; color:#b91c1c; border:1px solid #fecaca; font-weight:700; font-size:0.72rem; padding:3px 8px; border-radius:6px; display:inline-flex; align-items:center; gap:3px;">🔥 ${ph}</span>`).join(' ')
+        : '<span style="color:#94a3b8; font-size:0.75rem;">Chưa có đủ mẫu</span>';
+
+      const peakDaysHtml = peakDays.length > 0
+        ? peakDays.map(pd => `<span style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; font-weight:700; font-size:0.72rem; padding:3px 8px; border-radius:6px; display:inline-flex; align-items:center; gap:3px;">📅 ${pd}</span>`).join(' ')
+        : '<span style="color:#94a3b8; font-size:0.75rem;">Chưa có đủ mẫu</span>';
+
+      const topPacksHtml = topPacks.length > 0
+        ? topPacks.map(tp => `<span style="background:#fef3c7; color:#92400e; border:1px solid #fde68a; font-weight:700; font-size:0.7rem; padding:2px 7px; border-radius:4px;">🎁 ${escapeHtml(tp)}</span>`).join(' ')
+        : '<span style="color:#94a3b8; font-size:0.75rem;">Chưa ghi nhận mã pack</span>';
+
+      return `
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+            <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:10px; text-align:center;">
+              <div style="font-size:0.68rem; color:#166534; font-weight:600; text-transform:uppercase;">Tỉ lệ có hàng</div>
+              <div style="font-size:1.4rem; font-weight:900; color:#15803d; line-height:1.2; margin-top:2px;">${ratePct}%</div>
+              <div style="font-size:0.68rem; color:#166534; font-weight:600; margin-top:2px;">${inRep} / ${totalRep} báo cáo</div>
+            </div>
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px; text-align:center;">
+              <div style="font-size:0.68rem; color:#64748b; font-weight:600; text-transform:uppercase;">Có hàng gần nhất</div>
+              <div style="font-size:0.85rem; font-weight:800; color:#1e293b; line-height:1.3; margin-top:6px;">${data.last_in_stock_time || 'Chưa có'}</div>
+              <div style="font-size:0.65rem; color:#94a3b8; margin-top:2px;">(Giờ Nhật Bản JST)</div>
+            </div>
+          </div>
+
+          <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:10px 12px;">
+            <div style="font-size:0.75rem; font-weight:800; color:#1e293b; margin-bottom:6px; display:flex; align-items:center; gap:5px;">
+              <span>⚡</span> Khung giờ vàng hàng về (Peak Hours JST):
+            </div>
+            <div style="display:flex; flex-wrap:wrap; gap:6px;">
+              ${peakHoursHtml}
+            </div>
+
+            <div style="font-size:0.75rem; font-weight:800; color:#1e293b; margin-top:10px; margin-bottom:6px; display:flex; align-items:center; gap:5px;">
+              <span>🗓️</span> Ngày trong tuần hay có hàng nhất:
+            </div>
+            <div style="display:flex; flex-wrap:wrap; gap:6px;">
+              ${peakDaysHtml}
+            </div>
+          </div>
+
+          <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:10px 12px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <span style="font-size:0.75rem; font-weight:800; color:#1e293b;">🕒 Phân bố giờ có hàng (0h - 23h JST)</span>
+              <span style="font-size:0.65rem; color:#64748b;">(Cột càng cao = Hàng về càng nhiều)</span>
+            </div>
+            <div style="display:flex; gap:2px; align-items:flex-end; height:75px; padding:0 2px; border-bottom:1px solid #e2e8f0;">
+              ${hourlyBarsHtml}
+            </div>
+            <div style="text-align:center; font-size:0.62rem; color:#94a3b8; margin-top:4px;">0h = Nửa đêm • 12h = Trưa • 23h = Đêm (Giờ JST)</div>
+          </div>
+
+          <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:10px 12px;">
+            <div style="font-size:0.75rem; font-weight:800; color:#1e293b; margin-bottom:8px;">
+              📅 Phân bố ngày trong tuần (Thứ Hai → Chủ Nhật)
+            </div>
+            ${weekdayBarsHtml}
+          </div>
+
+          <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:10px 12px;">
+            <div style="font-size:0.75rem; font-weight:800; color:#1e293b; margin-bottom:6px;">
+              🎁 Các gói thẻ ghi nhận từng về tại quán:
+            </div>
+            <div style="display:flex; flex-wrap:wrap; gap:5px;">
+              ${topPacksHtml}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
     async function openStoreHistoryModal(storeId) {
       const modal = document.getElementById('store-history-modal');
       const bodyEl = document.getElementById('hist-modal-body');
+      const analyticsEl = document.getElementById('hist-modal-analytics');
+      const nameEl = document.getElementById('hist-modal-store-name');
+
+      switchHistTab('list');
       modal.classList.add('open');
       bodyEl.innerHTML = '<div style="text-align:center; padding:20px; color:#64748b;">⏳ Đang tải lịch sử báo cáo...</div>';
+      analyticsEl.innerHTML = '<div style="text-align:center; padding:20px; color:#64748b;">⏳ Đang phân tích quy luật hàng về...</div>';
+
+      const stName = (typeof storesDict !== 'undefined' && storesDict[storeId]) ? storesDict[storeId].name : 'Cửa hàng';
+      if (nameEl) nameEl.textContent = stName;
+
+      // 1. Fetch History List
       try {
         let history = storeHistoryCache[storeId];
         if (!history) {
@@ -3862,48 +4654,102 @@ def render_thongbao_page() -> str:
         }
         if (!history || history.length === 0) {
           bodyEl.innerHTML = '<div style="text-align:center; padding:20px; color:#64748b;">Chưa có lịch sử báo cáo nào.</div>';
-          return;
-        }
+        } else {
+          // Synchronize reportCounts with distinct counts from history
+          let countIn = 0, countOut = 0;
+          const seenInTs = new Set(), seenOutTs = new Set();
+          history.forEach(item => {
+            const ts = item.timestamp || item.formatted_time;
+            if (item.status_code === 'i') {
+              if (!seenInTs.has(ts)) { seenInTs.add(ts); countIn++; }
+            } else if (item.status_code === 'o') {
+              if (!seenOutTs.has(ts)) { seenOutTs.add(ts); countOut++; }
+            }
+          });
+          if (typeof reportCounts !== 'undefined') {
+            reportCounts[storeId] = { in: countIn, out: countOut };
+          }
 
-        // Propagate newest history record to local store object and refresh list
-        if (typeof storesDict !== 'undefined' && storesDict[storeId]) {
-          const newest = history[0];
-          const st = storesDict[storeId];
-          const histTs = Number(newest.timestamp) || 0;
-          if (histTs >= (st.last_timestamp || 0) || st.status === 'u') {
-            st.status = newest.status_code || newest.status || 'u';
-            st.last_timestamp = histTs;
-            st.last_reported_at = newest.formatted_time || '';
-            st.onsite = !!newest.onsite;
-            st.packs = newest.packs || [];
-            if (typeof renderStoreList === 'function') {
-              renderStoreList();
+          // Propagate newest history record to local store object and refresh list
+          if (typeof storesDict !== 'undefined' && storesDict[storeId]) {
+            const newest = history[0];
+            const st = storesDict[storeId];
+            const histTs = Number(newest.timestamp) || 0;
+            if (histTs >= (st.last_timestamp || 0) || st.status === 'u') {
+              st.status = newest.status_code || newest.status || 'u';
+              st.last_timestamp = histTs;
+              st.last_reported_at = newest.formatted_time || '';
+              st.onsite = !!newest.onsite;
+              st.packs = newest.packs || [];
+              if (typeof renderStoreList === 'function') {
+                renderStoreList();
+              }
             }
           }
-        }
-        bodyEl.innerHTML = history.map(item => {
-          let histColor = '#64748b', histText = '⚪ Chưa rõ';
-          if (item.status_code === 'i') { histColor = '#15803d'; histText = '🟢 Có hàng'; }
-          else if (item.status_code === 'o') { histColor = '#b91c1c'; histText = '🔴 Không có'; }
-          else if (item.status_code === 'n') { histColor = '#b45309'; histText = '🟡 Không bán thẻ'; }
-          let timeDisplay = item.formatted_time || '';
-          if (item.timestamp && item.timestamp > 0) {
-            const d = new Date(item.timestamp * 1000);
-            timeDisplay = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')} ${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth()+1).padStart(2, '0')}/${d.getFullYear()}`;
-          }
-          return `
-          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px 10px; margin-bottom:8px;">
-            <div style="display:flex; justify-content:space-between; font-weight:800; font-size:0.78rem;">
-              <span style="color:${histColor};">${histText}</span>
-              <span style="color:#64748b; font-size:0.7rem;">🕒 ${escapeHtml(timeDisplay)}</span>
+          bodyEl.innerHTML = history.map(item => {
+            let histColor = '#64748b', histText = '⚪ Chưa rõ';
+            if (item.status_code === 'i') { histColor = '#15803d'; histText = '🟢 Có hàng'; }
+            else if (item.status_code === 'o') { histColor = '#b91c1c'; histText = '🔴 Hết hàng'; }
+            else if (item.status_code === 'n') { histColor = '#b45309'; histText = '🟡 Không bán thẻ'; }
+
+            const packsHtml = (item.packs && item.packs.length > 0)
+              ? `<div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:6px;">
+                  ${item.packs.map(p => `
+                    <span style="display:inline-flex; align-items:center; gap:3px; background:#fef3c7; color:#92400e; border:1px solid #fde68a; font-size:0.68rem; font-weight:700; padding:2px 7px; border-radius:4px;">
+                      🎁 ${escapeHtml(p)}
+                    </span>
+                  `).join('')}
+                </div>`
+              : '';
+
+            const onsiteHtml = item.onsite
+              ? `<span style="display:inline-flex; align-items:center; gap:2px; background:#dcfce7; color:#15803d; border:1px solid #86efac; font-size:0.65rem; font-weight:700; padding:2px 6px; border-radius:10px;">
+                  📍 Tại quán (GPS)
+                </span>`
+              : '';
+
+            const confirmsCount = Number(item.confirms) || 1;
+            const confirmsHtml = (confirmsCount > 1)
+              ? `<span style="display:inline-flex; align-items:center; gap:2px; background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; font-size:0.65rem; font-weight:700; padding:2px 6px; border-radius:10px;">
+                  👍 ${confirmsCount} xác nhận
+                </span>`
+              : '';
+
+            return `
+            <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:10px; padding:10px 12px; margin-bottom:8px; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+              <div style="display:flex; justify-content:space-between; align-items:center; font-weight:800; font-size:0.8rem;">
+                <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                  <span style="color:${histColor}; font-weight:800;">${histText}</span>
+                  ${onsiteHtml}
+                  ${confirmsHtml}
+                </div>
+                <span style="color:#64748b; font-size:0.7rem; font-weight:500;">🕒 ${escapeHtml(item.formatted_time || '')}</span>
+              </div>
+              ${packsHtml}
+              ${item.note ? `<div style="font-size:0.75rem; color:#1e293b; background:#f8fafc; border:1px solid #f1f5f9; border-radius:6px; padding:5px 8px; margin-top:6px;">💬 ${escapeHtml(item.note)}</div>` : ''}
+              <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.68rem; color:#94a3b8; margin-top:6px;">
+                <span>👤 Người báo: <b>${escapeHtml(item.user || 'Ẩn danh')}</b>${item.who ? ` <span style="font-size:0.62rem; color:#cbd5e1;">(#${escapeHtml(item.who)})</span>` : ''}</span>
+                ${item.source ? `<span style="font-size:0.62rem; color:#94a3b8; text-transform:uppercase;">[${escapeHtml(item.source)}]</span>` : ''}
+              </div>
             </div>
-            ${item.note ? `<div style="font-size:0.74rem; color:#1e293b; margin-top:3px;">📦 ${escapeHtml(item.note)}</div>` : ''}
-            <div style="font-size:0.68rem; color:#94a3b8; margin-top:3px;">👤 Người báo: <b>${escapeHtml(item.user || 'Ẩn danh')}</b></div>
-          </div>
-        `;
-        }).join('');
+          `;
+          }).join('');
+        }
       } catch(e) {
-        bodyEl.innerHTML = '<div style="color:#ef4444; padding:20px; text-align:center;">Lỗi tải dữ liệu.</div>';
+        bodyEl.innerHTML = '<div style="color:#ef4444; padding:20px; text-align:center;">Lỗi tải lịch sử.</div>';
+      }
+
+      // 2. Fetch Analytics
+      try {
+        let analytics = storeAnalyticsCache[storeId];
+        if (!analytics) {
+          const aRes = await fetch(`/api/analytics/store/${storeId}`);
+          analytics = await aRes.json();
+          storeAnalyticsCache[storeId] = analytics;
+        }
+        analyticsEl.innerHTML = renderAnalyticsHtml(analytics);
+      } catch(e) {
+        analyticsEl.innerHTML = '<div style="color:#ef4444; padding:20px; text-align:center;">Lỗi phân tích quy luật.</div>';
       }
     }
     function closeStoreHistoryModal() { document.getElementById('store-history-modal').classList.remove('open'); }
@@ -3926,6 +4772,194 @@ def render_thongbao_page() -> str:
       );
     }
 
+    let audioCtx = null;
+    function playAudioAlert() {
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.12); // A5
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.45);
+        osc.start(audioCtx.currentTime);
+        osc.stop(audioCtx.currentTime + 0.45);
+      } catch(e) {}
+    }
+    document.addEventListener('click', () => {
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    }, { passive: true });
+
+
+    function formatTimeAgoJp(timestamp) {
+      if (!timestamp) return 'たった今';
+      const diffSec = getServerNowSec() - timestamp;
+      if (diffSec < 0) return 'たった今';
+      if (diffSec <= 120) return 'たった今';
+      if (diffSec < 3600) return `${Math.floor(diffSec / 60)}分前`;
+      if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}時間前`;
+      return `${Math.floor(diffSec / 86400)}日前`;
+    }
+
+    function showNewReportToast(rep) {
+      const container = document.getElementById('live-report-toast-container');
+      if (!container) return;
+
+      // 1. Remove any existing toast for this exact store so the store never appears twice
+      const existingSameStore = container.querySelector(`[data-store-id="${rep.store_id}"]`);
+      if (existingSameStore) {
+        existingSameStore.remove();
+      }
+
+      const st = storesDict[rep.store_id];
+      const name = st ? st.name : (rep.store_name || '店舗');
+      const isStock = rep.status_code === 'i';
+      const isOut = rep.status_code === 'o';
+
+      const dotClass = isStock ? 'dot-in' : (isOut ? 'dot-out' : 'dot-not');
+      const statusClass = isStock ? 'status-in' : (isOut ? 'status-out' : 'status-not');
+      const statusLabel = isStock ? '在庫あり' : (isOut ? '在庫なし' : '扱ってない');
+      const repTs = Number(rep.timestamp) || 0;
+      const repAgeSec = repTs > 0 ? (getServerNowSec() - repTs) : 0;
+      const timeAgo = (repTs > 0 && repAgeSec >= 0 && repAgeSec <= 120) ? 'たった今' : (repTs > 0 ? formatTimeAgoJp(repTs) : 'たった今');
+
+      const toast = document.createElement('div');
+      toast.className = `poketan-pill-toast ${isStock ? 'stock-pill' : ''}`;
+      toast.dataset.storeId = rep.store_id;
+      toast.dataset.ts = repTs;
+      toast.onclick = () => { window.location.href = `/map?focus=${rep.store_id}`; };
+      toast.innerHTML = `
+        <span class="pill-dot ${dotClass}"></span>
+        <span class="pill-store-name">${escapeHtml(name)}</span>
+        <span class="pill-text">で</span>
+        <span class="pill-status ${statusClass}">${statusLabel}</span>
+        <span class="pill-text">の報告</span>
+        <span class="pill-time">${escapeHtml(timeAgo)}</span>
+        <button type="button" class="pill-close-btn" onclick="event.stopPropagation(); this.closest('.poketan-pill-toast').remove();" title="閉じる">✕</button>
+      `;
+
+      // 2. Insert in strict chronological order: NEWEST (highest timestamp) at TOP, older below
+      const existingToasts = Array.from(container.children);
+      let inserted = false;
+      for (const existing of existingToasts) {
+        const existingTs = Number(existing.dataset.ts) || 0;
+        if (repTs >= existingTs) {
+          container.insertBefore(toast, existing);
+          inserted = true;
+          break;
+        }
+      }
+      if (!inserted) {
+        container.appendChild(toast);
+      }
+
+      // 3. Keep at most 3 visible toasts to keep screen clean and avoid covering UI
+      while (container.children.length > 3) {
+        container.lastElementChild.remove();
+      }
+
+      // 4. Auto-dismiss after 6 seconds
+      setTimeout(() => {
+        if (toast.parentElement) {
+          toast.style.opacity = '0';
+          toast.style.transform = 'translateY(-10px) scale(0.96)';
+          setTimeout(() => toast.remove(), 250);
+        }
+      }, 6000);
+    }
+
+    const seenToastKeys = new Set();
+    let lastDbPollTs = 0;
+
+    async function pollDatabaseUpdates() {
+      if (!lastDbPollTs) return;
+      try {
+        const res = await fetch(`/api/latest_reports?since=${lastDbPollTs}&limit=50`);
+        if (!res.ok) return;
+        const reports = await res.json();
+        if (Array.isArray(reports) && reports.length > 0) {
+          let hasNewStock = false;
+          let shouldReRender = false;
+          const nowSec = getServerNowSec();
+          const candidateStockReps = [];
+
+          for (const rep of reports) {
+            // Strictly advance polling timestamp using SQLite created_at
+            if (rep.created_at && rep.created_at > lastDbPollTs) {
+              lastDbPollTs = rep.created_at;
+            }
+
+            const sid = rep.store_id;
+            let st = storesDict[sid];
+            if (!st && rep.lat && rep.lng) {
+              storesDict[sid] = {
+                id: sid,
+                name: rep.store_name,
+                chain: rep.chain,
+                lat: rep.lat,
+                lng: rep.lng,
+                address: rep.address,
+                pref: rep.pref,
+                status: rep.status_code,
+                last_timestamp: rep.timestamp,
+                onsite: !!rep.onsite,
+                packs: rep.packs || [],
+                last_reported_at: rep.reported_at || rep.formatted_time || ''
+              };
+              st = storesDict[sid];
+              shouldReRender = true;
+            } else if (st) {
+              if (!st.last_timestamp || (rep.timestamp && rep.timestamp >= st.last_timestamp)) {
+                st.status = rep.status_code;
+                st.last_timestamp = rep.timestamp;
+                st.onsite = !!rep.onsite;
+                st.packs = rep.packs || [];
+                st.last_reported_at = rep.reported_at || rep.formatted_time || '';
+                shouldReRender = true;
+              }
+            }
+
+            // Real-time toast check:
+            // 1. Must be in-stock (i)
+            // 2. Deduplicate strictly by composite key (store_id, timestamp, status_code)
+            // 3. Must be genuinely real-time: reported within the last 120 seconds (2 minutes)
+            const toastKey = `${rep.store_id}_${rep.timestamp}_${rep.status_code}`;
+            const reportAgeSec = rep.timestamp > 0 ? (nowSec - rep.timestamp) : 0;
+            const isFreshRealtime = reportAgeSec >= 0 && reportAgeSec <= 120;
+
+            if (rep.status_code === 'i' && !seenToastKeys.has(toastKey) && isFreshRealtime) {
+              seenToastKeys.add(toastKey);
+              candidateStockReps.push(rep);
+            }
+          }
+
+          // Sort candidate stock reports strictly by timestamp DESC (newest first)
+          if (candidateStockReps.length > 0) {
+            candidateStockReps.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+            // Show at most 3 fresh toasts to avoid flooding screen
+            for (const rep of candidateStockReps.slice(0, 3)) {
+              hasNewStock = true;
+              showNewReportToast(rep);
+            }
+          }
+
+          if (hasNewStock && configData.soundEnabled) {
+            playAudioAlert();
+          }
+          if (shouldReRender) {
+            const q = document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '';
+            renderStoreList(q);
+          }
+        }
+      } catch (e) {
+        console.warn('DB Poll error:', e);
+      }
+    }
+
     async function initData() {
       checkGpsSilently();
       try {
@@ -3938,12 +4972,30 @@ def render_thongbao_page() -> str:
         storesDict = await storesRes.json();
         if (countsRes && countsRes.ok) reportCounts = await countsRes.json();
 
+        // Calibrate server time offset to correct browser clock drift
+        if (configData.serverTime) {
+          serverTimeOffset = configData.serverTime - Math.floor(Date.now() / 1000);
+        }
+
+        // Pre-fill seenToastKeys with all stores currently in stock so page load NEVER triggers old toast alerts!
+        for (const sid in storesDict) {
+          const s = storesDict[sid];
+          if (s && s.status === 'i' && s.last_timestamp) {
+            seenToastKeys.add(`${sid}_${s.last_timestamp}_i`);
+          }
+        }
+
         // Sync initial UI badges
         document.querySelectorAll('.list-sort-btn').forEach(b => b.classList.toggle('active', b.id === `sort-btn-${listSortMode}`));
         updateListFilterBadgeUI();
 
         renderStoreList();
-        setupRealtime();
+
+        // Initialize DB poll timestamp to current time so only future/real-time reports trigger alerts
+        lastDbPollTs = getServerNowSec();
+        if (!window._dbPollInterval) {
+          window._dbPollInterval = setInterval(pollDatabaseUpdates, 5000);
+        }
 
         // Mark all notifications as read when viewing Thongbao page
         localStorage.setItem('poketan_last_read_ts', String(Math.floor(Date.now() / 1000)));
@@ -3956,70 +5008,6 @@ def render_thongbao_page() -> str:
         if (overlay) overlay.style.opacity = '0';
         setTimeout(() => overlay && overlay.remove(), 150);
       }
-    }
-
-    function syncReportToBackend(storeId, statusVal, confVal) {
-      if (!storeId || !statusVal || typeof statusVal !== 'string') return;
-      const code = statusVal[0].toLowerCase();
-      const ts = parseInt(statusVal.slice(1)) || Math.floor(Date.now() / 1000);
-      const isGps = confVal && typeof confVal === 'string' && confVal.includes('g');
-      fetch('/api/record_report', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          store_id: storeId,
-          status_code: code,
-          timestamp: ts,
-          onsite: !!isGps,
-          source: 'poketan'
-        })
-      }).catch(() => {});
-    }
-
-    function setupRealtime() {
-      if (!window.FirebaseInit || !configData.apiKey) return;
-      try {
-        const { initializeApp, initializeFirestore, doc, onSnapshot } = window.FirebaseInit;
-        const app = initializeApp({ apiKey: configData.apiKey, projectId: configData.projectId });
-        const db = initializeFirestore(app, {});
-        ['osaka', 'kanagawa', 'aichi', 'gifu', 'mie'].forEach(p => {
-          onSnapshot(doc(db, 'status', p), (snap) => {
-            if (snap.exists()) {
-              const data = snap.data();
-              Object.assign(hotStatus, data);
-              for (const [k, v] of Object.entries(data)) {
-                if (k.endsWith('_c') || typeof v !== 'string' || v.length < 2) continue;
-                const sid = k;
-                const code = v[0].toLowerCase();
-                const ts = parseInt(v.slice(1)) || Math.floor(Date.now() / 1000);
-                const confVal = data[k + '_c'] || '';
-                const isGps = typeof confVal === 'string' && confVal.includes('g');
-
-                let isChanged = false;
-                if (storesDict[sid]) {
-                  const st = storesDict[sid];
-                  if (st.status !== code || (st.last_timestamp || 0) < ts) {
-                    st.status = code;
-                    st.last_timestamp = ts;
-                    st.onsite = isGps;
-                    isChanged = true;
-                  }
-                } else {
-                  isChanged = true;
-                }
-                if (isChanged) {
-                  syncReportToBackend(sid, v, confVal);
-                }
-              }
-              const q = document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '';
-              renderStoreList(q);
-              localStorage.setItem('poketan_last_read_ts', String(Math.floor(Date.now() / 1000)));
-              const badgeEl = document.getElementById('footer-unread-badge');
-              if (badgeEl) badgeEl.style.display = 'none';
-            }
-          });
-        });
-      } catch(e) {}
     }
 
     window.addEventListener('DOMContentLoaded', initData);

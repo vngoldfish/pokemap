@@ -133,7 +133,7 @@ def fetch_store_history(store_id: str) -> list:
 
     import urllib.parse
     clean_id_quoted = urllib.parse.quote(clean_id)
-    url = f"{FIRESTORE_BASE_URL}/stores/{clean_id_quoted}/history?key={FIREBASE_API_KEY}&pageSize=20"
+    url = f"{FIRESTORE_BASE_URL}/stores/{clean_id_quoted}/history?key={FIREBASE_API_KEY}&pageSize=100"
     history = []
     try:
         doc_json = fetch_json(url)
@@ -146,11 +146,12 @@ def fetch_store_history(store_id: str) -> list:
             formatted_time = ""
             if ts_str:
                 try:
-                    import datetime
-                    jst = datetime.timezone(datetime.timedelta(hours=9))
-                    dt = datetime.datetime.fromisoformat(ts_str.replace("Z", "+00:00")).astimezone(jst)
+                    from datetime import datetime as dt_cls, timezone, timedelta
+                    JST = timezone(timedelta(hours=9))
+                    dt = dt_cls.fromisoformat(ts_str.replace("Z", "+00:00"))
                     unix_ts = int(dt.timestamp())
-                    formatted_time = dt.strftime("%H:%M %d/%m/%Y")
+                    jst_dt = dt.astimezone(JST)
+                    formatted_time = jst_dt.strftime("%H:%M %d/%m/%Y")
                 except Exception:
                     pass
 
@@ -167,15 +168,49 @@ def fetch_store_history(store_id: str) -> list:
                 status_code = "n"
                 status_label = "⚪ Không bán thẻ"
 
+            note_str = fields.get("note", "")
+            packs_list = []
+            if isinstance(fields.get("packs"), list):
+                packs_list = fields.get("packs")
+            elif isinstance(fields.get("p"), list):
+                packs_list = fields.get("p")
+
+            # Detect pack tags from note if packs_list is empty
+            if not packs_list and note_str:
+                from .config import PACK_CODES
+                note_lower = note_str.lower()
+                for p_code, p_name in PACK_CODES.items():
+                    p_name_lower = p_name.lower()
+                    aliases = [p_name_lower]
+                    if "(" in p_name:
+                        aliases.append(p_name[p_name.find("(")+1:p_name.find(")")].lower())
+                    if any(a in note_lower for a in aliases):
+                        if p_name not in packs_list:
+                            packs_list.append(p_name)
+
+            confirms_count = 1
+            if fields.get("confirms"):
+                try:
+                    confirms_count = max(1, int(fields.get("confirms")))
+                except Exception:
+                    confirms_count = 1
+            elif fields.get("count"):
+                try:
+                    confirms_count = max(1, int(fields.get("count")))
+                except Exception:
+                    confirms_count = 1
+
             history.append({
                 "id": doc_id,
                 "status": raw_status,
                 "status_code": status_code,
                 "status_label": status_label,
-                "note": fields.get("note", ""),
+                "note": note_str,
+                "packs": packs_list,
                 "user": fields.get("user", "匿名トレーナー"),
                 "who": str(fields.get("who", ""))[:6] if fields.get("who") else "",
                 "onsite": fields.get("os") == 1,
+                "confirms": confirms_count,
                 "timestamp": unix_ts,
                 "formatted_time": formatted_time
             })

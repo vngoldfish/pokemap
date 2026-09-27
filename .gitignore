@@ -45,12 +45,20 @@ $RECYCLE.BIN/
 # ==========================================
 # Data cache & generated export files
 # ==========================================
-app/data/stores_*.json
 app/data/*_in_stock.json
 app/data/*_in_stock.csv
 app/data/*.csv
+app/data/harvest_checkpoint.json
 !app/data/.gitkeep
 !app/data/settings.json
+!app/data/stores_*.json
+!app/data/pokemap.db
+
+# ==========================================
+# Agent workspaces & scratch files
+# ==========================================
+.agents/
+/data/
 
 # ==========================================
 # Logs & temporary files
@@ -61,9 +69,8 @@ temp/
 tmp/
 
 # ==========================================
-# SQLite database files
+# SQLite database files (allow pokemap.db)
 # ==========================================
-*.db
 *.db-wal
 *.db-shm
 *.sqlite

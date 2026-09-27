@@ -21,9 +21,10 @@
     "discordWebhookUrl": "",
     "telegramBotToken": "8888535478:AAFtlcFhwjhlAvLZ4lPf7tGQtnZ8XIoKvSE",
     "telegramChatId": "5572197416",
-    "telegramEnabled": true,
+    "telegramEnabled": false,
     "telegramStatus": "in",
-    "telegramChain": "all",
+    "telegramChain": "conbini",
+    "telegramTime": "24",
     "telegramRegion": "osaka",
     "notifyPrefs": [
       "osaka",

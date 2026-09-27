@@ -44,6 +44,7 @@ from .db import (
     register_on_report_added
 )
 import threading
+from concurrent.futures import ThreadPoolExecutor
 
 # Initialize local SQLite database and populate stores on startup
 init_db()
@@ -83,6 +84,7 @@ DEFAULT_SETTINGS = {
         "telegramEnabled": False,     # Bật gửi Telegram khi có hàng
         "telegramStatus": "in",       # 'in' (chỉ có hàng), 'onsite' (tại quán), 'recent', 'all'
         "telegramChain": "all",       # 'all', 'conbini', 'seven', ...
+        "telegramTime": "24",         # '1', '3', '6', '24', 'all'
         "telegramRegion": "osaka",    # 'osaka', 'tokyo', 'nagoya', 'all'
         "notifyPrefs": ["osaka", "aichi", "kanagawa", "gifu", "mie"]  # Các tỉnh nhận thông báo
     },
@@ -138,18 +140,11 @@ def get_settings():
 
 @app.post("/api/settings")
 async def update_settings(request: Request):
-    global _tg_enabled_since
     try:
         data = await request.json()
         current = load_user_settings()
-        old_tg = bool(current.get("notifications", {}).get("telegramEnabled", False))
         deep_update_dict(current, data)
         save_user_settings(current)
-        new_tg = bool(current.get("notifications", {}).get("telegramEnabled", False))
-        if new_tg and not old_tg:
-            import time
-            _tg_enabled_since = time.time()
-            print(f"  [TelegramSettings] Telegram enabled at {_tg_enabled_since}. Silencing prior backlog.")
         return JSONResponse(content={"status": "ok", "settings": current})
     except Exception as e:
         return JSONResponse(status_code=400, content={"error": str(e)})
@@ -157,33 +152,36 @@ async def update_settings(request: Request):
 
 from typing import Optional, List, Dict, Any
 from concurrent.futures import ThreadPoolExecutor
-import time
 
 # All available prefectures on PokéTan
-ALL_PREFS = ["osaka", "aichi", "kanagawa", "gifu", "mie"]
+ALL_PREFS = ["osaka", "tokyo", "kanagawa", "aichi", "gifu", "mie"]
 
 # Defined 3 core regions + all (matching user specification)
 REGION_PREFS = {
     "osaka": ["osaka"],
-    "tokyo": ["kanagawa"],
+    "tokyo": ["tokyo", "kanagawa"],
     "kanagawa": ["kanagawa"],
     "nagoya": ["aichi", "gifu", "mie"],
     "aichi": ["aichi", "gifu", "mie"],
-    "all": ["osaka", "aichi", "kanagawa", "gifu", "mie"],
+    "all": ["osaka", "tokyo", "kanagawa", "aichi", "gifu", "mie"],
 }
 
 _recent_notified_keys = {}
-_daemon_start_time = time.time()
-_tg_enabled_since = time.time()
-_last_tg_enabled = False
 
 def send_telegram_alert(store: dict, info: dict, notif_cfg: dict, is_test: bool = False) -> dict:
-    """Send concise formatted alert to Telegram bot with 5 key data points."""
+    """
+    Send formatted alert to Telegram bot matching configured channel.
+    Concise 5-field format requested by user:
+    1. Tên cửa hàng (Chuỗi)
+    2. Thời gian có báo cáo (JST)
+    3. Trạng thái (Có hàng / Hết hàng...)
+    4. Khoảng cách (từ ga JR Imamiya hoặc định vị)
+    5. Địa chỉ kèm link mở vị trí trên PokéMap
+    """
     import urllib.request
     import urllib.parse
     import json
-    import time
-    import datetime
+    import math
 
     tg_token = (notif_cfg.get("telegramBotToken") or "").strip()
     tg_chat_id = (notif_cfg.get("telegramChatId") or "").strip()
@@ -194,93 +192,68 @@ def send_telegram_alert(store: dict, info: dict, notif_cfg: dict, is_test: bool 
     if not tg_enabled:
         return {"status": "disabled"}
 
-    # 1. Tên cửa hàng & Chuỗi
-    store_name = store.get('name', 'Cửa hàng')
-    store_chain = store.get('chain_label') or store.get('chain') or ''
-    chain_tag = f" ({store_chain})" if store_chain and store_chain != 'unknown' else ""
-
-    # 2. Thời gian có báo cáo (chuẩn múi giờ Nhật Bản JST UTC+9)
-    rep_ts = info.get('timestamp') or 0
-    cur_t = time.time()
-    if rep_ts > 0:
-        import datetime
-        jst = datetime.timezone(datetime.timedelta(hours=9))
-        dt_jst = datetime.datetime.fromtimestamp(rep_ts, tz=jst)
-        diff_sec = max(0, int(cur_t - rep_ts))
-        time_clock = dt_jst.strftime("%H:%M:%S")
-        if diff_sec < 60:
-            time_display = f"{time_clock} (Vừa xong)"
-        elif diff_sec < 3600:
-            time_display = f"{time_clock} ({diff_sec // 60} phút trước)"
-        else:
-            time_display = f"{time_clock} ({dt_jst.strftime('%d/%m')})"
-    else:
-        time_display = info.get('reported_at', 'Vừa xong')
-        if info.get('timeAgo'):
-            time_display += f" ({info.get('timeAgo')})"
-
-    # 3. Trạng thái
-    status_code = info.get("status_code") or info.get("code") or "i"
-    packs_text = ", ".join(info.get("packs", [])) if info.get("packs") else ""
-    if status_code == "i":
-        status_label = "🟢 Có hàng (Xác nhận tại chỗ)" if info.get("onsite") else "🟢 Có hàng"
-        if packs_text:
-            status_label += f" • {packs_text}"
-    elif status_code == "o":
-        status_label = "🔴 Hết hàng"
-    elif status_code == "n":
-        status_label = "⚪ Không kinh doanh thẻ"
-    else:
-        status_label = "🟢 Có hàng"
-
-    # 4. Khoảng cách (cách toạ độ định vị người dùng hoặc toạ độ cố định)
-    # Mặc định toạ độ cố định: Ga JR Imamiya (lat=34.6540, lng=135.4925) hoặc cấu hình anchor trong settings
-    ref_lat = float(info.get("userLat") or store.get("userLat") or notif_cfg.get("anchorLat") or 34.6540)
-    ref_lng = float(info.get("userLng") or store.get("userLng") or notif_cfg.get("anchorLng") or 135.4925)
-    ref_name = notif_cfg.get("anchorName") or ("Vị trí của bạn" if (info.get("userLat") or store.get("userLat")) else "ga JR Imamiya")
-
-    dist_str = ""
+    # Calculate distance to JR Imamiya Station (lat=34.6540, lng=135.4925)
+    imamiya_dist_str = "Chưa rõ vị trí"
     st_lat = store.get("lat")
     st_lng = store.get("lng")
     if st_lat is not None and st_lng is not None:
         try:
-            import math
             lat1, lon1 = float(st_lat), float(st_lng)
-            lat2, lon2 = ref_lat, ref_lng
+            lat2, lon2 = 34.6540, 135.4925
             dlat = math.radians(lat2 - lat1)
             dlon = math.radians(lon2 - lon1)
             a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon/2)**2
             dist_km = 6371 * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
             if dist_km < 1.0:
-                dist_str = f"{int(round(dist_km * 1000))} m"
+                imamiya_dist_str = f"~{int(round(dist_km * 1000))} m (từ ga JR Imamiya)"
             else:
-                dist_str = f"{dist_km:.1f} km"
+                imamiya_dist_str = f"~{dist_km:.1f} km (từ ga JR Imamiya)"
         except Exception:
             pass
-    dist_display = f"~{dist_str} (từ {ref_name})" if dist_str else "Chưa rõ toạ độ"
 
-    # 5. Link vị trí trong PokéMap (pokemap.bawui.com) -> từ đó ấn nút ra Google Maps
+    store_name = store.get('name', 'Cửa hàng')
+    store_chain = store.get('chain_label') or store.get('chain') or 'Tiện lợi'
+    store_addr = store.get('address') or 'Khu vực đang chọn'
     store_id = store.get("id") or info.get("store_id") or ""
     clean_id = store_id[:-2] if store_id.endswith("_c") else store_id
-    pokemap_params = []
-    if clean_id:
-        pokemap_params.append(f"focus={clean_id}")
+
+    # Format time (JST)
+    ts = info.get("timestamp") or 0
+    time_display = info.get("reported_at") or info.get("formatted_time") or ""
+    if ts and ts > 0:
+        try:
+            from datetime import datetime, timezone, timedelta
+            JST = timezone(timedelta(hours=9))
+            dt = datetime.fromtimestamp(ts, tz=JST)
+            time_display = dt.strftime("%H:%M:%S %d/%m/%Y")
+        except Exception:
+            pass
+    if not time_display:
+        time_display = "Vừa xong"
+
+    # Status label
+    code = info.get("status_code") or info.get("status") or "i"
+    if code == "i":
+        status_label = "🟢📸 Có hàng (Xác nhận tại chỗ)" if info.get("onsite") else "🟢 Có hàng (In stock)"
+    elif code == "o":
+        status_label = "🔴 Hết hàng (Sold out)"
+    elif code == "n":
+        status_label = "🟡 Không bán thẻ (No stock)"
+    else:
+        status_label = "⚪ Chưa có tin"
+
+    # Link to PokéMap location
+    pokemap_url = f"https://pokemap.bawui.com/?focus={clean_id}"
     if st_lat is not None and st_lng is not None:
-        pokemap_params.append(f"lat={st_lat}&lng={st_lng}")
+        pokemap_url += f"&lat={st_lat}&lng={st_lng}&zoom=17"
 
-    query_str = ("?" + "&".join(pokemap_params)) if pokemap_params else ""
-    pokemap_url = f"https://pokemap.bawui.com/{query_str}"
-
-    store_addr = store.get('address') or 'Khu vực đang chọn'
-    addr_display = f"<a href=\"{pokemap_url}\">{store_addr}</a> (🗺️ <a href=\"{pokemap_url}\">Mở PokéMap</a>)"
-
-    test_prefix = "🧪 <b>[TEST]</b> " if is_test else ""
+    header = "🧪 <b>[THÔNG BÁO THỬ NGHIỆM]</b>\n" if is_test else ""
     msg_lines = [
-        f"{test_prefix}🏪 <b>Cửa hàng:</b> <a href=\"{pokemap_url}\">{store_name}</a>{chain_tag}",
-        f"⏱ <b>Thời gian:</b> {time_display}",
-        f"📊 <b>Trạng thái:</b> {status_label}",
-        f"📍 <b>Khoảng cách:</b> {dist_display}",
-        f"🏠 <b>Địa chỉ:</b> {addr_display}"
+        f"{header}🏪 <b>Tên cửa hàng:</b> {store_name} ({store_chain})",
+        f"⏱ <b>Thời gian có báo cáo:</b> {time_display}",
+        f"⚡ <b>Trạng thái:</b> {status_label}",
+        f"📍 <b>Khoảng cách:</b> {imamiya_dist_str}",
+        f"🗺️ <b>Địa chỉ:</b> <a href=\"{pokemap_url}\">{store_addr} (Mở PokéMap ↗)</a>"
     ]
 
     tg_payload = {
@@ -302,171 +275,61 @@ def send_telegram_alert(store: dict, info: dict, notif_cfg: dict, is_test: bool 
         return {"status": f"error: {str(te)}"}
 
 
-def maybe_dispatch_telegram_alert(
-    store_id: str,
-    status_code: str,
-    timestamp: int,
-    onsite: bool = False,
-    packs: list = None,
-    note: str = "",
-    formatted_time: str = None,
-    source: str = "poketan",
-    force_test: bool = False
-) -> dict:
+def on_csdl_report_added(store: dict, entry: dict):
     """
-    Unified dispatcher for Telegram alerts.
-    Safely verifies all activation thresholds, freshness, deduplication, and user filters
-    before dispatching. Called by both record_report_endpoint and background watcher.
+    CSDL Event Hook:
+    Triggered ONLY when a brand-new report is officially committed into SQLite database.
+    Decoupled 100% from external data fetching.
     """
-    global _recent_notified_keys, _daemon_start_time, _tg_enabled_since
-    import time
+    try:
+        settings = load_user_settings()
+        notif_cfg = settings.get("notifications", {})
+        if not notif_cfg.get("telegramEnabled", False):
+            return
 
-    if not store_id or not status_code:
-        return {"status": "invalid_args"}
+        # Check region filter
+        tg_reg = notif_cfg.get("telegramRegion", "osaka")
+        store_pref = (store.get("pref") or "osaka").lower()
+        if tg_reg != "all" and tg_reg != store_pref:
+            return
 
-    clean_id = store_id[:-2] if store_id.endswith("_c") else store_id
-    code = status_code.lower()
-    ts = int(timestamp) if timestamp else int(time.time())
-    now_sec = time.time()
-
-    # 1. Deduplication check
-    report_key = f"{clean_id}_{ts}_{code}"
-    if report_key in _recent_notified_keys:
-        return {"status": "duplicate", "reason": "already_notified"}
-
-    # 2. Activation threshold: Never notify reports created before daemon started or TG enabled
-    activation_threshold = max(_daemon_start_time - 60, _tg_enabled_since - 30)
-    if not force_test and ts < activation_threshold:
-        _recent_notified_keys[report_key] = now_sec
-        return {"status": "too_old", "reason": f"report ts {ts} < activation threshold {activation_threshold}"}
-
-    # 3. Freshness check: Must be reported within last 5 minutes (300 seconds)
-    if not force_test and (now_sec - ts) > 300:
-        _recent_notified_keys[report_key] = now_sec
-        return {"status": "stale", "reason": f"report is {(now_sec - ts):.0f}s old (> 300s)"}
-
-    # 4. Anti-spam per store: do not spam the exact same store & status within 10 minutes
-    cooldown_key = f"cooldown_{clean_id}_{code}"
-    last_notified = _recent_notified_keys.get(cooldown_key, 0)
-    if not force_test and (now_sec - last_notified < 600):
-        _recent_notified_keys[report_key] = now_sec
-        return {"status": "cooldown", "reason": f"store {clean_id} notified {(now_sec - last_notified):.0f}s ago"}
-
-    # 5. Check user notification settings
-    settings = load_user_settings()
-    notif_cfg = settings.get("notifications", {})
-    tg_enabled = bool(notif_cfg.get("telegramEnabled", False)) or force_test
-    tg_token = (notif_cfg.get("telegramBotToken") or "").strip()
-    tg_chat_id = (notif_cfg.get("telegramChatId") or "").strip()
-
-    if not tg_enabled:
-        return {"status": "disabled", "reason": "telegram notifications disabled"}
-    if not (tg_token and tg_chat_id):
-        return {"status": "no_credentials", "reason": "missing bot token or chat_id"}
-
-    # 6. Status filter check
-    tg_status = notif_cfg.get("telegramStatus", "in")
-    if not force_test:
+        # Check status filter
+        code = entry.get("status_code", "i")
+        tg_status = notif_cfg.get("telegramStatus", "in")
         if tg_status == "in" and code != "i":
-            return {"status": "filtered", "reason": f"status '{code}' != 'i'"}
-        if tg_status == "onsite" and (code != "i" or not onsite):
-            return {"status": "filtered", "reason": "not onsite in-stock"}
-        if tg_status == "recent" and (code != "i" and not (ts > 0 and code != "n")):
-            return {"status": "filtered", "reason": "not recent or in-stock"}
+            return
+        if tg_status == "onsite" and (code != "i" or not entry.get("onsite")):
+            return
 
-    # 7. Store resolution & Region filter
-    st = db_get_store_by_id(clean_id)
-    if not st:
-        for p_name in ALL_PREFS:
-            p_stores = get_stores_by_pref(p_name)
-            if clean_id in p_stores:
-                st = dict(p_stores[clean_id])
-                st["pref"] = p_name
-                break
-    if not st:
-        st = {"id": clean_id, "name": clean_id, "pref": "osaka"}
+        # Check chain filter
+        tg_chain = notif_cfg.get("telegramChain", "all")
+        st_chain = (store.get("chain") or "").lower()
+        if tg_chain != "all":
+            if tg_chain == "conbini" and st_chain not in ["seven", "lawson", "familymart", "ministop"]:
+                return
+            elif tg_chain == "specialty" and st_chain != "specialty":
+                return
+            elif tg_chain == "electronics" and st_chain not in ['geo', 'joshin', 'edion', 'aeon', 'yamada', 'ks', 'toysrus', 'biccamera', 'yodobashi']:
+                return
+            elif tg_chain not in ["conbini", "specialty", "electronics"] and st_chain != tg_chain:
+                return
 
-    store_pref = (st.get("pref") or "osaka").lower()
-    tg_reg = notif_cfg.get("telegramRegion", "osaka")
-    tg_target_prefs = REGION_PREFS.get(tg_reg, ["osaka"]) if tg_reg != "all" else ALL_PREFS
+        print(f"  [CSDL -> Telegram] ⚡ BẢN GHI MỚI VỪA ADD VÀO CSDL: {store.get('name')} (pref={store_pref}, ts={entry.get('timestamp')}, code={code})")
+        res = send_telegram_alert(store, entry, notif_cfg, is_test=False)
+        print(f"  [CSDL -> Telegram] Kết quả gửi: {res}")
+    except Exception as e:
+        print(f"  [CSDL -> Telegram] Lỗi dispatch alert: {e}")
 
-    if not force_test and tg_reg != "all" and store_pref not in tg_target_prefs:
-        return {"status": "filtered", "reason": f"store pref '{store_pref}' not in '{tg_reg}'"}
-
-    # 8. Chain filter check
-    tg_chain = notif_cfg.get("telegramChain", "all")
-    st_chain = (st.get("chain") or "").lower()
-    if not force_test and tg_chain != "all":
-        if tg_chain == "conbini" and st_chain not in ["seven", "lawson", "familymart", "ministop"]:
-            return {"status": "filtered", "reason": f"chain '{st_chain}' not in conbini"}
-        elif tg_chain == "specialty" and st_chain != "specialty":
-            return {"status": "filtered", "reason": f"chain '{st_chain}' not specialty"}
-        elif tg_chain == "electronics" and st_chain not in ['geo', 'joshin', 'edion', 'aeon', 'yamada', 'ks', 'toysrus', 'biccamera', 'yodobashi']:
-            return {"status": "filtered", "reason": f"chain '{st_chain}' not electronics"}
-        elif tg_chain not in ["conbini", "specialty", "electronics"] and st_chain != tg_chain:
-            return {"status": "filtered", "reason": f"chain '{st_chain}' != '{tg_chain}'"}
-
-    # Mark as notified to avoid duplicate dispatch
-    _recent_notified_keys[report_key] = now_sec
-    _recent_notified_keys[cooldown_key] = now_sec
-
-    # 9. Format info payload and send
-    info_payload = {
-        "status_code": code,
-        "code": code,
-        "timestamp": ts,
-        "onsite": onsite,
-        "packs": packs or [],
-        "note": note or "",
-        "reported_at": formatted_time or ""
-    }
-
-    print(f"  [CSDL -> Telegram] ⚡ BẢN GHI MỚI VỪA ADD VÀO CSDL: {st.get('name')} (pref={store_pref}, ts={ts}, code={code})")
-    res = send_telegram_alert(st, info_payload, notif_cfg, is_test=force_test)
-    print(f"  [CSDL -> Telegram] Kết quả gửi: {res}")
-    return res
-
-
-def on_csdl_report_added(entry: dict):
-    """
-    Event listener triggered ONLY when a report is newly committed into SQLite CSDL.
-    External data fetching is purely to add data into CSDL; notifications are triggered from CSDL.
-    """
-    store_id = entry.get("store_id")
-    status_code = entry.get("status_code") or "u"
-    timestamp = entry.get("timestamp") or 0
-    onsite = bool(entry.get("onsite", False))
-    packs = entry.get("packs") or []
-    note = entry.get("note") or ""
-    formatted_time = entry.get("formatted_time") or ""
-    source = entry.get("source") or "csdl"
-
-    # Safely backfill full history in background if in-stock
-    if status_code == "i" and store_id:
-        threading.Thread(target=_backfill_store_history_safe, args=(store_id,), daemon=True).start()
-
-    # Trigger Telegram alert check & dispatch for the new CSDL entry
-    maybe_dispatch_telegram_alert(
-        store_id=store_id,
-        status_code=status_code,
-        timestamp=timestamp,
-        onsite=onsite,
-        packs=packs,
-        note=note,
-        formatted_time=formatted_time,
-        source=source
-    )
-
-# Register the CSDL hook immediately
+# Register event hook
 register_on_report_added(on_csdl_report_added)
 
 
 @app.post("/api/notify/webhook")
 async def send_webhook_notification(request: Request):
     """
-    Test or manual webhook notification endpoint.
-    If is_test is True, directly validates Telegram bot credentials and sends a test message.
-    Otherwise ingests report into SQLite CSDL.
+    Test or manual notification endpoint.
+    If is_test: tests Telegram connection directly without polluting SQLite CSDL.
+    If not is_test: ingests into SQLite, which dispatches CSDL event if new.
     """
     try:
         body = await request.json()
@@ -476,80 +339,88 @@ async def send_webhook_notification(request: Request):
         
         user_settings = load_user_settings()
         notif_cfg = user_settings.get("notifications", {})
-        
-        if is_test:
-            tg_res = send_telegram_alert(store, info, notif_cfg, is_test=True)
-            return JSONResponse(content={"status": "ok", "results": {"telegram": tg_res.get("status", "error")}})
 
-        # Normal webhook: Ingest into SQLite CSDL (CSDL handles new report notification event automatically)
+        if is_test:
+            test_store = store or {
+                "id": "test_store",
+                "name": "Pokémon Center Osaka",
+                "chain": "specialty",
+                "chain_label": "Pokémon Center",
+                "address": "Osaka, Kita Ward, Umeda 3-1-1",
+                "lat": 34.7025,
+                "lng": 135.4959,
+                "pref": "osaka"
+            }
+            test_info = info or {
+                "status_code": "i",
+                "timestamp": int(time.time()),
+                "onsite": True,
+                "note": "Kiểm tra kết nối Telegram Bot thành công"
+            }
+            res = send_telegram_alert(test_store, test_info, notif_cfg, is_test=True)
+            return JSONResponse(content={"status": "ok", "results": {"telegram": res.get("status", "ok")}})
+
+        # Ingest into SQLite database
         sid = store.get("id") or info.get("store_id")
         if sid:
-            record_new_report(
+            status_code_raw = info.get("status_code") or info.get("code") or "i"
+            timestamp_raw = info.get("timestamp") or int(time.time())
+            is_new, rep = record_new_report(
                 store_id=sid,
-                status_code=info.get("status_code") or info.get("code") or "i",
-                timestamp=info.get("timestamp") or int(time.time()),
+                status_code=status_code_raw,
+                timestamp=timestamp_raw,
                 onsite=bool(info.get("onsite", False)),
                 packs=info.get("packs") or [],
                 note=info.get("note") or "",
                 user=info.get("user") or "匿名トレーナー",
                 formatted_time=info.get("reported_at") or "",
-                source="webhook"
+                source="webhook",
+                pref=store.get("pref") or "osaka"
             )
+            return JSONResponse(content={"status": "ok", "is_new": is_new, "report": rep})
 
-        return JSONResponse(content={"status": "ok"})
+        return JSONResponse(content={"status": "no_store_id"})
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "error": str(e)})
 
 
-def _backfill_store_history_safe(store_id: str):
+def _backfill_store_history_safe(store_id: str, pref: str = "osaka"):
     """Safely fetch full history from PokéTan and save to SQLite in background."""
     clean_id = store_id[:-2] if store_id.endswith("_c") else store_id
     try:
         remote_hist = fetch_store_history(clean_id)
         if remote_hist:
-            save_bulk_history(clean_id, remote_hist, source="poketan")
+            save_bulk_history(clean_id, remote_hist, source="poketan", pref=pref)
     except Exception as e:
         print(f"  [DB] Background history backfill error for {clean_id}: {e}")
 
 
-def background_data_sync_daemon():
+def telegram_background_watcher():
     """
-    24/7 background worker running on VPS.
-    Purpose: Continuously ingest external data into local SQLite CSDL.
-    Completely decoupled from notifications - it ONLY adds new reports to CSDL.
-    CSDL commit triggers notifications automatically via register_on_report_added.
+    Background worker thread to continuously ingest hot reports from PokéTan into SQLite CSDL.
+    Purely ingests data into SQLite via record_new_report().
+    Telegram notifications are handled strictly by CSDL database events (when is_new == True).
     """
     import time
-    global _daemon_start_time, _recent_notified_keys
-    time.sleep(3)
-
-    _daemon_start_time = time.time()
-    print(f"  [DataSync] 24/7 External data ingestion started at {_daemon_start_time} (saving to SQLite CSDL)...")
-
-    # Baseline scan: silence existing reports so only new ones arriving from now on are notified
-    print("  [DataSync] Initializing baseline scan: silencing all existing reports...")
-    for pref in ALL_PREFS:
-        try:
-            init_hot = fetch_realtime_status(pref, include_cold=False)
-            for k, raw in init_hot.items():
-                if k.endswith("_c"):
-                    continue
-                parsed = parse_store_status(str(raw), None)
-                if parsed:
-                    p_ts = parsed.get("timestamp") or 0
-                    p_code = parsed.get("status_code") or "u"
-                    _recent_notified_keys[f"{k}_{p_ts}_{p_code}"] = _daemon_start_time
-        except Exception:
-            pass
-    print(f"  [DataSync] Baseline scan complete ({len(_recent_notified_keys)} reports initialized).")
-
+    import threading
+    time.sleep(5)
+    print("  [DataSyncDaemon] Background daemon started (syncing reports into SQLite CSDL)")
     while True:
         try:
-            now_sec = time.time()
-            for pref in ALL_PREFS:
-                try:
-                    hot_data = fetch_realtime_status(pref, include_cold=False)
-                    for k, raw in hot_data.items():
+            # Poll all active prefectures concurrently for ultra-fast background sync (~0.4s)
+            pref_data_map = {}
+            try:
+                with ThreadPoolExecutor(max_workers=min(6, len(ALL_PREFS))) as executor:
+                    futs = {executor.submit(fetch_realtime_status, p, False): p for p in ALL_PREFS}
+                    pref_data_map = {p: f.result() for f, p in futs.items()}
+            except Exception:
+                pass
+
+            for pref, hot_data in pref_data_map.items():
+                if not hot_data:
+                    continue
+                for k, raw in hot_data.items():
+                    try:
                         if k.endswith("_c"):
                             continue
                         sid = k
@@ -561,30 +432,52 @@ def background_data_sync_daemon():
                         ts = parsed.get("timestamp") or 0
                         code = parsed.get("status_code") or "u"
                         onsite = bool(parsed.get("onsite", False))
+                        confirms = parsed.get("confirms") or 1
                         packs = parsed.get("packs") or []
                         rep_time = parsed.get("reported_at") or ""
 
-                        # ONLY PURPOSE: Ingest into SQLite CSDL!
-                        # When a report is newly added to CSDL (is_new == True),
-                        # CSDL automatically triggers on_csdl_report_added callback.
-                        record_new_report(
+                        # Ingest report into SQLite database (fires on_csdl_report_added if is_new)
+                        is_new, rep = record_new_report(
                             store_id=sid,
                             status_code=code,
                             timestamp=ts,
                             onsite=onsite,
+                            confirms=confirms,
                             packs=packs,
                             formatted_time=rep_time,
-                            source="poketan"
+                            source="poketan",
+                            pref=pref
                         )
-                except Exception:
-                    pass
 
-            if len(_recent_notified_keys) > 1000:
-                _recent_notified_keys = {k: v for k, v in _recent_notified_keys.items() if now_sec - v < 7200}
+                        if is_new and code == "i":
+                            # Backfill rich history with notes/packs in background
+                            threading.Thread(target=_backfill_store_history_safe, args=(sid, pref), daemon=True).start()
+
+                    except Exception as pe:
+                        continue
 
         except Exception as e:
             pass
         time.sleep(15)
+
+
+_watcher_thread = None
+_watcher_lock = threading.Lock()
+
+def start_background_watcher():
+    """Start background watcher daemon thread if not already running."""
+    global _watcher_thread
+    with _watcher_lock:
+        if _watcher_thread is None or not _watcher_thread.is_alive():
+            _watcher_thread = threading.Thread(target=telegram_background_watcher, daemon=True)
+            _watcher_thread.start()
+            return _watcher_thread
+    return _watcher_thread
+
+
+@app.on_event("startup")
+def startup_event():
+    start_background_watcher()
 
 
 @app.post("/api/record_report")
@@ -592,8 +485,9 @@ async def record_report_endpoint(request: Request):
     """
     Ingest a newly observed report into local SQLite store_history and update store status.
     Called when Firestore onSnapshot fires on the client or via external reporting.
-    External data is only added to CSDL. CSDL automatically triggers notification hooks.
     """
+    import time
+    import threading
     try:
         body = await request.json()
         store_id = body.get("store_id")
@@ -609,19 +503,39 @@ async def record_report_endpoint(request: Request):
         who = body.get("who") or ""
         formatted_time = body.get("formatted_time")
         source = body.get("source") or "poketan"
+        confirms = int(body.get("confirms") or 1)
+        conf_raw = body.get("conf_raw") or body.get("conf")
+        if conf_raw:
+            try:
+                parsed = parse_store_status(f"{status_code}{timestamp}", str(conf_raw))
+                if parsed:
+                    onsite = parsed.get("onsite", onsite)
+                    confirms = parsed.get("confirms", confirms)
+                    if not packs and parsed.get("packs"):
+                        packs = parsed.get("packs")
+            except Exception:
+                pass
+
+        existing_s = db_get_store_by_id(store_id)
+        store_pref = existing_s.get("pref") if existing_s else "osaka"
 
         is_new, rep = record_new_report(
             store_id=store_id,
             status_code=status_code,
             timestamp=timestamp,
             onsite=onsite,
+            confirms=confirms,
             packs=packs,
             note=note,
             user=user,
             who=who,
             formatted_time=formatted_time,
-            source=source
+            source=source,
+            pref=store_pref
         )
+
+        if is_new and status_code == "i":
+            threading.Thread(target=_backfill_store_history_safe, args=(store_id, store_pref), daemon=True).start()
 
         return JSONResponse(content={"status": "ok", "is_new": is_new, "report": rep})
     except Exception as e:
@@ -718,14 +632,16 @@ def get_hot_status(region: Optional[str] = None, pref: Optional[str] = None):
 def get_store_history(store_id: str):
     clean_id = store_id[:-2] if store_id.endswith("_c") else store_id
     try:
-        local_hist = db_get_store_history(clean_id, limit=30)
+        local_hist = db_get_store_history(clean_id, limit=100)
         # If fewer than 2 records, backfill from PokéTan and save into SQLite
         if len(local_hist) < 2:
             try:
+                existing_s = db_get_store_by_id(clean_id)
+                store_pref = existing_s.get("pref") if existing_s else "osaka"
                 remote_hist = fetch_store_history(clean_id)
                 if remote_hist:
-                    save_bulk_history(clean_id, remote_hist, source="poketan")
-                    local_hist = db_get_store_history(clean_id, limit=30)
+                    save_bulk_history(clean_id, remote_hist, source="poketan", pref=store_pref)
+                    local_hist = db_get_store_history(clean_id, limit=100)
             except Exception as e:
                 print(f"[DB] Error backfilling history for {clean_id}: {e}")
         return JSONResponse(content=local_hist)
@@ -746,12 +662,37 @@ def get_report_counts(region: Optional[str] = None, pref: Optional[str] = None):
         return JSONResponse(content={})
 
 
+@app.get("/api/analytics/store/{store_id}")
+def get_store_analytics(store_id: str):
+    clean_id = store_id[:-2] if store_id.endswith("_c") else store_id
+    try:
+        from .db import get_store_restock_analytics
+        data = get_store_restock_analytics(clean_id)
+        return JSONResponse(content=data)
+    except Exception as e:
+        print(f"Error fetching analytics for {clean_id}:", e)
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+
+
+@app.get("/api/latest_reports")
+def get_latest_reports_route(since: int = 0, limit: int = 50):
+    try:
+        from .db import get_recent_reports
+        reports = get_recent_reports(since_created_at=since, limit=limit)
+        return JSONResponse(content=reports)
+    except Exception as e:
+        print("[DB] Error fetching latest reports:", e)
+        return JSONResponse(content=[])
+
+
 
 @app.get("/api/config")
 def get_config():
+    import time
     user_settings = load_user_settings()
     notif = user_settings.get("notifications", {})
     return {
+        "serverTime": int(time.time()),
         "apiKey": FIREBASE_API_KEY,
         "projectId": PROJECT_ID,
         "chainNames": CHAIN_NAMES,
@@ -764,6 +705,7 @@ def get_config():
         "telegramChatIdSet": bool(notif.get("telegramChatId")),
         "telegramStatus": notif.get("telegramStatus", "in"),
         "telegramChain": notif.get("telegramChain", "all"),
+        "telegramTime": str(notif.get("telegramTime", "24")),
         "telegramRegion": notif.get("telegramRegion", "osaka"),
         "currentRegion": user_settings.get("currentRegion", "osaka"),
         "activeFilter": user_settings.get("activeFilter", "all"),
@@ -793,17 +735,6 @@ def thongbao_page():
     return HTMLResponse(content=render_thongbao_page())
 
 
-_data_sync_started = False
-
-@app.on_event("startup")
-def startup_event():
-    global _data_sync_started
-    if not _data_sync_started:
-        _data_sync_started = True
-        import threading
-        threading.Thread(target=background_data_sync_daemon, daemon=True).start()
-
-
 def main():
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
@@ -827,6 +758,9 @@ def main():
     print("🚀 BAWUI POKE APP - Instant Real-Time Push Dashboard")
     print(f"👉 Mở trình duyệt tại: http://localhost:{port}")
     print("=================================================================")
+
+    # Start 24/7 background Telegram stock watcher daemon
+    start_background_watcher()
 
     uvicorn.run("app.web:app", host="0.0.0.0", port=port, reload=False)
 
