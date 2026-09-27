@@ -2340,16 +2340,23 @@ def render_map_page() -> str:
             }
           }
         }
-        bodyEl.innerHTML = history.map(item => `
+        bodyEl.innerHTML = history.map(item => {
+          let timeDisplay = item.formatted_time || '';
+          if (item.timestamp && item.timestamp > 0) {
+            const d = new Date(item.timestamp * 1000);
+            timeDisplay = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')} ${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth()+1).padStart(2, '0')}/${d.getFullYear()}`;
+          }
+          return `
           <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px 10px; margin-bottom:8px;">
             <div style="display:flex; justify-content:space-between; font-weight:800; font-size:0.78rem;">
               <span style="color:${item.status_code === 'i' ? '#15803d' : '#b91c1c'};">${item.status_code === 'i' ? '🟢 Có hàng' : '🔴 Hết hàng'}</span>
-              <span style="color:#64748b; font-size:0.7rem;">🕒 ${escapeHtml(item.formatted_time || '')}</span>
+              <span style="color:#64748b; font-size:0.7rem;">🕒 ${escapeHtml(timeDisplay)}</span>
             </div>
             ${item.note ? `<div style="font-size:0.74rem; color:#1e293b; margin-top:3px;">📦 ${escapeHtml(item.note)}</div>` : ''}
             <div style="font-size:0.68rem; color:#94a3b8; margin-top:3px;">👤 Người báo: <b>${escapeHtml(item.user || 'Ẩn danh')}</b></div>
           </div>
-        `).join('');
+          `;
+        }).join('');
       } catch(e) {
         bodyEl.innerHTML = '<div style="color:#ef4444; padding:20px; text-align:center;">Lỗi tải dữ liệu.</div>';
       }
@@ -3873,11 +3880,16 @@ def render_thongbao_page() -> str:
           if (item.status_code === 'i') { histColor = '#15803d'; histText = '🟢 Có hàng'; }
           else if (item.status_code === 'o') { histColor = '#b91c1c'; histText = '🔴 Không có'; }
           else if (item.status_code === 'n') { histColor = '#b45309'; histText = '🟡 Không bán thẻ'; }
+          let timeDisplay = item.formatted_time || '';
+          if (item.timestamp && item.timestamp > 0) {
+            const d = new Date(item.timestamp * 1000);
+            timeDisplay = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')} ${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth()+1).padStart(2, '0')}/${d.getFullYear()}`;
+          }
           return `
           <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px 10px; margin-bottom:8px;">
             <div style="display:flex; justify-content:space-between; font-weight:800; font-size:0.78rem;">
               <span style="color:${histColor};">${histText}</span>
-              <span style="color:#64748b; font-size:0.7rem;">🕒 ${escapeHtml(item.formatted_time || '')}</span>
+              <span style="color:#64748b; font-size:0.7rem;">🕒 ${escapeHtml(timeDisplay)}</span>
             </div>
             ${item.note ? `<div style="font-size:0.74rem; color:#1e293b; margin-top:3px;">📦 ${escapeHtml(item.note)}</div>` : ''}
             <div style="font-size:0.68rem; color:#94a3b8; margin-top:3px;">👤 Người báo: <b>${escapeHtml(item.user || 'Ẩn danh')}</b></div>

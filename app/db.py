@@ -425,6 +425,16 @@ def get_store_history(store_id: str, limit: int = 30) -> List[Dict[str, Any]]:
                     packs = json.loads(r["packs_json"])
             except Exception:
                 packs = []
+
+            ts = r["timestamp"]
+            fmt_time = r["formatted_time"] or ""
+            if ts and ts > 0:
+                try:
+                    dt = datetime.fromtimestamp(ts, tz=JST)
+                    fmt_time = dt.strftime("%H:%M %d/%m/%Y")
+                except Exception:
+                    pass
+
             history.append({
                 "id": r["id"],
                 "store_id": r["store_id"],
@@ -435,8 +445,8 @@ def get_store_history(store_id: str, limit: int = 30) -> List[Dict[str, Any]]:
                 "user": r["user"] or "匿名トレーナー",
                 "who": r["who"] or "",
                 "onsite": bool(r["onsite"]),
-                "timestamp": r["timestamp"],
-                "formatted_time": r["formatted_time"] or "",
+                "timestamp": ts,
+                "formatted_time": fmt_time,
                 "source": r["source"] or "poketan"
             })
         return history
