@@ -458,8 +458,11 @@ def register_on_report_added(callback: Callable[[Dict[str, Any]], None]) -> None
     """
     Register an event hook to be triggered immediately whenever a brand-new report
     is added and committed into the SQLite CSDL database.
+    Deduplicates by qualname to avoid duplicate registration when imported by uvicorn.
     """
-    if callback not in _on_report_added_callbacks:
+    cb_name = getattr(callback, "__qualname__", str(callback))
+    existing_names = [getattr(cb, "__qualname__", str(cb)) for cb in _on_report_added_callbacks]
+    if cb_name not in existing_names:
         _on_report_added_callbacks.append(callback)
 
 
