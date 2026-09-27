@@ -24,6 +24,18 @@ JST = timezone(timedelta(hours=9))
 # Module-level concurrency write lock for SQLite transactions
 _db_write_lock = threading.Lock()
 
+# In-memory query TTL cache for stores and report counts
+_stores_cache: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+_report_counts_cache: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+_CACHE_TTL = 15.0  # seconds
+
+def invalidate_stores_cache():
+    """Invalidate in-memory cache for stores and report counts."""
+    global _stores_cache, _report_counts_cache
+    _stores_cache.clear()
+    _report_counts_cache.clear()
+
+
 @contextmanager
 def get_db_connection():
     """Create a thread-safe connection to the SQLite database with WAL mode."""
@@ -436,6 +448,7 @@ def backfill_all_poketan_statuses(force: bool = False) -> int:
             """)
             conn.commit()
 
+    invalidate_stores_cache()
     total_backfilled = len(history_batch)
     print(f"  [DB] Successfully backfilled {total_backfilled} statuses into SQLite store_history & stores!")
     return total_backfilled
@@ -444,6 +457,13 @@ def backfill_all_poketan_statuses(force: bool = False) -> int:
 def get_stores(region: Optional[str] = None, pref: Optional[str] = None) -> Dict[str, Dict[str, Any]]:
     """Query stores dictionary from SQLite database matching region or prefecture."""
     from .config import CHAIN_NAMES
+
+    cache_key = f"{region}:{pref}"
+    now_mono = time.monotonic()
+    if cache_key in _stores_cache:
+        cached_ts, cached_res = _stores_cache[cache_key]
+        if now_mono - cached_ts < _CACHE_TTL:
+            return cached_res
 
     target_prefs = []
     if pref:
@@ -486,7 +506,7 @@ def get_stores(region: Optional[str] = None, pref: Optional[str] = None) -> Dict
                 packs = []
 
             chain_key = r["chain"] or "other"
-            res[sid] = {
+            item = {
                 "id": sid,
                 "name": r["name"],
                 "chain": chain_key,
@@ -495,15 +515,21 @@ def get_stores(region: Optional[str] = None, pref: Optional[str] = None) -> Dict
                 "lat": r["lat"],
                 "lng": r["lng"],
                 "pref": r["pref"],
-                "city": r["city"],
-                "zip": r["zip"],
-                "phone": r["phone"],
                 "status": r["current_status"],
                 "last_timestamp": r["last_timestamp"],
                 "last_reported_at": r["last_reported_at"],
                 "onsite": bool(r["onsite"]),
                 "packs": packs
             }
+            if r["city"]:
+                item["city"] = r["city"]
+            if r["zip"]:
+                item["zip"] = r["zip"]
+            if r["phone"]:
+                item["phone"] = r["phone"]
+            res[sid] = item
+
+    _stores_cache[cache_key] = (now_mono, res)
     return res
 
 
@@ -712,6 +738,7 @@ def record_new_report(
             ))
 
             conn.commit()
+            invalidate_stores_cache()
 
     entry = {
         "id": hist_id,
@@ -883,6 +910,7 @@ def save_bulk_history(store_id: str, history_list: List[Dict[str, Any]], source:
                 ))
 
             conn.commit()
+            invalidate_stores_cache()
     return len(batch)
 
 
@@ -891,6 +919,13 @@ def get_report_counts(region: Optional[str] = None, pref: Optional[str] = None) 
     Calculate number of in-stock and out-of-stock reports per store using fast SQL aggregation.
     Returns: { store_id: { "in": int, "out": int } }
     """
+    cache_key = f"{region}:{pref}"
+    now_mono = time.monotonic()
+    if cache_key in _report_counts_cache:
+        cached_ts, cached_res = _report_counts_cache[cache_key]
+        if now_mono - cached_ts < _CACHE_TTL:
+            return cached_res
+
     target_prefs = []
     if pref:
         target_prefs = [pref.strip().lower()]
@@ -935,6 +970,7 @@ def get_report_counts(region: Optional[str] = None, pref: Optional[str] = None) 
                 "in": r["count_in"] or 0,
                 "out": r["count_out"] or 0
             }
+        _report_counts_cache[cache_key] = (now_mono, counts)
         return counts
 
 

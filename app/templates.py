@@ -2213,6 +2213,35 @@ def render_map_page() -> str:
       }
     });
 
+    // Dynamic Region Store Loader
+    const loadedRegions = new Set();
+    async function ensureStoresLoadedForRegion(reg) {
+      if (!reg) return;
+      if (loadedRegions.has(reg)) return;
+      if (reg === 'all' && loadedRegions.has('all')) return;
+      try {
+        const res = await fetch('/api/stores_data?region=' + encodeURIComponent(reg));
+        if (res.ok) {
+          const newStores = await res.json();
+          Object.assign(storesDict, newStores);
+          loadedRegions.add(reg);
+          for (const sid in newStores) {
+            const s = newStores[sid];
+            if (s && s.status === 'i' && s.last_timestamp) {
+              seenToastKeys.add(`${sid}_${s.last_timestamp}_i`);
+            }
+          }
+          fetch('/api/report_counts?region=' + encodeURIComponent(reg))
+            .then(r => r.ok ? r.json() : null)
+            .then(c => { if (c) Object.assign(storeCountsCache, c); })
+            .catch(() => {});
+          renderMapMarkers();
+        }
+      } catch (e) {
+        console.warn('Error loading stores for region:', reg, e);
+      }
+    }
+
     // Map Filter Modal
     let mapModalTempRegion = currentRegion, mapModalTempStatus = 'all', mapModalTempChain = 'all', mapModalTempTime = 'all';
     function openMapFilterModal() {
@@ -2256,6 +2285,9 @@ def render_map_page() -> str:
         map.flyTo(REGIONS[mapRegionFilter].center, REGIONS[mapRegionFilter].zoom || 13, { duration: 1.0 });
       }
       renderMapMarkers();
+      if (regionChanged && typeof ensureStoresLoadedForRegion === 'function') {
+        ensureStoresLoadedForRegion(mapRegionFilter);
+      }
     }
 
     // 7. GACHI MEGURI (⚡)
@@ -2383,6 +2415,7 @@ def render_map_page() -> str:
       if (lat && lng) map.flyTo([lat, lng], zoom || 14, { duration: 1.0 });
       closePrefModal();
       renderMapMarkers();
+      if (typeof ensureStoresLoadedForRegion === 'function') ensureStoresLoadedForRegion(pref);
     }
     function filterAreaList(query) {
       const q = query.toLowerCase().trim();
@@ -2479,6 +2512,7 @@ def render_map_page() -> str:
       updateMapFilterUI();
       renderMapMarkers();
       closeSettingsModal();
+      if (typeof ensureStoresLoadedForRegion === 'function') ensureStoresLoadedForRegion(pref);
     }
 
     function refreshData() {
@@ -3028,13 +3062,22 @@ def render_map_page() -> str:
     // 11. INIT DATA & URL QUERY PARAMS
     async function initData() {
       try {
-        const [cfgRes, storesRes, countsRes] = await Promise.all([
+        const reqRegion = currentRegion || 'osaka';
+        const [cfgRes, storesRes] = await Promise.all([
           fetch('/api/config'),
-          fetch('/api/stores_data?region=all'),
-          fetch('/api/report_counts').catch(() => null)
+          fetch('/api/stores_data?region=' + encodeURIComponent(reqRegion))
         ]);
         configData = await cfgRes.json();
         storesDict = await storesRes.json();
+        loadedRegions.add(reqRegion);
+
+        // Fetch report counts asynchronously in background (does not block initial map render)
+        fetch('/api/report_counts?region=' + encodeURIComponent(reqRegion))
+          .then(r => r.ok ? r.json() : null)
+          .then(countsData => {
+            if (countsData) Object.assign(storeCountsCache, countsData);
+          })
+          .catch(() => {});
 
         // Calibrate server time offset to correct browser clock drift
         if (configData.serverTime) {
@@ -3047,11 +3090,6 @@ def render_map_page() -> str:
           if (s && s.status === 'i' && s.last_timestamp) {
             seenToastKeys.add(`${sid}_${s.last_timestamp}_i`);
           }
-        }
-
-        if (countsRes && countsRes.ok) {
-          const countsData = await countsRes.json();
-          Object.assign(storeCountsCache, countsData);
         }
 
         updateMapFilterUI();
@@ -4232,6 +4270,41 @@ def render_thongbao_page() -> str:
       renderStoreList(val);
     }
 
+    // Dynamic Region Store Loader
+    const loadedRegions = new Set();
+    async function ensureStoresLoadedForRegion(reg) {
+      if (!reg) return;
+      if (loadedRegions.has(reg)) return;
+      if (reg === 'all' && loadedRegions.has('all')) return;
+      try {
+        const res = await fetch('/api/stores_data?region=' + encodeURIComponent(reg));
+        if (res.ok) {
+          const newStores = await res.json();
+          Object.assign(storesDict, newStores);
+          loadedRegions.add(reg);
+          for (const sid in newStores) {
+            const s = newStores[sid];
+            if (s && s.status === 'i' && s.last_timestamp) {
+              seenToastKeys.add(`${sid}_${s.last_timestamp}_i`);
+            }
+          }
+          fetch('/api/report_counts?region=' + encodeURIComponent(reg))
+            .then(r => r.ok ? r.json() : null)
+            .then(c => {
+              if (c) {
+                if (typeof reportCounts !== 'undefined') Object.assign(reportCounts, c);
+                if (typeof storeCountsCache !== 'undefined') Object.assign(storeCountsCache, c);
+              }
+            })
+            .catch(() => {});
+          const searchVal = document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '';
+          renderStoreList(searchVal);
+        }
+      } catch (e) {
+        console.warn('Error loading stores for region:', reg, e);
+      }
+    }
+
     // Filter Modal (6 Criteria)
     let modalTempRegion = currentRegion, modalTempFilter = 'all', modalTempChain = 'all', modalTempTime = 'all', modalTempRadius = 'all', modalTempSort = 'newest';
     function openFilterModal() {
@@ -4299,6 +4372,7 @@ def render_thongbao_page() -> str:
       listCurrentPage = 1;
       const searchVal = document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '';
       renderStoreList(searchVal);
+      if (typeof ensureStoresLoadedForRegion === 'function') ensureStoresLoadedForRegion(listRegionFilter);
     }
 
     // 5. AREA & MODALS
@@ -4311,6 +4385,7 @@ def render_thongbao_page() -> str:
       try { localStorage.setItem('poketan_selected_region', pref); } catch(e) {}
       closePrefModal();
       renderStoreList();
+      if (typeof ensureStoresLoadedForRegion === 'function') ensureStoresLoadedForRegion(pref);
     }
     function filterAreaList(query) {
       const q = query.toLowerCase().trim();
@@ -4405,6 +4480,7 @@ def render_thongbao_page() -> str:
       const searchVal = document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '';
       renderStoreList(searchVal);
       closeSettingsModal();
+      if (typeof ensureStoresLoadedForRegion === 'function') ensureStoresLoadedForRegion(pref);
     }
 
     function refreshData() {
@@ -4963,14 +5039,25 @@ def render_thongbao_page() -> str:
     async function initData() {
       checkGpsSilently();
       try {
-        const [cfgRes, storesRes, countsRes] = await Promise.all([
+        const reqRegion = currentRegion || 'osaka';
+        const [cfgRes, storesRes] = await Promise.all([
           fetch('/api/config'),
-          fetch('/api/stores_data?region=all'),
-          fetch('/api/report_counts?region=all').catch(() => null)
+          fetch('/api/stores_data?region=' + encodeURIComponent(reqRegion))
         ]);
         configData = await cfgRes.json();
         storesDict = await storesRes.json();
-        if (countsRes && countsRes.ok) reportCounts = await countsRes.json();
+        loadedRegions.add(reqRegion);
+
+        // Fetch report counts asynchronously in background (does not block list render)
+        fetch('/api/report_counts?region=' + encodeURIComponent(reqRegion))
+          .then(r => r.ok ? r.json() : null)
+          .then(countsData => {
+            if (countsData) {
+              if (typeof reportCounts !== 'undefined') Object.assign(reportCounts, countsData);
+              if (typeof storeCountsCache !== 'undefined') Object.assign(storeCountsCache, countsData);
+            }
+          })
+          .catch(() => {});
 
         // Calibrate server time offset to correct browser clock drift
         if (configData.serverTime) {

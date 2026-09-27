@@ -24,6 +24,7 @@ import sys
 import os
 import json
 from fastapi import FastAPI, Query, Request
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 import uvicorn
 
@@ -52,6 +53,7 @@ seed_stores_if_empty()
 threading.Thread(target=backfill_all_poketan_statuses, daemon=True).start()
 
 app = FastAPI(title="BAWUI POKE APP - Real-Time Stock & Lottery Tracker")
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 SETTINGS_FILE = os.path.join(DEFAULT_CACHE_DIR, "settings.json")
 
