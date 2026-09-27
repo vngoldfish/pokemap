@@ -166,7 +166,7 @@ REGION_PREFS = {
 _recent_notified_keys = {}
 
 def send_telegram_alert(store: dict, info: dict, notif_cfg: dict, is_test: bool = False) -> dict:
-    """Send formatted alert to Telegram bot matching configured channel."""
+    """Send concise formatted alert to Telegram bot with 5 key data points."""
     import urllib.request
     import urllib.parse
     import json
@@ -180,91 +180,79 @@ def send_telegram_alert(store: dict, info: dict, notif_cfg: dict, is_test: bool 
     if not tg_enabled:
         return {"status": "disabled"}
 
-    # Calculate distance to JR Imamiya Station (lat=34.6540, lng=135.4925)
-    imamiya_dist_str = ""
+    # 1. Tên cửa hàng & Chuỗi
+    store_name = store.get('name', 'Cửa hàng')
+    store_chain = store.get('chain_label') or store.get('chain') or ''
+    chain_tag = f" ({store_chain})" if store_chain and store_chain != 'unknown' else ""
+
+    # 2. Thời gian có báo cáo
+    time_display = info.get('reported_at', 'Vừa xong')
+    if info.get('timeAgo'):
+        time_display += f" ({info.get('timeAgo')})"
+
+    # 3. Trạng thái
+    status_code = info.get("status_code") or info.get("code") or "i"
+    packs_text = ", ".join(info.get("packs", [])) if info.get("packs") else ""
+    if status_code == "i":
+        status_label = "🟢 Có hàng (Xác nhận tại chỗ)" if info.get("onsite") else "🟢 Có hàng"
+        if packs_text:
+            status_label += f" • {packs_text}"
+    elif status_code == "o":
+        status_label = "🔴 Hết hàng"
+    elif status_code == "n":
+        status_label = "⚪ Không kinh doanh thẻ"
+    else:
+        status_label = "🟢 Có hàng"
+
+    # 4. Khoảng cách (cách toạ độ định vị người dùng hoặc toạ độ cố định)
+    # Mặc định toạ độ cố định: Ga JR Imamiya (lat=34.6540, lng=135.4925) hoặc cấu hình anchor trong settings
+    ref_lat = float(info.get("userLat") or store.get("userLat") or notif_cfg.get("anchorLat") or 34.6540)
+    ref_lng = float(info.get("userLng") or store.get("userLng") or notif_cfg.get("anchorLng") or 135.4925)
+    ref_name = notif_cfg.get("anchorName") or ("Vị trí của bạn" if (info.get("userLat") or store.get("userLat")) else "ga JR Imamiya")
+
+    dist_str = ""
     st_lat = store.get("lat")
     st_lng = store.get("lng")
     if st_lat is not None and st_lng is not None:
         try:
             import math
             lat1, lon1 = float(st_lat), float(st_lng)
-            lat2, lon2 = 34.6540, 135.4925
+            lat2, lon2 = ref_lat, ref_lng
             dlat = math.radians(lat2 - lat1)
             dlon = math.radians(lon2 - lon1)
             a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon/2)**2
             dist_km = 6371 * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
             if dist_km < 1.0:
-                imamiya_dist_str = f"{int(round(dist_km * 1000))} m"
+                dist_str = f"{int(round(dist_km * 1000))} m"
             else:
-                imamiya_dist_str = f"{dist_km:.1f} km"
+                dist_str = f"{dist_km:.1f} km"
         except Exception:
             pass
+    dist_display = f"~{dist_str} (từ {ref_name})" if dist_str else "Chưa rõ toạ độ"
 
-    store_name = store.get('name', 'Cửa hàng')
-    store_chain = store.get('chain_label') or store.get('chain') or 'Tiện lợi'
+    # 5. Địa chỉ (+ Link Google Maps trực tiếp)
     store_addr = store.get('address') or 'Khu vực đang chọn'
     maps_query = urllib.parse.quote_plus(f"{store_name} {store_addr}".strip())
     maps_url = f"https://www.google.com/maps/search/?api=1&query={maps_query}" if maps_query else ""
-    time_display = info.get('reported_at', 'Vừa xong')
-    if info.get('timeAgo'):
-        time_display += f" ({info.get('timeAgo')})"
-
-    packs_text = ", ".join(info.get("packs", [])) if info.get("packs") else "Gói thẻ Pokémon (Xem tại quán)"
-
-    # History
-    store_id = store.get("id") or ""
-    history_list = []
-    if store_id and store_id != "test_store_webhook":
-        try:
-            history_list = fetch_store_history(store_id) or []
-        except Exception:
-            pass
-    elif is_test:
-        history_list = [
-            {"status_code": "o", "status_label": "🔴 Hết hàng", "note": "Hết đợt Terastal Festival", "formatted_time": "14:20 24/09"},
-            {"status_code": "i", "status_label": "🟢 Có hàng", "note": "Về 2 box Terastal", "formatted_time": "09:15 24/09"}
-        ]
-
-    # Filter out current report if duplicated in history
-    filtered_hist = []
-    cur_ts = info.get("timestamp") or 0
-    for h in history_list:
-        h_ts = h.get("timestamp") or 0
-        if cur_ts > 0 and abs(h_ts - cur_ts) < 180:
-            continue
-        filtered_hist.append(h)
-        if len(filtered_hist) >= 3:
-            break
-
-    hist_text_tg_lines = []
-    if filtered_hist:
-        for item in filtered_hist:
-            s_icon = "🟢" if item.get("status_code") == "i" else ("🔴" if item.get("status_code") == "o" else "⚪")
-            t_str = item.get("formatted_time") or "Trước đó"
-            note_str = f" ({item.get('note')})" if item.get("note") else ""
-            hist_text_tg_lines.append(f"- {s_icon} {t_str}: {item.get('status_label', '')}{note_str}")
-
-    dist_part = f" • 📍 ~{imamiya_dist_str}" if imamiya_dist_str else ""
-    title_status = "🟢📸 CÓ HÀNG (XÁC NHẬN TẠI CHỖ)" if info.get("onsite") else "🟢 CÓ HÀNG (IN STOCK)"
-    header = "🧪 <b>[THÔNG BÁO THỬ NGHIỆM]</b>\n" if is_test else f"🔥 <b>{title_status}!</b>\n"
-
-    msg_lines = [
-        f"{header}🏪 <b>{store_name}</b> ({store_chain})",
-        f"📍 {store_addr}{dist_part}",
-        f"📦 <b>Sản phẩm:</b> {packs_text}",
-        f"⏱ <b>Thời gian báo:</b> {time_display}"
-    ]
-    if hist_text_tg_lines:
-        msg_lines.append("\n📜 <b>Lịch sử báo cáo gần đây:</b>")
-        msg_lines.extend(hist_text_tg_lines)
     if maps_url:
-        msg_lines.append(f"\n🗺️ <a href=\"{maps_url}\">Mở Google Maps dẫn đường chính xác ↗</a>")
+        addr_display = f"<a href=\"{maps_url}\">{store_addr}</a> (📍 <a href=\"{maps_url}\">Google Maps</a>)"
+    else:
+        addr_display = store_addr
+
+    test_prefix = "🧪 <b>[TEST]</b> " if is_test else ""
+    msg_lines = [
+        f"{test_prefix}🏪 <b>Cửa hàng:</b> {store_name}{chain_tag}",
+        f"⏱ <b>Thời gian:</b> {time_display}",
+        f"📊 <b>Trạng thái:</b> {status_label}",
+        f"📍 <b>Khoảng cách:</b> {dist_display}",
+        f"🏠 <b>Địa chỉ:</b> {addr_display}"
+    ]
 
     tg_payload = {
         "chat_id": tg_chat_id,
         "text": "\n".join(msg_lines),
         "parse_mode": "HTML",
-        "disable_web_page_preview": False
+        "disable_web_page_preview": True
     }
     try:
         tg_api_url = f"https://api.telegram.org/bot{tg_token}/sendMessage"
