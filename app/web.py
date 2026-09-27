@@ -828,9 +828,6 @@ def main():
     print(f"👉 Mở trình duyệt tại: http://localhost:{port}")
     print("=================================================================")
 
-    # Start 24/7 background external data ingestion worker
-    startup_event()
-
     uvicorn.run("app.web:app", host="0.0.0.0", port=port, reload=False)
 
 
