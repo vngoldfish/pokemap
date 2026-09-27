@@ -2220,7 +2220,6 @@ def render_map_page() -> str:
       const enabledEl = document.getElementById('tg-cfg-enabled');
       const statusEl = document.getElementById('tg-cfg-status');
       const chainEl = document.getElementById('tg-cfg-chain');
-      const timeEl = document.getElementById('tg-cfg-time');
       const regionEl = document.getElementById('tg-cfg-region');
 
       if (tokenEl) tokenEl.value = configData.telegramBotToken || '';
@@ -3705,7 +3704,6 @@ def render_thongbao_page() -> str:
       const enabledEl = document.getElementById('tg-cfg-enabled');
       const statusEl = document.getElementById('tg-cfg-status');
       const chainEl = document.getElementById('tg-cfg-chain');
-      const timeEl = document.getElementById('tg-cfg-time');
       const regionEl = document.getElementById('tg-cfg-region');
 
       if (tokenEl) tokenEl.value = configData.telegramBotToken || '';
