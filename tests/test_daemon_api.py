@@ -45,19 +45,19 @@ def client():
 
 def test_prefecture_coverage_in_web():
     """Verify ALL_PREFS and REGION_PREFS properly include Tokyo across all mappings."""
-    expected_all_prefs = ["osaka", "tokyo", "kanagawa", "aichi", "gifu", "mie"]
+    expected_all_prefs = ["osaka", "tokyo", "kanagawa", "chiba", "aichi", "gifu", "mie"]
     assert ALL_PREFS == expected_all_prefs, f"ALL_PREFS mismatch: {ALL_PREFS}"
 
     assert "tokyo" in REGION_PREFS, "tokyo missing from REGION_PREFS"
-    assert REGION_PREFS["tokyo"] == ["tokyo", "kanagawa"], f"REGION_PREFS['tokyo'] mismatch: {REGION_PREFS['tokyo']}"
+    assert REGION_PREFS["tokyo"] == ["tokyo", "kanagawa", "chiba"], f"REGION_PREFS['tokyo'] mismatch: {REGION_PREFS['tokyo']}"
 
     assert "all" in REGION_PREFS, "all missing from REGION_PREFS"
     assert REGION_PREFS["all"] == expected_all_prefs, f"REGION_PREFS['all'] mismatch: {REGION_PREFS['all']}"
 
     # Verify get_target_prefs
-    assert get_target_prefs(region="tokyo") == ["tokyo", "kanagawa"]
+    assert get_target_prefs(region="tokyo") == ["tokyo", "kanagawa", "chiba"]
     assert get_target_prefs(region="all") == expected_all_prefs
-    assert get_target_prefs(pref="tokyo") == ["tokyo", "kanagawa"]
+    assert get_target_prefs(pref="tokyo") == ["tokyo", "kanagawa", "chiba"]
 
 
 def test_api_config_server_time(client):

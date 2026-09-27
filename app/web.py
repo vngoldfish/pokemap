@@ -143,8 +143,26 @@ def get_settings():
 @app.post("/api/settings")
 async def update_settings(request: Request):
     try:
+        import time
         data = await request.json()
         current = load_user_settings()
+        
+        # Check if telegramEnabled is transitioning to True
+        old_notif = current.get("notifications", {})
+        new_notif = data.get("notifications", {})
+        was_tg_enabled = bool(old_notif.get("telegramEnabled", False))
+        is_tg_enabled = new_notif.get("telegramEnabled") if isinstance(new_notif, dict) else None
+        if is_tg_enabled is True and not was_tg_enabled:
+            # User just turned Telegram ON! Record exact activation timestamp
+            if not isinstance(data.get("notifications"), dict):
+                data["notifications"] = {}
+            data["notifications"]["telegramEnabledAt"] = int(time.time())
+            print(f"  [Settings] Telegram bật lúc {data['notifications']['telegramEnabledAt']} - chỉ gửi báo cáo phát sinh sau thời điểm này!")
+        elif is_tg_enabled is False:
+            if not isinstance(data.get("notifications"), dict):
+                data["notifications"] = {}
+            data["notifications"]["telegramEnabledAt"] = 0
+
         deep_update_dict(current, data)
         save_user_settings(current)
         return JSONResponse(content={"status": "ok", "settings": current})
@@ -156,16 +174,17 @@ from typing import Optional, List, Dict, Any
 from concurrent.futures import ThreadPoolExecutor
 
 # All available prefectures on PokéTan
-ALL_PREFS = ["osaka", "tokyo", "kanagawa", "aichi", "gifu", "mie"]
+ALL_PREFS = ["osaka", "tokyo", "kanagawa", "chiba", "aichi", "gifu", "mie"]
 
-# Defined 3 core regions + all (matching user specification)
+# Defined core regions + all (matching user specification)
 REGION_PREFS = {
     "osaka": ["osaka"],
-    "tokyo": ["tokyo", "kanagawa"],
+    "tokyo": ["tokyo", "kanagawa", "chiba"],
     "kanagawa": ["kanagawa"],
+    "chiba": ["chiba"],
     "nagoya": ["aichi", "gifu", "mie"],
     "aichi": ["aichi", "gifu", "mie"],
-    "all": ["osaka", "tokyo", "kanagawa", "aichi", "gifu", "mie"],
+    "all": ["osaka", "tokyo", "kanagawa", "chiba", "aichi", "gifu", "mie"],
 }
 
 _recent_notified_keys = {}
@@ -287,6 +306,22 @@ def on_csdl_report_added(store: dict, entry: dict):
         settings = load_user_settings()
         notif_cfg = settings.get("notifications", {})
         if not notif_cfg.get("telegramEnabled", False):
+            return
+
+        now_ts = int(time.time())
+        rep_ts = int(entry.get("timestamp") or 0)
+
+        # 1. Freshness guard: NEVER notify for old historical reports!
+        # Only notify reports submitted within the last 30 minutes (1800s)
+        if rep_ts <= 0 or (now_ts - rep_ts > 1800):
+            print(f"  [CSDL -> Telegram] Bỏ qua báo cáo cũ: ts={rep_ts}, tuổi={(now_ts - rep_ts)/60:.1f} phút")
+            return
+
+        # 2. Telegram enabled time guard:
+        # Only notify reports submitted AFTER the user turned on Telegram notifications
+        tg_enabled_at = notif_cfg.get("telegramEnabledAt") or 0
+        if tg_enabled_at > 0 and rep_ts < (tg_enabled_at - 120):
+            print(f"  [CSDL -> Telegram] Bỏ qua báo cáo phát sinh trước khi bật Telegram: ts={rep_ts} < enabled_at={tg_enabled_at}")
             return
 
         # Check region filter
@@ -686,6 +721,17 @@ def get_latest_reports_route(since: int = 0, limit: int = 50):
         print("[DB] Error fetching latest reports:", e)
         return JSONResponse(content=[])
 
+
+
+@app.post("/api/admin/harvest_all")
+def trigger_harvest_all():
+    """Admin endpoint to trigger full backfill from PokéTan into SQLite CSDL."""
+    from .harvester import harvest_all_to_csdl
+    try:
+        res = harvest_all_to_csdl()
+        return JSONResponse(content={"status": "ok", "result": res})
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"status": "error", "error": str(e)})
 
 
 @app.get("/api/config")

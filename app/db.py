@@ -180,10 +180,10 @@ def init_db():
             except Exception:
                 pass
 
-            # Ensure region definitions include tokyo
+            # Ensure region definitions include tokyo and chiba
             try:
-                cursor.execute("UPDATE regions SET prefs_json = ? WHERE id = 'tokyo';", (json.dumps(["tokyo", "kanagawa"]),))
-                cursor.execute("UPDATE regions SET prefs_json = ? WHERE id = 'all';", (json.dumps(["osaka", "tokyo", "kanagawa", "aichi", "gifu", "mie"]),))
+                cursor.execute("UPDATE regions SET prefs_json = ? WHERE id = 'tokyo';", (json.dumps(["tokyo", "kanagawa", "chiba"]),))
+                cursor.execute("UPDATE regions SET prefs_json = ? WHERE id = 'all';", (json.dumps(["osaka", "tokyo", "kanagawa", "chiba", "aichi", "gifu", "mie"]),))
             except Exception:
                 pass
 
@@ -235,9 +235,9 @@ def seed_regions_if_empty():
     """Populate default regions."""
     default_regions = [
         ("osaka", "大阪・関西 (Osaka & Lân cận)", "なんば", 34.6667, 135.5000, 13, json.dumps(["osaka"])),
-        ("tokyo", "東京・神奈川 (Tokyo & Lân cận)", "横浜", 35.4500, 139.6300, 12, json.dumps(["tokyo", "kanagawa"])),
+        ("tokyo", "東京・神奈川・千葉 (Tokyo, Kanagawa, Chiba)", "横浜", 35.4500, 139.6300, 12, json.dumps(["tokyo", "kanagawa", "chiba"])),
         ("nagoya", "名古屋・東海 (Nagoya & Lân cận)", "名古屋", 35.1709, 136.8815, 12, json.dumps(["aichi", "gifu", "mie"])),
-        ("all", "全エリア (Tất cả 3 vùng / Toàn quốc)", "全エリア", 34.6937, 135.5023, 11, json.dumps(["osaka", "tokyo", "kanagawa", "aichi", "gifu", "mie"]))
+        ("all", "全エリア (Tất cả vùng / Toàn quốc)", "全エリア", 34.6937, 135.5023, 11, json.dumps(["osaka", "tokyo", "kanagawa", "chiba", "aichi", "gifu", "mie"]))
     ]
     with _db_write_lock:
         with get_db_connection() as conn:
@@ -268,6 +268,7 @@ def seed_stores_if_empty():
                 "osaka": "stores_osaka.json",
                 "tokyo": "stores_tokyo.json",
                 "kanagawa": "stores_kanagawa.json",
+                "chiba": "stores_chiba.json",
                 "aichi": "stores_aichi.json",
                 "gifu": "stores_gifu.json",
                 "mie": "stores_mie.json"
@@ -473,13 +474,15 @@ def get_stores(region: Optional[str] = None, pref: Optional[str] = None) -> Dict
         if r == "osaka":
             target_prefs = ["osaka"]
         elif r == "tokyo":
-            target_prefs = ["tokyo", "kanagawa"]
+            target_prefs = ["tokyo", "kanagawa", "chiba"]
         elif r == "kanagawa":
             target_prefs = ["kanagawa"]
+        elif r == "chiba":
+            target_prefs = ["chiba"]
         elif r == "nagoya" or r == "aichi":
             target_prefs = ["aichi", "gifu", "mie"]
         elif r == "all":
-            target_prefs = ["osaka", "tokyo", "kanagawa", "aichi", "gifu", "mie"]
+            target_prefs = ["osaka", "tokyo", "kanagawa", "chiba", "aichi", "gifu", "mie"]
     if not target_prefs:
         target_prefs = ["osaka"]
 
@@ -641,7 +644,8 @@ def record_new_report(
     formatted_time: Optional[str] = None,
     source: str = "poketan",
     confirms: int = 1,
-    pref: str = "osaka"
+    pref: str = "osaka",
+    notify: bool = True
 ) -> Tuple[bool, Dict[str, Any]]:
     """
     Record a new report into SQLite store_history and update stores table.
@@ -757,7 +761,7 @@ def record_new_report(
     }
 
     # Database Event: A brand-new report has been officially committed into SQLite CSDL!
-    if _on_report_added_callbacks:
+    if notify and _on_report_added_callbacks:
         store_dict = {"id": clean_id, "name": clean_id, "pref": pref}
         try:
             with get_db_connection() as conn:
@@ -934,13 +938,15 @@ def get_report_counts(region: Optional[str] = None, pref: Optional[str] = None) 
         if r == "osaka":
             target_prefs = ["osaka"]
         elif r == "tokyo":
-            target_prefs = ["tokyo", "kanagawa"]
+            target_prefs = ["tokyo", "kanagawa", "chiba"]
         elif r == "kanagawa":
             target_prefs = ["kanagawa"]
+        elif r == "chiba":
+            target_prefs = ["chiba"]
         elif r == "nagoya" or r == "aichi":
             target_prefs = ["aichi", "gifu", "mie"]
         elif r == "all":
-            target_prefs = ["osaka", "tokyo", "kanagawa", "aichi", "gifu", "mie"]
+            target_prefs = ["osaka", "tokyo", "kanagawa", "chiba", "aichi", "gifu", "mie"]
 
     with get_db_connection() as conn:
         cursor = conn.cursor()
