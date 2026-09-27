@@ -4,8 +4,10 @@ Decodes compressed status strings, confirmations, pack tags, and joins with stor
 """
 
 import re
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List, Optional
+
+JST = timezone(timedelta(hours=9))
 
 from .config import (
     STATUS_CODE_MAP,
@@ -78,8 +80,8 @@ def parse_store_status(val: str, conf_val: Optional[str] = None) -> Optional[Dic
     status_meta = STATUS_CODE_MAP[code]
     timestamp = int(ts_str)
     try:
-        report_dt = datetime.fromtimestamp(timestamp)
-        report_time_str = report_dt.strftime("%Y-%m-%d %H:%M:%S")
+        report_dt = datetime.fromtimestamp(timestamp, tz=JST)
+        report_time_str = report_dt.strftime("%H:%M %d/%m/%Y")
     except Exception:
         report_time_str = str(timestamp)
 

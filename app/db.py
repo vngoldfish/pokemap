@@ -10,8 +10,10 @@ import sqlite3
 import os
 import json
 import time
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List, Optional, Tuple
+
+JST = timezone(timedelta(hours=9))
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "data", "pokemap.db")
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
@@ -472,7 +474,7 @@ def record_new_report(
 
     if not formatted_time:
         try:
-            dt = datetime.fromtimestamp(timestamp)
+            dt = datetime.fromtimestamp(timestamp, tz=JST)
             formatted_time = dt.strftime("%H:%M %d/%m/%Y")
         except Exception:
             formatted_time = ""
@@ -580,7 +582,7 @@ def save_bulk_history(store_id: str, history_list: List[Dict[str, Any]], source:
         formatted_time = item.get("formatted_time") or ""
         if ts > 0 and not formatted_time:
             try:
-                dt = datetime.fromtimestamp(ts)
+                dt = datetime.fromtimestamp(ts, tz=JST)
                 formatted_time = dt.strftime("%H:%M %d/%m/%Y")
             except Exception:
                 pass
@@ -636,7 +638,7 @@ def save_bulk_history(store_id: str, history_list: List[Dict[str, Any]], source:
             newest_formatted = newest.get("formatted_time") or ""
             if newest_ts > 0 and not newest_formatted:
                 try:
-                    dt = datetime.fromtimestamp(newest_ts)
+                    dt = datetime.fromtimestamp(newest_ts, tz=JST)
                     newest_formatted = dt.strftime("%H:%M %d/%m/%Y")
                 except Exception:
                     pass

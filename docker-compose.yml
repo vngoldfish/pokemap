@@ -9,6 +9,7 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - PORT=8000
+      - TZ=Asia/Tokyo
     volumes:
       - ./app/data:/app/app/data
     networks:

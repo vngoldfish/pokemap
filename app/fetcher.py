@@ -147,7 +147,8 @@ def fetch_store_history(store_id: str) -> list:
             if ts_str:
                 try:
                     import datetime
-                    dt = datetime.datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                    jst = datetime.timezone(datetime.timedelta(hours=9))
+                    dt = datetime.datetime.fromisoformat(ts_str.replace("Z", "+00:00")).astimezone(jst)
                     unix_ts = int(dt.timestamp())
                     formatted_time = dt.strftime("%H:%M %d/%m/%Y")
                 except Exception:

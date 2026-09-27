@@ -170,6 +170,8 @@ def send_telegram_alert(store: dict, info: dict, notif_cfg: dict, is_test: bool 
     import urllib.request
     import urllib.parse
     import json
+    import time
+    import datetime
 
     tg_token = (notif_cfg.get("telegramBotToken") or "").strip()
     tg_chat_id = (notif_cfg.get("telegramChatId") or "").strip()
@@ -185,10 +187,25 @@ def send_telegram_alert(store: dict, info: dict, notif_cfg: dict, is_test: bool 
     store_chain = store.get('chain_label') or store.get('chain') or ''
     chain_tag = f" ({store_chain})" if store_chain and store_chain != 'unknown' else ""
 
-    # 2. Thời gian có báo cáo
-    time_display = info.get('reported_at', 'Vừa xong')
-    if info.get('timeAgo'):
-        time_display += f" ({info.get('timeAgo')})"
+    # 2. Thời gian có báo cáo (chuẩn múi giờ Nhật Bản JST UTC+9)
+    rep_ts = info.get('timestamp') or 0
+    cur_t = time.time()
+    if rep_ts > 0:
+        import datetime
+        jst = datetime.timezone(datetime.timedelta(hours=9))
+        dt_jst = datetime.datetime.fromtimestamp(rep_ts, tz=jst)
+        diff_sec = max(0, int(cur_t - rep_ts))
+        time_clock = dt_jst.strftime("%H:%M:%S")
+        if diff_sec < 60:
+            time_display = f"{time_clock} (Vừa xong)"
+        elif diff_sec < 3600:
+            time_display = f"{time_clock} ({diff_sec // 60} phút trước)"
+        else:
+            time_display = f"{time_clock} ({dt_jst.strftime('%d/%m')})"
+    else:
+        time_display = info.get('reported_at', 'Vừa xong')
+        if info.get('timeAgo'):
+            time_display += f" ({info.get('timeAgo')})"
 
     # 3. Trạng thái
     status_code = info.get("status_code") or info.get("code") or "i"
