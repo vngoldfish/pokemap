@@ -312,9 +312,9 @@ def on_csdl_report_added(store: dict, entry: dict):
         rep_ts = int(entry.get("timestamp") or 0)
 
         # 1. Freshness guard: NEVER notify for old historical reports!
-        # Only notify reports submitted within the last 30 minutes (1800s)
-        if rep_ts <= 0 or (now_ts - rep_ts > 1800):
-            print(f"  [CSDL -> Telegram] Bỏ qua báo cáo cũ: ts={rep_ts}, tuổi={(now_ts - rep_ts)/60:.1f} phút")
+        # Only notify reports submitted within the last 5 minutes (300s) - tức là VỪA CÓ NGƯỜI BÁO CÁO TỨC THÌ
+        if rep_ts <= 0 or (now_ts - rep_ts > 300):
+            print(f"  [CSDL -> Telegram] Bỏ qua báo cáo không mới tức thì: ts={rep_ts}, tuổi={(now_ts - rep_ts)/60:.1f} phút (> 5 phút)")
             return
 
         # 2. Telegram enabled time guard:
