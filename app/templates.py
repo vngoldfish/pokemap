@@ -972,14 +972,14 @@ SHARED_MODALS_HTML = """
               <div style="background:#f8fafc; border:2px solid #0284c7; border-radius:12px; padding:12px; margin-top:8px; box-shadow:0 2px 6px rgba(2,132,199,0.08);">
                 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; flex-wrap:wrap; gap:6px;">
                   <div style="font-weight:800; font-size:0.82rem; color:#0369a1; display:flex; align-items:center; gap:5px;">
-                    <span style="font-size:1.1rem;">📍</span> <span>VỊ TRÍ ĐỊNH VỊ NEO CHO TELEGRAM:</span>
+                    <span style="font-size:1.1rem;">📍</span> <span>MỐC TOẠ ĐỘ NEO TELEGRAM (BACKEND VPS):</span>
                   </div>
-                  <button type="button" onclick="useCurrentGpsForTelegram()" style="background:#0284c7; color:#ffffff; border:none; border-radius:6px; padding:4px 10px; font-size:0.72rem; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:4px; box-shadow:0 1px 3px rgba(2,132,199,0.3);">
-                    <span>🎯</span> <span>Lấy GPS hiện tại</span>
-                  </button>
+                  <span style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; border-radius:6px; padding:3px 8px; font-size:0.7rem; font-weight:700;">
+                    🖥️ Lưu tại Backend VPS
+                  </span>
                 </div>
                 <div style="font-size:0.7rem; color:#64748b; margin-bottom:8px; line-height:1.4;">
-                  Mốc toạ độ để Bot Telegram tự động tính khoảng cách (~km) khi gửi thông báo có hàng (VD: <i>~1.2km (Ga Imamiya)</i>).
+                  Mốc toạ độ cố định lưu trên máy chủ VPS để Bot Telegram tính khoảng cách (~km) khi gửi thông báo. Định vị điện thoại của bạn chỉ lưu ở LocalStorage trên máy này để xem bản đồ, không ảnh hưởng đến Telegram.
                 </div>
 
                 <!-- Smart Google Maps Link / Address Resolver -->
@@ -2665,51 +2665,7 @@ def render_map_page() -> str:
     }
 
     function useCurrentGpsForTelegram() {
-      const nameEl = document.getElementById('tg-cfg-loc-name');
-      const latEl = document.getElementById('tg-cfg-lat');
-      const lngEl = document.getElementById('tg-cfg-lng');
-      if (typeof userLat !== 'undefined' && userLat && typeof userLng !== 'undefined' && userLng) {
-        if (latEl) latEl.value = parseFloat(userLat).toFixed(4);
-        if (lngEl) lngEl.value = parseFloat(userLng).toFixed(4);
-        if (nameEl && !nameEl.value.trim()) nameEl.value = 'Vị trí của bạn';
-        return;
-      }
-      try {
-        const cLat = localStorage.getItem('poketan_user_lat');
-        const cLng = localStorage.getItem('poketan_user_lng');
-        if (cLat && cLng) {
-          if (latEl) latEl.value = parseFloat(cLat).toFixed(4);
-          if (lngEl) lngEl.value = parseFloat(cLng).toFixed(4);
-          if (nameEl && !nameEl.value.trim()) nameEl.value = 'Vị trí của bạn';
-          return;
-        }
-      } catch(e) {}
-
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            if (latEl) latEl.value = pos.coords.latitude.toFixed(4);
-            if (lngEl) lngEl.value = pos.coords.longitude.toFixed(4);
-            if (nameEl && !nameEl.value.trim()) nameEl.value = 'Vị trí của bạn';
-          },
-          () => {
-            navigator.geolocation.getCurrentPosition(
-              (pos2) => {
-                if (latEl) latEl.value = pos2.coords.latitude.toFixed(4);
-                if (lngEl) lngEl.value = pos2.coords.longitude.toFixed(4);
-                if (nameEl && !nameEl.value.trim()) nameEl.value = 'Vị trí của bạn';
-              },
-              () => {
-                alert('Không thể tự lấy GPS từ thiết bị. Bạn có thể dán link Google Maps hoặc gõ địa chỉ vào ô bên trên nhé!');
-              },
-              { enableHighAccuracy: false, timeout: 8000 }
-            );
-          },
-          { enableHighAccuracy: true, timeout: 4000 }
-        );
-      } else {
-        alert('Trình duyệt không hỗ trợ Geolocation.');
-      }
+      alert('📍 Toạ độ Telegram được lưu cố định trên Backend VPS (mặc định: Ga JR Imamiya). Định vị GPS của điện thoại bạn chỉ lưu ở LocalStorage trên trình duyệt để hiển thị Bản đồ, hoàn toàn độc lập.');
     }
 
     async function resolveSmartLocation() {
@@ -2779,22 +2735,12 @@ def render_map_page() -> str:
       }
       configData.telegramEnabled = checked;
       try {
-        const token = (document.getElementById('tg-cfg-token') ? document.getElementById('tg-cfg-token').value : (configData.telegramBotToken || '')).trim();
-        const chatId = (document.getElementById('tg-cfg-chatid') ? document.getElementById('tg-cfg-chatid').value : (configData.telegramChatId || '')).trim();
-        const locName = (document.getElementById('tg-cfg-loc-name') ? document.getElementById('tg-cfg-loc-name').value : (configData.telegramLocationName || 'Ga Imamiya')).trim();
-        const latVal = (document.getElementById('tg-cfg-lat') && document.getElementById('tg-cfg-lat').value !== '') ? parseFloat(document.getElementById('tg-cfg-lat').value) : (configData.telegramLat || 34.6540);
-        const lngVal = (document.getElementById('tg-cfg-lng') && document.getElementById('tg-cfg-lng').value !== '') ? parseFloat(document.getElementById('tg-cfg-lng').value) : (configData.telegramLng || 135.4925);
         await fetch('/api/settings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             notifications: {
-              telegramEnabled: checked,
-              telegramBotToken: token,
-              telegramChatId: chatId,
-              telegramLocationName: locName,
-              telegramLat: latVal,
-              telegramLng: lngVal
+              telegramEnabled: checked
             }
           })
         });
@@ -2891,7 +2837,14 @@ def render_map_page() -> str:
       if (chatIdEl) chatIdEl.value = configData.telegramChatId || '';
       if (enabledEl) {
         enabledEl.checked = !!configData.telegramEnabled;
-        onTelegramToggleChange(!!configData.telegramEnabled);
+        const slider = document.getElementById('tg-cfg-slider');
+        if (slider) slider.style.background = enabledEl.checked ? '#0284c7' : '#cbd5e1';
+        const badge = document.getElementById('tg-status-badge');
+        if (badge) {
+          badge.innerText = enabledEl.checked ? '🟢 Đang BẬT' : '⚪ Đang TẮT';
+          badge.style.background = enabledEl.checked ? '#dcfce7' : '#e2e8f0';
+          badge.style.color = enabledEl.checked ? '#15803d' : '#475569';
+        }
       }
       if (statusEl) statusEl.value = configData.telegramStatus || 'in';
       if (chainEl) chainEl.value = configData.telegramChain || 'all';
@@ -4995,51 +4948,7 @@ def render_thongbao_page() -> str:
     }
 
     function useCurrentGpsForTelegram() {
-      const nameEl = document.getElementById('tg-cfg-loc-name');
-      const latEl = document.getElementById('tg-cfg-lat');
-      const lngEl = document.getElementById('tg-cfg-lng');
-      if (typeof userLat !== 'undefined' && userLat && typeof userLng !== 'undefined' && userLng) {
-        if (latEl) latEl.value = parseFloat(userLat).toFixed(4);
-        if (lngEl) lngEl.value = parseFloat(userLng).toFixed(4);
-        if (nameEl && !nameEl.value.trim()) nameEl.value = 'Vị trí của bạn';
-        return;
-      }
-      try {
-        const cLat = localStorage.getItem('poketan_user_lat');
-        const cLng = localStorage.getItem('poketan_user_lng');
-        if (cLat && cLng) {
-          if (latEl) latEl.value = parseFloat(cLat).toFixed(4);
-          if (lngEl) lngEl.value = parseFloat(cLng).toFixed(4);
-          if (nameEl && !nameEl.value.trim()) nameEl.value = 'Vị trí của bạn';
-          return;
-        }
-      } catch(e) {}
-
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            if (latEl) latEl.value = pos.coords.latitude.toFixed(4);
-            if (lngEl) lngEl.value = pos.coords.longitude.toFixed(4);
-            if (nameEl && !nameEl.value.trim()) nameEl.value = 'Vị trí của bạn';
-          },
-          () => {
-            navigator.geolocation.getCurrentPosition(
-              (pos2) => {
-                if (latEl) latEl.value = pos2.coords.latitude.toFixed(4);
-                if (lngEl) lngEl.value = pos2.coords.longitude.toFixed(4);
-                if (nameEl && !nameEl.value.trim()) nameEl.value = 'Vị trí của bạn';
-              },
-              () => {
-                alert('Không thể tự lấy GPS từ thiết bị. Bạn có thể dán link Google Maps hoặc gõ địa chỉ vào ô bên trên nhé!');
-              },
-              { enableHighAccuracy: false, timeout: 8000 }
-            );
-          },
-          { enableHighAccuracy: true, timeout: 4000 }
-        );
-      } else {
-        alert('Trình duyệt không hỗ trợ Geolocation.');
-      }
+      alert('📍 Toạ độ Telegram được lưu cố định trên Backend VPS (mặc định: Ga JR Imamiya). Định vị GPS của điện thoại bạn chỉ lưu ở LocalStorage trên trình duyệt để hiển thị Danh sách thông báo, hoàn toàn độc lập.');
     }
 
     async function resolveSmartLocation() {
@@ -5109,22 +5018,12 @@ def render_thongbao_page() -> str:
       }
       configData.telegramEnabled = checked;
       try {
-        const token = (document.getElementById('tg-cfg-token') ? document.getElementById('tg-cfg-token').value : (configData.telegramBotToken || '')).trim();
-        const chatId = (document.getElementById('tg-cfg-chatid') ? document.getElementById('tg-cfg-chatid').value : (configData.telegramChatId || '')).trim();
-        const locName = (document.getElementById('tg-cfg-loc-name') ? document.getElementById('tg-cfg-loc-name').value : (configData.telegramLocationName || 'Ga Imamiya')).trim();
-        const latVal = (document.getElementById('tg-cfg-lat') && document.getElementById('tg-cfg-lat').value !== '') ? parseFloat(document.getElementById('tg-cfg-lat').value) : (configData.telegramLat || 34.6540);
-        const lngVal = (document.getElementById('tg-cfg-lng') && document.getElementById('tg-cfg-lng').value !== '') ? parseFloat(document.getElementById('tg-cfg-lng').value) : (configData.telegramLng || 135.4925);
         await fetch('/api/settings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             notifications: {
-              telegramEnabled: checked,
-              telegramBotToken: token,
-              telegramChatId: chatId,
-              telegramLocationName: locName,
-              telegramLat: latVal,
-              telegramLng: lngVal
+              telegramEnabled: checked
             }
           })
         });
@@ -5261,7 +5160,14 @@ def render_thongbao_page() -> str:
       if (chatIdEl) chatIdEl.value = configData.telegramChatId || '';
       if (enabledEl) {
         enabledEl.checked = !!configData.telegramEnabled;
-        onTelegramToggleChange(!!configData.telegramEnabled);
+        const slider = document.getElementById('tg-cfg-slider');
+        if (slider) slider.style.background = enabledEl.checked ? '#0284c7' : '#cbd5e1';
+        const badge = document.getElementById('tg-status-badge');
+        if (badge) {
+          badge.innerText = enabledEl.checked ? '🟢 Đang BẬT' : '⚪ Đang TẮT';
+          badge.style.background = enabledEl.checked ? '#dcfce7' : '#e2e8f0';
+          badge.style.color = enabledEl.checked ? '#15803d' : '#475569';
+        }
       }
       if (statusEl) statusEl.value = configData.telegramStatus || 'in';
       if (chainEl) chainEl.value = configData.telegramChain || 'all';
