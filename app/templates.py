@@ -23,6 +23,11 @@ def get_shared_head(title: str, include_leaflet: bool = False) -> str:
   <meta charset="UTF-8">
   <title>{title}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <link rel="prefetch" href="/map" />
+  <link rel="prefetch" href="/thongbao" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="dns-prefetch" href="https://unpkg.com">
   {leaflet_tags}
   <!-- Font Inter -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -3634,13 +3639,35 @@ def render_map_page() -> str:
     async function initData() {
       try {
         const reqRegion = currentRegion || 'osaka';
+
+        // Fast-path: Check client-side cache for instant render (< 5ms)
+        try {
+          const cachedRaw = sessionStorage.getItem('poketan_stores_' + reqRegion);
+          if (cachedRaw) {
+            const parsed = JSON.parse(cachedRaw);
+            if (parsed && parsed.data && (Date.now() - (parsed.ts || 0) < 300000)) {
+              storesDict = parsed.data;
+              loadedRegions.add(reqRegion);
+              renderMapMarkers();
+            }
+          }
+        } catch(e) {}
+
         const [cfgRes, storesRes] = await Promise.all([
           fetch('/api/config'),
           fetch('/api/stores_data?region=' + encodeURIComponent(reqRegion))
         ]);
         configData = await cfgRes.json();
-        storesDict = await storesRes.json();
+        const freshStores = await storesRes.json();
+        storesDict = freshStores;
         loadedRegions.add(reqRegion);
+
+        try {
+          const sJson = JSON.stringify({ ts: Date.now(), data: freshStores });
+          if (sJson.length < 4500000) {
+            sessionStorage.setItem('poketan_stores_' + reqRegion, sJson);
+          }
+        } catch(e) {}
 
         // Fetch report counts asynchronously in background (does not block initial map render)
         fetch('/api/report_counts?region=' + encodeURIComponent(reqRegion))
@@ -5953,13 +5980,35 @@ def render_thongbao_page() -> str:
       checkGpsSilently();
       try {
         const reqRegion = currentRegion || 'osaka';
+
+        // Fast-path: Check client-side cache for instant render (< 5ms)
+        try {
+          const cachedRaw = sessionStorage.getItem('poketan_stores_' + reqRegion);
+          if (cachedRaw) {
+            const parsed = JSON.parse(cachedRaw);
+            if (parsed && parsed.data && (Date.now() - (parsed.ts || 0) < 300000)) {
+              storesDict = parsed.data;
+              loadedRegions.add(reqRegion);
+              renderStoreList();
+            }
+          }
+        } catch(e) {}
+
         const [cfgRes, storesRes] = await Promise.all([
           fetch('/api/config'),
           fetch('/api/stores_data?region=' + encodeURIComponent(reqRegion))
         ]);
         configData = await cfgRes.json();
-        storesDict = await storesRes.json();
+        const freshStores = await storesRes.json();
+        storesDict = freshStores;
         loadedRegions.add(reqRegion);
+
+        try {
+          const sJson = JSON.stringify({ ts: Date.now(), data: freshStores });
+          if (sJson.length < 4500000) {
+            sessionStorage.setItem('poketan_stores_' + reqRegion, sJson);
+          }
+        } catch(e) {}
 
         // Fetch report counts asynchronously in background (does not block list render)
         fetch('/api/report_counts?region=' + encodeURIComponent(reqRegion))

@@ -27,7 +27,7 @@ import time
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Query, Request
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 import uvicorn
 
 from .fetcher import fetch_stores, fetch_firestore_document, DEFAULT_CACHE_DIR, fetch_store_history, fetch_realtime_status
@@ -181,7 +181,7 @@ async def update_settings(request: Request):
         return JSONResponse(status_code=400, content={"error": str(e)})
 
 
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 from concurrent.futures import ThreadPoolExecutor
 
 # All available prefectures on PokéTan
@@ -750,12 +750,34 @@ def fetch_single_pref_status(pref, is_cold=False):
     except Exception as e:
         return {}
 
+
+_stores_json_cache: Dict[str, Tuple[float, str]] = {}
+_STORES_CACHE_TTL = 300.0  # 5 minutes
+
+
 @app.get("/api/stores_data")
 def get_stores_data(region: Optional[str] = None, pref: Optional[str] = None):
+    cache_key = f"{region}:{pref}"
+    now_mono = time.monotonic()
+    if cache_key in _stores_json_cache:
+        c_ts, c_json = _stores_json_cache[cache_key]
+        if now_mono - c_ts < _STORES_CACHE_TTL:
+            return Response(
+                content=c_json,
+                media_type="application/json",
+                headers={"Cache-Control": "public, max-age=300, stale-while-revalidate=600"}
+            )
+
     try:
         stores = db_get_stores(region=region, pref=pref)
         if stores:
-            return JSONResponse(content=stores)
+            raw_json = json.dumps(stores)
+            _stores_json_cache[cache_key] = (now_mono, raw_json)
+            return Response(
+                content=raw_json,
+                media_type="application/json",
+                headers={"Cache-Control": "public, max-age=300, stale-while-revalidate=600"}
+            )
     except Exception as e:
         print("[DB] Error querying stores from SQLite:", e)
 
@@ -763,7 +785,13 @@ def get_stores_data(region: Optional[str] = None, pref: Optional[str] = None):
     all_stores = {}
     for p in target_prefs:
         all_stores.update(get_stores_by_pref(p))
-    return JSONResponse(content=all_stores)
+    raw_json = json.dumps(all_stores)
+    _stores_json_cache[cache_key] = (now_mono, raw_json)
+    return Response(
+        content=raw_json,
+        media_type="application/json",
+        headers={"Cache-Control": "public, max-age=300, stale-while-revalidate=600"}
+    )
 
 @app.get("/api/cold_status")
 def get_cold_status(region: Optional[str] = None, pref: Optional[str] = None):
@@ -827,7 +855,10 @@ def get_store_history(store_id: str):
 def get_report_counts(region: Optional[str] = None, pref: Optional[str] = None):
     try:
         counts = db_get_report_counts(region=region, pref=pref)
-        return JSONResponse(content=counts)
+        return JSONResponse(
+            content=counts,
+            headers={"Cache-Control": "public, max-age=60, stale-while-revalidate=120"}
+        )
     except Exception as e:
         print("[DB] Error fetching SQL report counts:", e)
         return JSONResponse(content={})
@@ -907,10 +938,26 @@ def get_calendar(include_expired: bool = False):
 from .templates import render_map_page, render_thongbao_page
 
 
-NO_CACHE_HEADERS = {
-    "Cache-Control": "no-cache, no-store, must-revalidate",
-    "Pragma": "no-cache",
-    "Expires": "0"
+_cached_map_html = None
+_cached_thongbao_html = None
+
+
+def get_map_html():
+    global _cached_map_html
+    if _cached_map_html is None:
+        _cached_map_html = render_map_page()
+    return _cached_map_html
+
+
+def get_thongbao_html():
+    global _cached_thongbao_html
+    if _cached_thongbao_html is None:
+        _cached_thongbao_html = render_thongbao_page()
+    return _cached_thongbao_html
+
+
+PAGE_CACHE_HEADERS = {
+    "Cache-Control": "no-cache",
 }
 
 
@@ -919,13 +966,13 @@ NO_CACHE_HEADERS = {
 @app.get("/calendar", response_class=HTMLResponse)
 @app.get("/events", response_class=HTMLResponse)
 def map_page():
-    return HTMLResponse(content=render_map_page(), headers=NO_CACHE_HEADERS)
+    return HTMLResponse(content=get_map_html(), headers=PAGE_CACHE_HEADERS)
 
 
 @app.get("/thongbao", response_class=HTMLResponse)
 @app.get("/stores", response_class=HTMLResponse)
 def thongbao_page():
-    return HTMLResponse(content=render_thongbao_page(), headers=NO_CACHE_HEADERS)
+    return HTMLResponse(content=get_thongbao_html(), headers=PAGE_CACHE_HEADERS)
 
 
 def main():
