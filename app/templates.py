@@ -1054,25 +1054,6 @@ SHARED_MODALS_HTML = """
                 </button>
               </div>
             </div>
-
-            <!-- D. ĐỘ TƯƠI MỚI / THỜI GIAN BÁO -->
-            <div>
-              <div class="filter-group-title">⏱️ Độ mới của báo cáo (Tránh tin cũ)</div>
-              <div class="filter-options-grid" id="tg-modal-time-group">
-                <button type="button" class="filter-option-btn" data-val="realtime" onclick="selectTgModalTime('realtime')">
-                  ⚡ Tức thì (Vừa báo ≤ 5 phút)
-                </button>
-                <button type="button" class="filter-option-btn" data-val="1" onclick="selectTgModalTime('1')">
-                  ⏱️ Trong vòng 1 giờ
-                </button>
-                <button type="button" class="filter-option-btn" data-val="3" onclick="selectTgModalTime('3')">
-                  ⏱️ Trong vòng 3 giờ
-                </button>
-                <button type="button" class="filter-option-btn active" data-val="24" onclick="selectTgModalTime('24')">
-                  📅 Trong vòng 24 giờ
-                </button>
-              </div>
-            </div>
           </div>
 
           <div id="tg-test-result" style="display:none; padding:10px 12px; border-radius:8px; font-size:0.75rem; font-weight:700; margin-top:4px;"></div>
@@ -2611,9 +2592,6 @@ def render_map_page() -> str:
       document.querySelectorAll('#tg-modal-chain-group .filter-option-btn').forEach(btn => {
         btn.classList.toggle('active', btn.getAttribute('data-val') === chain);
       });
-      document.querySelectorAll('#tg-modal-time-group .filter-option-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.getAttribute('data-val') === time);
-      });
     }
 
     function selectTgModalRegion(val) {
@@ -2639,14 +2617,7 @@ def render_map_page() -> str:
         btn.classList.toggle('active', btn.getAttribute('data-val') === val);
       });
     }
-
-    function selectTgModalTime(val) {
-      const el = document.getElementById('tg-cfg-time');
-      if (el) el.value = val;
-      document.querySelectorAll('#tg-modal-time-group .filter-option-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.getAttribute('data-val') === val);
-      });
-    }
+    function selectTgModalTime(val) {}
 
     function openTelegramModal() {
       openSettingsModal('telegram');
@@ -4775,9 +4746,6 @@ def render_thongbao_page() -> str:
       document.querySelectorAll('#tg-modal-chain-group .filter-option-btn').forEach(btn => {
         btn.classList.toggle('active', btn.getAttribute('data-val') === chain);
       });
-      document.querySelectorAll('#tg-modal-time-group .filter-option-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.getAttribute('data-val') === time);
-      });
     }
 
     function selectTgModalRegion(val) {
@@ -4803,14 +4771,7 @@ def render_thongbao_page() -> str:
         btn.classList.toggle('active', btn.getAttribute('data-val') === val);
       });
     }
-
-    function selectTgModalTime(val) {
-      const el = document.getElementById('tg-cfg-time');
-      if (el) el.value = val;
-      document.querySelectorAll('#tg-modal-time-group .filter-option-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.getAttribute('data-val') === val);
-      });
-    }
+    function selectTgModalTime(val) {}
 
     function openTelegramModal() {
       openSettingsModal('telegram');

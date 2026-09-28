@@ -318,33 +318,10 @@ def on_csdl_report_added(store: dict, entry: dict):
 
         now_ts = int(time.time())
         rep_ts = int(entry.get("timestamp") or 0)
-
-        # 1. Freshness guard: NEVER notify for old historical reports!
-        rep_ts = int(entry.get("timestamp") or 0)
-        now_ts = int(time.time())
-
-        # Check configured freshness/time window
-        tg_time = str(notif_cfg.get("telegramTime", "24")).lower()
-        if tg_time in ["realtime", "0"]:
-            max_age = 300  # 5 minutes
-        elif tg_time == "1":
-            max_age = 3600  # 1 hour
-        elif tg_time == "3":
-            max_age = 3 * 3600  # 3 hours
-        elif tg_time == "6":
-            max_age = 6 * 3600  # 6 hours
-        elif tg_time == "24":
-            max_age = 24 * 3600  # 24 hours
-        elif tg_time == "all":
-            max_age = 7 * 86400  # 7 days
-        else:
-            try:
-                max_age = int(tg_time) * 3600
-            except Exception:
-                max_age = 24 * 3600
-
-        if rep_ts <= 0 or (now_ts - rep_ts > max_age):
-            print(f"  [CSDL -> Telegram] Bỏ qua báo cáo không thỏa độ mới ({tg_time}): ts={rep_ts}, tuổi={(now_ts - rep_ts)/60:.1f} phút (> {max_age/60:.0f} phút)")
+        # 1. Freshness guard: Chỉ gửi báo cáo mới tức thì (vừa báo trong vòng 5 phút)
+        # Bất kỳ ai vừa báo có hàng là bắn tin về Telegram ngay lập tức
+        if rep_ts <= 0 or (now_ts - rep_ts > 300):
+            print(f"  [CSDL -> Telegram] Bỏ qua báo cáo cũ (không mới tức thì): ts={rep_ts}, tuổi={(now_ts - rep_ts)/60:.1f} phút (> 5 phút)")
             return
 
         # 2. Telegram enabled time guard:

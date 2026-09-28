@@ -660,24 +660,22 @@ def test_telegram_filter_tab_structure():
         assert 'id="tg-cfg-token"' in html, f"Missing #tg-cfg-token in {name}"
         assert 'id="tg-cfg-chatid"' in html, f"Missing #tg-cfg-chatid in {name}"
 
-        # 4 Filter Groups
+        # 3 Filter Groups (Region, Status, Chain - Time filter removed as Telegram is strictly real-time)
         assert 'id="tg-modal-region-group"' in html, f"Missing #tg-modal-region-group in {name}"
         assert 'id="tg-modal-status-group"' in html, f"Missing #tg-modal-status-group in {name}"
         assert 'id="tg-modal-chain-group"' in html, f"Missing #tg-modal-chain-group in {name}"
-        assert 'id="tg-modal-time-group"' in html, f"Missing #tg-modal-time-group in {name}"
+        assert 'id="tg-modal-time-group"' not in html, f"Redundant #tg-modal-time-group should be removed from {name}"
 
         # Underlying hidden inputs for backward compatibility
         assert 'id="tg-cfg-region"' in html, f"Missing #tg-cfg-region in {name}"
         assert 'id="tg-cfg-status"' in html, f"Missing #tg-cfg-status in {name}"
         assert 'id="tg-cfg-chain"' in html, f"Missing #tg-cfg-chain in {name}"
-        assert 'id="tg-cfg-time"' in html, f"Missing #tg-cfg-time in {name}"
 
         # JS functions
         assert "function syncTelegramModalUI(" in html, f"Missing syncTelegramModalUI in {name}"
         assert "function selectTgModalRegion(" in html, f"Missing selectTgModalRegion in {name}"
         assert "function selectTgModalStatus(" in html, f"Missing selectTgModalStatus in {name}"
         assert "function selectTgModalChain(" in html, f"Missing selectTgModalChain in {name}"
-        assert "function selectTgModalTime(" in html, f"Missing selectTgModalTime in {name}"
         assert "function saveTelegramConfig(" in html, f"Missing saveTelegramConfig in {name}"
         assert "function testTelegramWebhook(" in html, f"Missing testTelegramWebhook in {name}"
 
@@ -687,14 +685,13 @@ def test_telegram_filter_tab_structure():
 # ==============================================================================
 
 def test_telegram_backend_dispatch_filters():
-    """Verify on_csdl_report_added correctly handles multi-prefecture regions and filters."""
+    """Verify on_csdl_report_added correctly handles multi-prefecture regions, filters, and real-time guard."""
     import time
     from unittest.mock import patch
     from app.web import on_csdl_report_added
 
     now = int(time.time())
 
-    # 1. Tokyo region should accept Kanagawa store
     sent_alerts = []
     def fake_send(store, entry, notif_cfg, is_test=False):
         sent_alerts.append((store, entry))
@@ -706,7 +703,6 @@ def test_telegram_backend_dispatch_filters():
             "telegramRegion": "tokyo",
             "telegramStatus": "in",
             "telegramChain": "all",
-            "telegramTime": "24",
             "telegramEnabledAt": now - 3600
         }
     }
@@ -730,10 +726,10 @@ def test_telegram_backend_dispatch_filters():
         on_csdl_report_added(kanagawa_store, report_out)
         assert len(sent_alerts) == 1, "Sold out report should be rejected when status filter is 'in'"
 
-        # Outdated report (> max_age) should be REJECTED
-        report_stale = {"status_code": "i", "timestamp": now - 90000, "onsite": False}
+        # Outdated report (> 5 mins old) should be REJECTED (Telegram is strictly real-time)
+        report_stale = {"status_code": "i", "timestamp": now - 400, "onsite": False}
         on_csdl_report_added(kanagawa_store, report_stale)
-        assert len(sent_alerts) == 1, "Report older than 24h should be rejected"
+        assert len(sent_alerts) == 1, "Report older than 5m should be rejected as not real-time"
 
 
 
