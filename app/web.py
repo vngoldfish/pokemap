@@ -783,18 +783,25 @@ def get_calendar(include_expired: bool = False):
 from .templates import render_map_page, render_thongbao_page
 
 
+NO_CACHE_HEADERS = {
+    "Cache-Control": "no-cache, no-store, must-revalidate",
+    "Pragma": "no-cache",
+    "Expires": "0"
+}
+
+
 @app.get("/", response_class=HTMLResponse)
 @app.get("/map", response_class=HTMLResponse)
 @app.get("/calendar", response_class=HTMLResponse)
 @app.get("/events", response_class=HTMLResponse)
 def map_page():
-    return HTMLResponse(content=render_map_page())
+    return HTMLResponse(content=render_map_page(), headers=NO_CACHE_HEADERS)
 
 
 @app.get("/thongbao", response_class=HTMLResponse)
 @app.get("/stores", response_class=HTMLResponse)
 def thongbao_page():
-    return HTMLResponse(content=render_thongbao_page())
+    return HTMLResponse(content=render_thongbao_page(), headers=NO_CACHE_HEADERS)
 
 
 def main():

@@ -825,6 +825,18 @@ SHARED_MODALS_HTML = """
         
         <!-- PANE 1: BỘ LỌC BẢN ĐỒ -->
         <div id="settings-pane-map" class="settings-tab-pane active" style="display:flex; flex-direction:column; gap:16px;">
+          <!-- Quick switch to Telegram tab banner -->
+          <div onclick="switchSettingsTab('telegram')" style="background:#f0f9ff; border:1.5px solid #0284c7; border-radius:10px; padding:10px 14px; display:flex; align-items:center; justify-content:space-between; cursor:pointer; box-shadow:0 1px 3px rgba(2,132,199,0.1);">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:1.3rem;">✈️</span>
+              <div>
+                <div style="font-weight:800; font-size:0.82rem; color:#0369a1;">Cài đặt Telegram &amp; Vị trí định vị neo</div>
+                <div style="font-size:0.7rem; color:#0284c7;">Bấm vào đây để cấu hình Bot và toạ độ tính khoảng cách (~km) ➔</div>
+              </div>
+            </div>
+            <span style="font-size:0.78rem; color:#ffffff; background:#0284c7; font-weight:800; padding:4px 10px; border-radius:6px;">Mở tab Telegram ✈️</span>
+          </div>
+
           <!-- KHU VỰC BẢN ĐỒ -->
           <div>
             <div class="filter-group-title">📍 Khu vực hiển thị (地域・エリア)</div>
@@ -952,47 +964,54 @@ SHARED_MODALS_HTML = """
               </div>
 
               <!-- Anchor Location for Telegram Distance Calculation -->
-              <div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:10px; padding:10px; margin-top:4px;">
-                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
-                  <label style="font-weight:800; font-size:0.75rem; color:#1e293b; display:flex; align-items:center; gap:4px;">
-                    <span>📍</span> <span>Vị trí tính khoảng cách cho Telegram:</span>
-                  </label>
-                  <button type="button" onclick="useCurrentGpsForTelegram()" style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; border-radius:6px; padding:3px 8px; font-size:0.68rem; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:3px;">
+              <div style="background:#f8fafc; border:2px solid #0284c7; border-radius:12px; padding:12px; margin-top:8px; box-shadow:0 2px 6px rgba(2,132,199,0.08);">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; flex-wrap:wrap; gap:6px;">
+                  <div style="font-weight:800; font-size:0.82rem; color:#0369a1; display:flex; align-items:center; gap:5px;">
+                    <span style="font-size:1.1rem;">📍</span> <span>VỊ TRÍ ĐỊNH VỊ NEO CHO TELEGRAM:</span>
+                  </div>
+                  <button type="button" onclick="useCurrentGpsForTelegram()" style="background:#0284c7; color:#ffffff; border:none; border-radius:6px; padding:4px 10px; font-size:0.72rem; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:4px; box-shadow:0 1px 3px rgba(2,132,199,0.3);">
                     <span>🎯</span> <span>Lấy GPS hiện tại</span>
                   </button>
                 </div>
-                <div style="margin-bottom:6px;">
-                  <input type="text" id="tg-cfg-loc-name" placeholder="Tên vị trí (VD: Ga Imamiya, Nhà riêng...)" style="width:100%; border:1px solid #cbd5e1; border-radius:6px; padding:6px 8px; font-size:0.75rem; outline:none; background:#ffffff;" />
+                <div style="font-size:0.7rem; color:#64748b; margin-bottom:8px; line-height:1.4;">
+                  Mốc toạ độ để Bot Telegram tự động tính khoảng cách (~km) khi gửi thông báo có hàng (VD: <i>~1.2km (Ga Imamiya)</i>).
+                </div>
+                <div style="margin-bottom:8px;">
+                  <div style="font-size:0.68rem; color:#334155; font-weight:700; margin-bottom:2px;">🏷️ Tên vị trí hiển thị trong tin nhắn:</div>
+                  <input type="text" id="tg-cfg-loc-name" placeholder="Ví dụ: Ga Imamiya, Nhà riêng, Chỗ làm..." style="width:100%; border:1px solid #cbd5e1; border-radius:6px; padding:7px 10px; font-size:0.78rem; outline:none; background:#ffffff; font-weight:600;" />
                 </div>
                 <div style="display:flex; gap:8px;">
                   <div style="flex:1;">
-                    <div style="font-size:0.65rem; color:#64748b; font-weight:700; margin-bottom:2px;">Vĩ độ (Lat):</div>
-                    <input type="number" step="0.0001" id="tg-cfg-lat" placeholder="34.6540" style="width:100%; border:1px solid #cbd5e1; border-radius:6px; padding:6px 8px; font-size:0.75rem; outline:none; background:#ffffff;" />
+                    <div style="font-size:0.68rem; color:#334155; font-weight:700; margin-bottom:2px;">🌐 Vĩ độ (Lat):</div>
+                    <input type="number" step="0.0001" id="tg-cfg-lat" placeholder="34.6540" style="width:100%; border:1px solid #cbd5e1; border-radius:6px; padding:7px 10px; font-size:0.78rem; outline:none; background:#ffffff; font-weight:600;" />
                   </div>
                   <div style="flex:1;">
-                    <div style="font-size:0.65rem; color:#64748b; font-weight:700; margin-bottom:2px;">Kinh độ (Lng):</div>
-                    <input type="number" step="0.0001" id="tg-cfg-lng" placeholder="135.4925" style="width:100%; border:1px solid #cbd5e1; border-radius:6px; padding:6px 8px; font-size:0.75rem; outline:none; background:#ffffff;" />
+                    <div style="font-size:0.68rem; color:#334155; font-weight:700; margin-bottom:2px;">🌐 Kinh độ (Lng):</div>
+                    <input type="number" step="0.0001" id="tg-cfg-lng" placeholder="135.4925" style="width:100%; border:1px solid #cbd5e1; border-radius:6px; padding:7px 10px; font-size:0.78rem; outline:none; background:#ffffff; font-weight:600;" />
                   </div>
                 </div>
-                <div style="display:flex; gap:5px; margin-top:8px; flex-wrap:wrap;">
-                  <button type="button" onclick="setTelegramLocPreset('Ga JR Imamiya', 34.6540, 135.4925)" style="background:#f1f5f9; border:1px solid #e2e8f0; border-radius:12px; padding:2px 8px; font-size:0.65rem; font-weight:700; color:#334155; cursor:pointer;">
-                    📍 Ga Imamiya
-                  </button>
-                  <button type="button" onclick="setTelegramLocPreset('Ga Osaka / Umeda', 34.7025, 135.4959)" style="background:#f1f5f9; border:1px solid #e2e8f0; border-radius:12px; padding:2px 8px; font-size:0.65rem; font-weight:700; color:#334155; cursor:pointer;">
-                    📍 Ga Umeda
-                  </button>
-                  <button type="button" onclick="setTelegramLocPreset('Ga Namba', 34.6667, 135.5000)" style="background:#f1f5f9; border:1px solid #e2e8f0; border-radius:12px; padding:2px 8px; font-size:0.65rem; font-weight:700; color:#334155; cursor:pointer;">
-                    📍 Ga Namba
-                  </button>
-                  <button type="button" onclick="setTelegramLocPreset('Ga Tokyo', 35.6812, 139.7671)" style="background:#f1f5f9; border:1px solid #e2e8f0; border-radius:12px; padding:2px 8px; font-size:0.65rem; font-weight:700; color:#334155; cursor:pointer;">
-                    📍 Ga Tokyo
-                  </button>
-                  <button type="button" onclick="setTelegramLocPreset('Ga Shinjuku', 35.6896, 139.7006)" style="background:#f1f5f9; border:1px solid #e2e8f0; border-radius:12px; padding:2px 8px; font-size:0.65rem; font-weight:700; color:#334155; cursor:pointer;">
-                    📍 Ga Shinjuku
-                  </button>
-                  <button type="button" onclick="setTelegramLocPreset('Ga Nagoya', 35.1709, 136.8815)" style="background:#f1f5f9; border:1px solid #e2e8f0; border-radius:12px; padding:2px 8px; font-size:0.65rem; font-weight:700; color:#334155; cursor:pointer;">
-                    📍 Ga Nagoya
-                  </button>
+                <div style="margin-top:10px; padding-top:8px; border-top:1px dashed #cbd5e1;">
+                  <div style="font-size:0.68rem; color:#475569; font-weight:700; margin-bottom:5px;">⚡ Hoặc chọn nhanh ga trọng điểm:</div>
+                  <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                    <button type="button" onclick="setTelegramLocPreset('Ga JR Imamiya', 34.6540, 135.4925)" style="background:#ffffff; border:1px solid #cbd5e1; border-radius:12px; padding:3px 9px; font-size:0.68rem; font-weight:700; color:#334155; cursor:pointer;">
+                      📍 Ga Imamiya
+                    </button>
+                    <button type="button" onclick="setTelegramLocPreset('Ga Osaka / Umeda', 34.7025, 135.4959)" style="background:#ffffff; border:1px solid #cbd5e1; border-radius:12px; padding:3px 9px; font-size:0.68rem; font-weight:700; color:#334155; cursor:pointer;">
+                      📍 Ga Umeda
+                    </button>
+                    <button type="button" onclick="setTelegramLocPreset('Ga Namba', 34.6667, 135.5000)" style="background:#ffffff; border:1px solid #cbd5e1; border-radius:12px; padding:3px 9px; font-size:0.68rem; font-weight:700; color:#334155; cursor:pointer;">
+                      📍 Ga Namba
+                    </button>
+                    <button type="button" onclick="setTelegramLocPreset('Ga Tokyo', 35.6812, 139.7671)" style="background:#ffffff; border:1px solid #cbd5e1; border-radius:12px; padding:3px 9px; font-size:0.68rem; font-weight:700; color:#334155; cursor:pointer;">
+                      📍 Ga Tokyo
+                    </button>
+                    <button type="button" onclick="setTelegramLocPreset('Ga Shinjuku', 35.6896, 139.7006)" style="background:#ffffff; border:1px solid #cbd5e1; border-radius:12px; padding:3px 9px; font-size:0.68rem; font-weight:700; color:#334155; cursor:pointer;">
+                      📍 Ga Shinjuku
+                    </button>
+                    <button type="button" onclick="setTelegramLocPreset('Ga Nagoya', 35.1709, 136.8815)" style="background:#ffffff; border:1px solid #cbd5e1; border-radius:12px; padding:3px 9px; font-size:0.68rem; font-weight:700; color:#334155; cursor:pointer;">
+                      📍 Ga Nagoya
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
