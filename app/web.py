@@ -630,7 +630,7 @@ def telegram_background_watcher():
                             pref=pref
                         )
 
-                        if is_new and code == "i":
+                        if is_new and code in ("i", "o", "n"):
                             # Backfill rich history with notes/packs in background
                             threading.Thread(target=_backfill_store_history_safe, args=(sid, pref), daemon=True).start()
 
