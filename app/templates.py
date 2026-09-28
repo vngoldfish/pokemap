@@ -976,6 +976,21 @@ SHARED_MODALS_HTML = """
                 <div style="font-size:0.7rem; color:#64748b; margin-bottom:8px; line-height:1.4;">
                   Mốc toạ độ để Bot Telegram tự động tính khoảng cách (~km) khi gửi thông báo có hàng (VD: <i>~1.2km (Ga Imamiya)</i>).
                 </div>
+
+                <!-- Smart Google Maps Link / Address Resolver -->
+                <div style="margin-bottom:10px; padding:10px; background:#ffffff; border:1.5px solid #0284c7; border-radius:10px; box-shadow:0 1px 3px rgba(2,132,199,0.1);">
+                  <div style="font-size:0.72rem; color:#0369a1; font-weight:800; margin-bottom:4px; display:flex; align-items:center; gap:4px;">
+                    <span>🔗</span> <span>Dán link Google Maps hoặc Nhập địa chỉ:</span>
+                  </div>
+                  <div style="display:flex; gap:6px;">
+                    <input type="text" id="tg-cfg-smart-input" placeholder="Ví dụ: https://maps.app.goo.gl/... hoặc Ga Namba..." style="flex:1; border:1px solid #cbd5e1; border-radius:8px; padding:7px 10px; font-size:0.78rem; outline:none; background:#ffffff;" onkeydown="if(event.key==='Enter') resolveSmartLocation()" />
+                    <button type="button" onclick="resolveSmartLocation()" style="background:#0284c7; color:#ffffff; border:none; border-radius:8px; padding:7px 14px; font-size:0.75rem; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:4px; white-space:nowrap; box-shadow:0 1px 3px rgba(2,132,199,0.3);">
+                      <span>🚀</span> <span>Nhận diện</span>
+                    </button>
+                  </div>
+                  <div id="tg-smart-loc-msg" style="display:none; font-size:0.7rem; font-weight:700; margin-top:5px; padding:5px 8px; border-radius:6px;"></div>
+                </div>
+
                 <div style="margin-bottom:8px;">
                   <div style="font-size:0.68rem; color:#334155; font-weight:700; margin-bottom:2px;">🏷️ Tên vị trí hiển thị trong tin nhắn:</div>
                   <input type="text" id="tg-cfg-loc-name" placeholder="Ví dụ: Ga Imamiya, Nhà riêng, Chỗ làm..." style="width:100%; border:1px solid #cbd5e1; border-radius:6px; padding:7px 10px; font-size:0.78rem; outline:none; background:#ffffff; font-weight:600;" />
@@ -2658,6 +2673,62 @@ def render_map_page() -> str:
         );
       } else {
         alert('Trình duyệt không hỗ trợ Geolocation.');
+      }
+    }
+
+    async function resolveSmartLocation() {
+      const inputEl = document.getElementById('tg-cfg-smart-input');
+      const msgEl = document.getElementById('tg-smart-loc-msg');
+      if (!inputEl) return;
+      const raw = inputEl.value.trim();
+      if (!raw) {
+        if (msgEl) {
+          msgEl.style.display = 'block';
+          msgEl.style.background = '#fef2f2';
+          msgEl.style.color = '#b91c1c';
+          msgEl.innerText = '⚠️ Vui lòng dán link Google Maps hoặc nhập địa chỉ!';
+        }
+        return;
+      }
+      if (msgEl) {
+        msgEl.style.display = 'block';
+        msgEl.style.background = '#f0f9ff';
+        msgEl.style.color = '#0369a1';
+        msgEl.innerText = '⏳ Đang giải mã toạ độ từ Google Maps...';
+      }
+      try {
+        const res = await fetch('/api/resolve_location', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ input: raw })
+        });
+        const d = await res.json();
+        if (d.status === 'ok') {
+          const nameEl = document.getElementById('tg-cfg-loc-name');
+          const latEl = document.getElementById('tg-cfg-lat');
+          const lngEl = document.getElementById('tg-cfg-lng');
+          if (nameEl) nameEl.value = d.name || 'Vị trí Google Maps';
+          if (latEl) latEl.value = d.lat;
+          if (lngEl) lngEl.value = d.lng;
+          if (msgEl) {
+            msgEl.style.background = '#dcfce7';
+            msgEl.style.color = '#15803d';
+            msgEl.innerText = `✅ Đã nhận diện toạ độ thành công: ${d.lat}, ${d.lng} (${d.name})! Đang tự động lưu...`;
+          }
+          await saveTelegramConfig();
+        } else {
+          if (msgEl) {
+            msgEl.style.background = '#fee2e2';
+            msgEl.style.color = '#b91c1c';
+            msgEl.innerText = `❌ ${d.error || 'Không tìm thấy toạ độ từ thông tin đã nhập'}`;
+          }
+        }
+      } catch (e) {
+        if (msgEl) {
+          msgEl.style.background = '#fee2e2';
+          msgEl.style.color = '#b91c1c';
+          msgEl.innerText = '❌ Lỗi kết nối tới máy chủ khi nhận diện vị trí';
+        }
       }
     }
 
@@ -4889,6 +4960,62 @@ def render_thongbao_page() -> str:
         );
       } else {
         alert('Trình duyệt không hỗ trợ Geolocation.');
+      }
+    }
+
+    async function resolveSmartLocation() {
+      const inputEl = document.getElementById('tg-cfg-smart-input');
+      const msgEl = document.getElementById('tg-smart-loc-msg');
+      if (!inputEl) return;
+      const raw = inputEl.value.trim();
+      if (!raw) {
+        if (msgEl) {
+          msgEl.style.display = 'block';
+          msgEl.style.background = '#fef2f2';
+          msgEl.style.color = '#b91c1c';
+          msgEl.innerText = '⚠️ Vui lòng dán link Google Maps hoặc nhập địa chỉ!';
+        }
+        return;
+      }
+      if (msgEl) {
+        msgEl.style.display = 'block';
+        msgEl.style.background = '#f0f9ff';
+        msgEl.style.color = '#0369a1';
+        msgEl.innerText = '⏳ Đang giải mã toạ độ từ Google Maps...';
+      }
+      try {
+        const res = await fetch('/api/resolve_location', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ input: raw })
+        });
+        const d = await res.json();
+        if (d.status === 'ok') {
+          const nameEl = document.getElementById('tg-cfg-loc-name');
+          const latEl = document.getElementById('tg-cfg-lat');
+          const lngEl = document.getElementById('tg-cfg-lng');
+          if (nameEl) nameEl.value = d.name || 'Vị trí Google Maps';
+          if (latEl) latEl.value = d.lat;
+          if (lngEl) lngEl.value = d.lng;
+          if (msgEl) {
+            msgEl.style.background = '#dcfce7';
+            msgEl.style.color = '#15803d';
+            msgEl.innerText = `✅ Đã nhận diện toạ độ thành công: ${d.lat}, ${d.lng} (${d.name})! Đang tự động lưu...`;
+          }
+          await saveTelegramConfig();
+        } else {
+          if (msgEl) {
+            msgEl.style.background = '#fee2e2';
+            msgEl.style.color = '#b91c1c';
+            msgEl.innerText = `❌ ${d.error || 'Không tìm thấy toạ độ từ thông tin đã nhập'}`;
+          }
+        }
+      } catch (e) {
+        if (msgEl) {
+          msgEl.style.background = '#fee2e2';
+          msgEl.style.color = '#b91c1c';
+          msgEl.innerText = '❌ Lỗi kết nối tới máy chủ khi nhận diện vị trí';
+        }
       }
     }
 

@@ -664,6 +664,7 @@ def test_telegram_filter_tab_structure():
         assert 'id="tg-cfg-loc-name"' in html, f"Missing #tg-cfg-loc-name in {name}"
         assert 'id="tg-cfg-lat"' in html, f"Missing #tg-cfg-lat in {name}"
         assert 'id="tg-cfg-lng"' in html, f"Missing #tg-cfg-lng in {name}"
+        assert 'id="tg-cfg-smart-input"' in html, f"Missing #tg-cfg-smart-input in {name}"
 
         # 3 Filter Groups (Region, Status, Chain - Time filter removed as Telegram is strictly real-time)
         assert 'id="tg-modal-region-group"' in html, f"Missing #tg-modal-region-group in {name}"
@@ -685,6 +686,7 @@ def test_telegram_filter_tab_structure():
         assert "function testTelegramWebhook(" in html, f"Missing testTelegramWebhook in {name}"
         assert "function useCurrentGpsForTelegram(" in html, f"Missing useCurrentGpsForTelegram in {name}"
         assert "function setTelegramLocPreset(" in html, f"Missing setTelegramLocPreset in {name}"
+        assert "function resolveSmartLocation(" in html, f"Missing resolveSmartLocation in {name}"
 
 
 # ==============================================================================
@@ -808,6 +810,35 @@ def test_send_telegram_alert_custom_anchor_location():
         text = posted_messages[0]["text"]
         assert "Nhà riêng" in text
         assert "(Nhà riêng)" in text
+
+
+def test_resolve_google_maps_or_address():
+    """Verify resolve_google_maps_or_address correctly parses coordinates and Google Maps links."""
+    from unittest.mock import patch
+    from app.web import resolve_google_maps_or_address
+
+    # 1. Direct coordinates
+    res_coord = resolve_google_maps_or_address("34.6519, 135.4885")
+    assert res_coord["status"] == "ok"
+    assert res_coord["lat"] == 34.6519
+    assert res_coord["lng"] == 135.4885
+
+    # 2. Mocked Google Maps URL
+    class MockResp:
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            pass
+        def geturl(self):
+            return "https://www.google.co.jp/maps/place/Nakahiraki,+Nishinari+Ward,+Osaka/@34.6519842,135.4896498,447m/data=!3m1!1e3!4m6!3m5!1s0x6000e777f478317f:0x9f6ebfc852dbf4f4!8m2!3d34.6519336!4d135.488452"
+
+    with patch("urllib.request.urlopen", return_value=MockResp()):
+        res_link = resolve_google_maps_or_address("https://maps.app.goo.gl/JZJCL16gyKbZYJyw9")
+        assert res_link["status"] == "ok"
+        assert res_link["lat"] == 34.6519
+        assert res_link["lng"] == 135.4885
+        assert "Nakahiraki" in res_link["name"]
+
 
 
 

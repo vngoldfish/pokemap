@@ -435,6 +435,127 @@ async def send_webhook_notification(request: Request):
         return JSONResponse(status_code=500, content={"status": "error", "error": str(e)})
 
 
+def resolve_google_maps_or_address(raw_input: str) -> dict:
+    """
+    Resolve Google Maps URLs (short links like maps.app.goo.gl, standard URLs)
+    or text addresses / coordinates into exact {lat, lng, name}.
+    """
+    import re
+    import urllib.request
+    import urllib.parse
+
+    raw = (raw_input or "").strip()
+    if not raw:
+        return {"status": "error", "error": "Vui lòng nhập link Google Maps hoặc địa chỉ"}
+
+    # 1. Raw coordinates: e.g. "34.6519, 135.4885" or "34.6519 135.4885"
+    coord_m = re.match(r"^([-+]?\d{1,3}\.\d+)[,\s]+([-+]?\d{1,3}\.\d+)$", raw)
+    if coord_m:
+        lat = round(float(coord_m.group(1)), 4)
+        lng = round(float(coord_m.group(2)), 4)
+        return {
+            "status": "ok",
+            "lat": lat,
+            "lng": lng,
+            "name": f"Toạ độ ({lat}, {lng})"
+        }
+
+    # 2. URL (Google Maps short link or standard link)
+    if "maps.app.goo.gl" in raw or "goo.gl/maps" in raw or "google." in raw or raw.startswith("http://") or raw.startswith("https://"):
+        try:
+            req = urllib.request.Request(
+                raw,
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                final_url = resp.geturl()
+
+            lat, lng = None, None
+            # Pinpoint coordinates !3d... !4d...
+            m_pin = re.search(r"!3d([-+]?\d+\.\d+)!4d([-+]?\d+\.\d+)", final_url)
+            # Center / map position @lat,lng
+            m_at = re.search(r"@([-+]?\d+\.\d+),([-+]?\d+\.\d+)", final_url)
+            # Query param ?q=lat,lng or &ll=lat,lng
+            m_q = re.search(r"[?&](?:q|ll)=([-+]?\d+\.\d+),([-+]?\d+\.\d+)", final_url)
+
+            if m_pin:
+                lat, lng = float(m_pin.group(1)), float(m_pin.group(2))
+            elif m_at:
+                lat, lng = float(m_at.group(1)), float(m_at.group(2))
+            elif m_q:
+                lat, lng = float(m_q.group(1)), float(m_q.group(2))
+
+            m_name = re.search(r"/place/([^/@]+)", final_url)
+            name = ""
+            if m_name:
+                decoded = urllib.parse.unquote_plus(m_name.group(1))
+                parts = [p.strip() for p in decoded.split(",") if p.strip()]
+                if parts:
+                    name = parts[0]
+
+            if lat is not None and lng is not None:
+                return {
+                    "status": "ok",
+                    "lat": round(lat, 4),
+                    "lng": round(lng, 4),
+                    "name": name or "Vị trí Google Maps"
+                }
+        except Exception as e:
+            return {"status": "error", "error": f"Không thể giải mã link Google Maps: {str(e)}"}
+
+    # 3. Search in local stores database (names or addresses)
+    try:
+        from .db import get_db_connection
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT name, lat, lng FROM stores WHERE name LIKE ? OR address LIKE ? LIMIT 1;", (f"%{raw}%", f"%{raw}%"))
+            row = cursor.fetchone()
+            if row and row["lat"] and row["lng"]:
+                return {
+                    "status": "ok",
+                    "lat": round(float(row["lat"]), 4),
+                    "lng": round(float(row["lng"]), 4),
+                    "name": row["name"]
+                }
+    except Exception:
+        pass
+
+    # 4. OpenStreetMap Nominatim Geocoding
+    try:
+        url = "https://nominatim.openstreetmap.org/search?" + urllib.parse.urlencode({
+            "q": raw,
+            "format": "json",
+            "limit": 1,
+            "addressdetails": 1
+        })
+        req = urllib.request.Request(url, headers={"User-Agent": "BawuiPokeMap/1.0 (contact@bawui.com)"})
+        with urllib.request.urlopen(req, timeout=6) as resp:
+            data = json.loads(resp.read().decode())
+            if data:
+                item = data[0]
+                return {
+                    "status": "ok",
+                    "lat": round(float(item["lat"]), 4),
+                    "lng": round(float(item["lon"]), 4),
+                    "name": item.get("display_name", "").split(",")[0].strip() or raw
+                }
+    except Exception:
+        pass
+
+    return {"status": "error", "error": "Không tìm thấy toạ độ từ link hoặc địa chỉ này. Vui lòng kiểm tra lại."}
+
+
+@app.post("/api/resolve_location")
+async def api_resolve_location(request: Request):
+    try:
+        body = await request.json()
+        raw = body.get("input", "") or body.get("url", "") or body.get("address", "")
+        result = resolve_google_maps_or_address(raw)
+        return JSONResponse(content=result)
+    except Exception as e:
+        return JSONResponse(content={"status": "error", "error": str(e)}, status_code=400)
+
+
 def _backfill_store_history_safe(store_id: str, pref: str = "osaka"):
     """Safely fetch full history from PokéTan and save to SQLite in background."""
     clean_id = store_id[:-2] if store_id.endswith("_c") else store_id
