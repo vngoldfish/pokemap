@@ -595,3 +595,29 @@ def test_settings_map_filter_tab_structure():
         assert "function switchSettingsTab(" in html, f"Missing switchSettingsTab in {name}"
         assert "function applyAndCloseMapFilterModal(" in html, f"Missing applyAndCloseMapFilterModal in {name}"
         assert "function resetMapFilters(" in html, f"Missing resetMapFilters in {name}"
+
+
+# ==============================================================================
+# 12. Map Header Brand Only (LOGO BAWUI TENPAI MAP)
+# ==============================================================================
+
+def test_map_header_brand_only():
+    """Verify header on Map page strictly displays only LOGO + BAWUI TENPAI MAP."""
+    map_html = render_map_page()
+
+    # Extract header element
+    header_match = re.search(r'<header id="poketan-header"[^>]*>(.*?)</header>', map_html, re.DOTALL)
+    assert header_match, "poketan-header not found in map page"
+    header_content = header_match.group(1)
+
+    # 1. Brand logo and title MUST be inside header
+    assert "brand-logo-icon" in header_content, "Missing brand-logo-icon in header"
+    assert "BAWUI" in header_content, "Missing BAWUI text in header"
+    assert "TENPAI MAP" in header_content, "Missing TENPAI MAP text in header"
+
+    # 2. Filter buttons and stats breakdown MUST NOT be inside header
+    assert "btn-map-filter" not in header_content, "btn-map-filter should be removed from header"
+    assert "btn-map-filter-clear" not in header_content, "btn-map-filter-clear should be removed from header"
+    assert "map-counter-pill" not in header_content, "map-counter-pill should be removed from header"
+    assert "mft-title" not in header_content, "mft-title should be removed from header"
+

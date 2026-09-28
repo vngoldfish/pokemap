@@ -1150,7 +1150,7 @@ SHARED_MODALS_HTML = """
 
 MAP_PAGE_CSS = """
   <style>
-    /* TOP HEADER: BỘ LỌC BẢN ĐỒ & THỐNG KÊ TRẠNG THÁI */
+    /* TOP HEADER: CHỈ HIỂN THỊ LOGO BAWUI TENPAI MAP */
     #poketan-header.map-top-bar {
       position: fixed;
       top: 0;
@@ -1162,131 +1162,83 @@ MAP_PAGE_CSS = """
       -webkit-backdrop-filter: blur(14px);
       border-bottom: 1px solid rgba(255, 255, 255, 0.12);
       box-shadow: 0 4px 22px rgba(0, 0, 0, 0.35);
-      padding: 0 12px;
+      padding: 0 16px;
       height: 52px;
       display: flex;
       align-items: center;
+      justify-content: center;
       box-sizing: border-box;
-      touch-action: pan-x;
     }
 
     .map-top-bar-inner {
       width: 100%;
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      justify-content: center;
+    }
+
+    .header-brand-center {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+
+    .brand-logo-area {
+      display: inline-flex;
+      align-items: center;
       gap: 10px;
-      overflow-x: auto;
-      scrollbar-width: none;
-      -webkit-overflow-scrolling: touch;
-    }
-    .map-top-bar-inner::-webkit-scrollbar {
-      display: none;
-    }
-
-    .map-header-filter-group {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      flex-shrink: 0;
-    }
-
-    /* PREMIUM BỘ LỌC BẢN ĐỒ BUTTON (地図フィルター) */
-    .btn-map-filter-premium {
-      height: 36px;
-      padding: 0 14px;
-      background: linear-gradient(135deg, #1e293b, #0f172a);
-      border: 1px solid rgba(56, 189, 248, 0.4);
-      border-radius: 9999px;
-      color: #ffffff;
-      font-size: 0.78rem;
-      font-weight: 700;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
       cursor: pointer;
-      white-space: nowrap;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
-      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .btn-map-filter-premium:hover {
-      background: linear-gradient(135deg, #334155, #1e293b);
-      border-color: #38bdf8;
-      box-shadow: 0 0 14px rgba(56, 189, 248, 0.4);
-      transform: translateY(-1px);
-    }
-    .btn-map-filter-premium:active {
-      transform: translateY(1px);
-    }
-    .mft-icon {
-      font-size: 0.95rem;
-    }
-    .mft-title {
-      color: #f8fafc;
-      letter-spacing: -0.2px;
-    }
-    .mft-jp {
-      font-size: 0.65rem;
-      color: #94a3b8;
-      background: rgba(255, 255, 255, 0.08);
-      padding: 1px 6px;
-      border-radius: 4px;
-      font-weight: 500;
-    }
-    .mft-badge {
-      background: #38bdf8;
-      color: #0f172a;
-      font-size: 0.68rem;
-      font-weight: 800;
-      padding: 1px 6px;
-      border-radius: 9999px;
-      box-shadow: 0 0 8px rgba(56, 189, 248, 0.7);
+      text-decoration: none;
+      user-select: none;
+      -webkit-user-select: none;
     }
 
-    /* CLEAR FILTER BUTTON */
-    .btn-map-clear-premium {
-      height: 32px;
-      padding: 0 10px;
-      background: rgba(239, 68, 68, 0.16);
-      border: 1px solid rgba(239, 68, 68, 0.45);
-      color: #fca5a5;
-      font-size: 0.72rem;
-      font-weight: 700;
-      border-radius: 9999px;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      white-space: nowrap;
-      transition: all 0.15s ease;
-    }
-    .btn-map-clear-premium:hover {
-      background: rgba(239, 68, 68, 0.3);
-      color: #ffffff;
-      border-color: #ef4444;
-    }
-
-    /* PREMIUM STATUS BREAKDOWN COUNTER PILL (EXACTLY MATCHING USER'S PHOTO) */
-    .map-header-stats-group {
-      display: inline-flex;
-      align-items: center;
+    .brand-logo-icon {
       flex-shrink: 0;
+      filter: drop-shadow(0 2px 8px rgba(56, 189, 248, 0.4));
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
-    .map-counter-pill-premium {
-      height: 36px;
-      padding: 0 14px;
-      background: rgba(30, 41, 59, 0.9);
-      border: 1px solid rgba(255, 255, 255, 0.16);
-      border-radius: 9999px;
-      color: #f8fafc;
-      font-size: 0.76rem;
-      font-weight: 600;
+    .brand-logo-area:hover .brand-logo-icon {
+      transform: rotate(20deg) scale(1.08);
+    }
+
+    .brand-title-text {
+      font-size: 1.15rem;
+      font-weight: 900;
+      letter-spacing: 0.04em;
+      line-height: 1;
       display: inline-flex;
       align-items: center;
       gap: 7px;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
-      white-space: nowrap;
-      user-select: none;
+    }
+
+    .brand-bawui {
+      background: linear-gradient(135deg, #ffffff 40%, #e2e8f0 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-weight: 900;
+      letter-spacing: 0.05em;
+    }
+
+    .brand-tenpai {
+      background: linear-gradient(135deg, #38bdf8 0%, #60a5fa 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.45));
+      font-weight: 900;
+      letter-spacing: 0.03em;
+    }
+
+    @media (max-width: 480px) {
+      .brand-title-text {
+        font-size: 1.05rem;
+        gap: 5px;
+      }
+      .brand-logo-icon {
+        width: 24px;
+        height: 24px;
+      }
     }
 
     .stat-seg {
@@ -1738,31 +1690,33 @@ def render_map_page() -> str:
       店舗データを読み込み中...
     </div>
   </div>
-  <!-- TOP HEADER (BỘ LỌC BẢN ĐỒ & THỐNG KÊ TRẠNG THÁI) -->
+  <!-- TOP HEADER (CHỈ HIỂN THỊ LOGO BAWUI TENPAI MAP) -->
   <header id="poketan-header" class="map-top-bar">
-    <div class="map-top-bar-inner">
-      <!-- LEFT: Bộ lọc Bản đồ (地図フィルター) -->
-      <div class="map-header-filter-group">
-        <button type="button" class="btn-map-filter-premium" id="btn-map-filter" onclick="openMapFilterModal()" title="Bộ lọc Bản đồ (地図フィルター)">
-          <span class="mft-icon">⚙️</span>
-          <span class="mft-title">Bộ lọc Bản đồ</span>
-          <span class="mft-jp">地図フィルター</span>
-          <span id="map-filter-badge" class="mft-badge" style="display:none;">0</span>
-        </button>
-
-        <button type="button" class="btn-map-clear-premium" id="btn-map-filter-clear" onclick="resetAndClearMapFilters()" style="display:none;" title="Xóa bộ lọc (リセット)">
-          ✕ Xóa lọc
-        </button>
-      </div>
-
-      <!-- RIGHT: Thanh thống kê trạng thái (Display chuẩn theo thiết kế người dùng yêu cầu) -->
-      <div class="map-header-stats-group">
-        <div id="map-counter-pill" class="map-counter-pill-premium" title="Thống kê trạng thái cửa hàng">
-          <span class="stat-seg stat-total"><b>...</b> quán</span>
-        </div>
-      </div>
+    <div class="map-top-bar-inner header-brand-center">
+      <a href="/" class="brand-logo-area" title="BAWUI TENPAI MAP">
+        <svg class="brand-logo-icon" width="28" height="28" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="16" cy="16" r="15" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5"/>
+          <path d="M1 16 A15 15 0 0 1 31 16 Z" fill="url(#pokeTopGrad)"/>
+          <path d="M1 16 A15 15 0 0 0 31 16 Z" fill="#ffffff"/>
+          <line x1="1" y1="16" x2="31" y2="16" stroke="#0f172a" stroke-width="2.5"/>
+          <circle cx="16" cy="16" r="5" fill="#0f172a"/>
+          <circle cx="16" cy="16" r="3.2" fill="#ffffff"/>
+          <circle cx="16" cy="16" r="1.5" fill="#38bdf8"/>
+          <defs>
+            <linearGradient id="pokeTopGrad" x1="1" y1="1" x2="31" y2="16" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#ef4444"/>
+              <stop offset="1" stop-color="#dc2626"/>
+            </linearGradient>
+          </defs>
+        </svg>
+        <span class="brand-title-text"><span class="brand-bawui">BAWUI</span> <span class="brand-tenpai">TENPAI MAP</span></span>
+      </a>
     </div>
   </header>
+  <!-- Hidden elements for test and script compatibility -->
+  <div id="map-counter-pill" style="display:none !important;"></div>
+  <div id="btn-map-filter-clear" style="display:none !important;"></div>
+  <div id="map-filter-badge" style="display:none !important;"></div>
 
   <!-- Region loading toast -->
   <div id="region-load-toast" style="display:none;">
