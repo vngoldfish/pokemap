@@ -2549,33 +2549,56 @@ def render_map_page() -> str:
         updateGpsBtnState();
       }
 
-      // 1. Initial immediate location fix
+      function onPositionSuccess(pos) {
+        userLat = pos.coords.latitude;
+        userLng = pos.coords.longitude;
+        try {
+          localStorage.setItem('poketan_user_lat', String(userLat));
+          localStorage.setItem('poketan_user_lng', String(userLng));
+        } catch(e) {}
+        updateUserMarker(userLat, userLng, pos.coords.accuracy || 25);
+        if (btn) {
+          btn.classList.remove('locating');
+          updateGpsBtnState();
+        }
+        const urlParams = new URLSearchParams(window.location.search);
+        if (autoFly && !urlParams.get('focus') && urlParams.get('hunt') !== '1') {
+          map.flyTo([userLat, userLng], 15, { duration: 1.0 });
+        }
+      }
+
+      function onPositionFailure() {
+        if (btn) {
+          btn.classList.remove('locating');
+          updateGpsBtnState();
+        }
+        try {
+          const cLat = localStorage.getItem('poketan_user_lat');
+          const cLng = localStorage.getItem('poketan_user_lng');
+          if (cLat && cLng && userLat === null) {
+            userLat = parseFloat(cLat);
+            userLng = parseFloat(cLng);
+            updateUserMarker(userLat, userLng, 50);
+          }
+        } catch(e) {}
+      }
+
+      // 1. Initial immediate location fix with graceful fallback
       navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          userLat = pos.coords.latitude;
-          userLng = pos.coords.longitude;
-          try {
-            localStorage.setItem('poketan_user_lat', String(userLat));
-            localStorage.setItem('poketan_user_lng', String(userLng));
-          } catch(e) {}
-          updateUserMarker(userLat, userLng, pos.coords.accuracy || 25);
-          if (btn) {
-            btn.classList.remove('locating');
-            updateGpsBtnState();
-          }
-          const urlParams = new URLSearchParams(window.location.search);
-          if (autoFly && !urlParams.get('focus') && urlParams.get('hunt') !== '1') {
-            map.flyTo([userLat, userLng], 15, { duration: 1.0 });
-          }
-        },
+        onPositionSuccess,
         (err) => {
-          if (btn) {
-            btn.classList.remove('locating');
-            updateGpsBtnState();
+          if (err && err.code === 1) { // PERMISSION_DENIED
+            onPositionFailure();
+            return;
           }
-          console.warn('GPS initial fix warning:', err);
+          // Fallback to low-accuracy / network / Wi-Fi positioning (succeeds indoors and on desktops)
+          navigator.geolocation.getCurrentPosition(
+            onPositionSuccess,
+            () => { onPositionFailure(); },
+            { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
+          );
         },
-        { enableHighAccuracy: true, timeout: 8000 }
+        { enableHighAccuracy: true, timeout: 4000, maximumAge: 60000 }
       );
 
       // 2. Real-time continuous tracking as device moves
@@ -2583,22 +2606,9 @@ def render_map_page() -> str:
         navigator.geolocation.clearWatch(gpsWatchId);
       }
       gpsWatchId = navigator.geolocation.watchPosition(
-        (pos) => {
-          userLat = pos.coords.latitude;
-          userLng = pos.coords.longitude;
-          try {
-            localStorage.setItem('poketan_user_lat', String(userLat));
-            localStorage.setItem('poketan_user_lng', String(userLng));
-          } catch(e) {}
-          updateUserMarker(userLat, userLng, pos.coords.accuracy || 25);
-          if (isFollowingUser) {
-            map.panTo([userLat, userLng], { animate: true, duration: 0.5 });
-          }
-        },
-        (err) => {
-          console.warn('GPS watch error:', err);
-        },
-        { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }
+        onPositionSuccess,
+        () => {},
+        { enableHighAccuracy: false, maximumAge: 5000, timeout: 15000 }
       );
     }
 
@@ -2659,6 +2669,17 @@ def render_map_page() -> str:
         if (nameEl && !nameEl.value.trim()) nameEl.value = 'Vị trí của bạn';
         return;
       }
+      try {
+        const cLat = localStorage.getItem('poketan_user_lat');
+        const cLng = localStorage.getItem('poketan_user_lng');
+        if (cLat && cLng) {
+          if (latEl) latEl.value = parseFloat(cLat).toFixed(4);
+          if (lngEl) lngEl.value = parseFloat(cLng).toFixed(4);
+          if (nameEl && !nameEl.value.trim()) nameEl.value = 'Vị trí của bạn';
+          return;
+        }
+      } catch(e) {}
+
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           (pos) => {
@@ -2666,10 +2687,20 @@ def render_map_page() -> str:
             if (lngEl) lngEl.value = pos.coords.longitude.toFixed(4);
             if (nameEl && !nameEl.value.trim()) nameEl.value = 'Vị trí của bạn';
           },
-          (err) => {
-            alert('Không thể lấy vị trí GPS hiện tại từ trình duyệt: ' + err.message);
+          () => {
+            navigator.geolocation.getCurrentPosition(
+              (pos2) => {
+                if (latEl) latEl.value = pos2.coords.latitude.toFixed(4);
+                if (lngEl) lngEl.value = pos2.coords.longitude.toFixed(4);
+                if (nameEl && !nameEl.value.trim()) nameEl.value = 'Vị trí của bạn';
+              },
+              () => {
+                alert('Không thể tự lấy GPS từ thiết bị. Bạn có thể dán link Google Maps hoặc gõ địa chỉ vào ô bên trên nhé!');
+              },
+              { enableHighAccuracy: false, timeout: 8000 }
+            );
           },
-          { enableHighAccuracy: true, timeout: 8000 }
+          { enableHighAccuracy: true, timeout: 4000 }
         );
       } else {
         alert('Trình duyệt không hỗ trợ Geolocation.');
@@ -4946,6 +4977,17 @@ def render_thongbao_page() -> str:
         if (nameEl && !nameEl.value.trim()) nameEl.value = 'Vị trí của bạn';
         return;
       }
+      try {
+        const cLat = localStorage.getItem('poketan_user_lat');
+        const cLng = localStorage.getItem('poketan_user_lng');
+        if (cLat && cLng) {
+          if (latEl) latEl.value = parseFloat(cLat).toFixed(4);
+          if (lngEl) lngEl.value = parseFloat(cLng).toFixed(4);
+          if (nameEl && !nameEl.value.trim()) nameEl.value = 'Vị trí của bạn';
+          return;
+        }
+      } catch(e) {}
+
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           (pos) => {
@@ -4953,10 +4995,20 @@ def render_thongbao_page() -> str:
             if (lngEl) lngEl.value = pos.coords.longitude.toFixed(4);
             if (nameEl && !nameEl.value.trim()) nameEl.value = 'Vị trí của bạn';
           },
-          (err) => {
-            alert('Không thể lấy vị trí GPS hiện tại từ trình duyệt: ' + err.message);
+          () => {
+            navigator.geolocation.getCurrentPosition(
+              (pos2) => {
+                if (latEl) latEl.value = pos2.coords.latitude.toFixed(4);
+                if (lngEl) lngEl.value = pos2.coords.longitude.toFixed(4);
+                if (nameEl && !nameEl.value.trim()) nameEl.value = 'Vị trí của bạn';
+              },
+              () => {
+                alert('Không thể tự lấy GPS từ thiết bị. Bạn có thể dán link Google Maps hoặc gõ địa chỉ vào ô bên trên nhé!');
+              },
+              { enableHighAccuracy: false, timeout: 8000 }
+            );
           },
-          { enableHighAccuracy: true, timeout: 8000 }
+          { enableHighAccuracy: true, timeout: 4000 }
         );
       } else {
         alert('Trình duyệt không hỗ trợ Geolocation.');
