@@ -1267,18 +1267,18 @@ MAP_PAGE_CSS = """
       z-index: 3000 !important;
     }
     .stock-circle-target {
-      width: 22px;
-      height: 22px;
+      width: 24px;
+      height: 24px;
       border-radius: 50%;
-      background: rgba(34, 197, 94, 0.28);
-      border: 2.5px solid #16a34a;
+      background: rgba(16, 185, 129, 0.28);
+      border: 2.5px solid #10b981;
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 0 12px rgba(34, 197, 94, 0.85), 0 2px 5px rgba(0,0,0,0.3);
+      box-shadow: 0 0 16px rgba(16, 185, 129, 0.9), 0 2px 6px rgba(0,0,0,0.35);
       position: relative;
     }
-    .stock-circle-target::after {
+    .stock-circle-target::before, .stock-circle-target::after {
       content: '';
       position: absolute;
       top: -5px;
@@ -1286,31 +1286,39 @@ MAP_PAGE_CSS = """
       right: -5px;
       bottom: -5px;
       border-radius: 50%;
-      border: 2px solid #22c55e;
-      animation: stockRipple 1.6s ease-out infinite;
+      border: 2px solid #10b981;
+      animation: stockRipple 2s cubic-bezier(0, 0.2, 0.8, 1) infinite;
       pointer-events: none;
     }
+    .stock-circle-target::after {
+      animation-delay: 1s;
+    }
     @keyframes stockRipple {
-      0% { transform: scale(0.7); opacity: 1; }
-      100% { transform: scale(2.2); opacity: 0; }
+      0% { transform: scale(0.6); opacity: 1; border-color: #34d399; }
+      100% { transform: scale(2.4); opacity: 0; border-color: #059669; }
     }
     .stock-circle-inner {
       width: 10px;
       height: 10px;
       border-radius: 50%;
-      background: #16a34a;
-      box-shadow: 0 0 6px #16a34a;
+      background: #10b981;
+      box-shadow: 0 0 8px #34d399;
     }
     .stock-time-badge {
-      background: rgba(15, 23, 42, 0.92);
-      color: #4ade80;
-      border: 1px solid rgba(74, 222, 128, 0.4);
+      background: rgba(15, 23, 42, 0.94);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      color: #34d399;
+      border: 1px solid rgba(52, 211, 153, 0.45);
       font-size: 0.72rem;
       font-weight: 800;
-      padding: 2px 7px;
+      padding: 3px 8px;
       border-radius: 9999px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.35);
       letter-spacing: -0.2px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
     }
 
     /* CONBINI CIRCULAR DOT PINS - 100% CLEAN CIRCLES, NO LETTERS */
@@ -1449,30 +1457,49 @@ MAP_PAGE_CSS = """
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 4px;
-      padding: 8px 6px;
-      background: #2563eb;
+      gap: 5px;
+      padding: 9px 8px;
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
       color: white;
       text-decoration: none;
-      border-radius: 8px;
+      border-radius: 10px;
       font-weight: 700;
-      font-size: 0.74rem;
+      font-size: 0.76rem;
       border: none;
       cursor: pointer;
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+      transition: all 0.15s ease;
+    }
+    .btn-popup-maps:hover {
+      background: linear-gradient(135deg, #1d4ed8, #1e40af);
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.5);
+      transform: translateY(-1px);
+    }
+    .btn-popup-maps:active {
+      transform: translateY(0);
     }
     .btn-popup-hist {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 4px;
-      padding: 8px 6px;
-      background: #0f172a;
+      gap: 5px;
+      padding: 9px 8px;
+      background: linear-gradient(135deg, #0f172a, #1e293b);
       color: white;
-      border-radius: 8px;
+      border-radius: 10px;
       font-weight: 700;
-      font-size: 0.74rem;
-      border: none;
+      font-size: 0.76rem;
+      border: 1px solid rgba(255, 255, 255, 0.12);
       cursor: pointer;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.25);
+      transition: all 0.15s ease;
+    }
+    .btn-popup-hist:hover {
+      background: linear-gradient(135deg, #1e293b, #334155);
+      transform: translateY(-1px);
+    }
+    .btn-popup-hist:active {
+      transform: translateY(0);
     }
     .popup-hist-scroll {
       margin-top: 10px;
@@ -1687,8 +1714,6 @@ def render_map_page() -> str:
     let currentPref = REGIONS[currentRegion].prefs[0] || 'osaka';
 
     let storesDict = {};
-    let hotStatus = {};
-    let coldStatus = {};
     let configData = {};
     let serverTimeOffset = 0; // seconds: serverNow - browserNow
 
@@ -1771,37 +1796,7 @@ def render_map_page() -> str:
     map.addLayer(clusterGroup);
     const stockLayer = L.layerGroup().addTo(map);
 
-    // 3. DECODE STATUS & ICONS
-    function decodeStatus(rawVal) {
-      if (!rawVal || typeof rawVal !== 'string') {
-        return { code: 'u', label: '不明', packs: [], reported_at: '', timeAgo: '', onsite: false, timestamp: 0 };
-      }
-      const code = rawVal[0].toLowerCase();
-      let rest = rawVal.substring(1);
-      let onsite = false;
-      if (rest.endsWith('g')) { onsite = true; rest = rest.slice(0, -1); }
-      let packs = [];
-      const packCodes = configData.packCodes || {};
-      for (const [pCode, pName] of Object.entries(packCodes)) {
-        if (rest.endsWith(pCode)) { packs.push(pName); rest = rest.slice(0, -pCode.length); }
-      }
-      let dtStr = '', timeAgo = '', timestamp = 0;
-      if (rest.length >= 10) {
-        const parsed = parseInt(rest.substring(0, 10), 10);
-        if (!isNaN(parsed) && parsed > 0) {
-          timestamp = parsed;
-          const d = new Date(parsed * 1000);
-          dtStr = `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')} (${d.getMonth()+1}/${d.getDate()})`;
-          const diffSec = Math.floor(Date.now() / 1000 - parsed);
-          if (diffSec < 60) timeAgo = 'たった今';
-          else if (diffSec < 3600) timeAgo = `${Math.floor(diffSec / 60)}分前`;
-          else if (diffSec < 86400) timeAgo = `${Math.floor(diffSec / 3600)}時間前`;
-          else timeAgo = `${Math.floor(diffSec / 86400)}日前`;
-        }
-      }
-      const labelMap = { 'i': '在庫あり', 'o': '在庫なし', 'n': '扱ってない', 'u': '未確認' };
-      return { code, label: labelMap[code] || '未確認', packs, reported_at: dtStr, timeAgo, onsite, timestamp };
-    }
+    // 3. STORE STATUS & ICONS
 
     function getStoreStatusInfo(store) {
       let code = (store.status || 'u').toLowerCase();
@@ -1954,7 +1949,6 @@ def render_map_page() -> str:
       stockLayer.clearLayers();
 
       const allStores = Object.values(storesDict);
-      const effectiveStatus = { ...coldStatus, ...hotStatus };
       const now = Math.floor(Date.now() / 1000);
       const clusterBatch = [];
       let newestInStore = null, maxTimestamp = 0;
@@ -2115,7 +2109,6 @@ def render_map_page() -> str:
       if (!badgeEl) return;
 
       const lastReadTs = parseInt(localStorage.getItem('poketan_last_read_ts') || '0', 10);
-      const effectiveStatus = { ...coldStatus, ...hotStatus };
       const allStores = Object.values(storesDict);
       const targetRegion = mapRegionFilter || currentRegion || 'osaka';
       const allowedPrefs = (REGIONS[targetRegion] ? REGIONS[targetRegion].prefs : [targetRegion]) || ['osaka'];
@@ -3770,8 +3763,6 @@ def render_thongbao_page() -> str:
     let currentPref = REGIONS[currentRegion].prefs[0] || 'osaka';
 
     let storesDict = {};
-    let hotStatus = {};
-    let coldStatus = {};
     let configData = {};
     const storeHistoryCache = {};
     const storeCountsCache = {};
@@ -3815,48 +3806,6 @@ def render_thongbao_page() -> str:
     } catch(e) {}
 
     // 2. HELPERS
-    function decodeStatus(rawVal, confVal = '') {
-      if (!rawVal || typeof rawVal !== 'string') {
-        return { code: 'u', label: 'Chưa có tin', packs: [], reported_at: '', timeOnly: '', dateOnly: '', timeAgo: '', onsite: false, timestamp: 0 };
-      }
-      const code = rawVal[0].toLowerCase();
-      let rest = rawVal.substring(1);
-      let onsite = false;
-      const confCombined = (confVal || '') + rest;
-      if (confCombined.includes('g')) { onsite = true; }
-
-      let packs = [];
-      const packCodes = configData.packCodes || {};
-      for (const [pCode, pName] of Object.entries(packCodes)) {
-        if (confCombined.includes(pCode)) { packs.push(pName); }
-      }
-
-      let dtStr = '', timeAgo = '', timeOnly = '', dateOnly = '', timestamp = 0;
-      if (rest.length >= 10) {
-        const parsed = parseInt(rest.substring(0, 10), 10);
-        if (!isNaN(parsed) && parsed > 0) {
-          timestamp = parsed;
-          const jst = new Date((parsed + 9 * 3600) * 1000);
-          const hours = String(jst.getUTCHours()).padStart(2, '0');
-          const minutes = String(jst.getUTCMinutes()).padStart(2, '0');
-          const seconds = String(jst.getUTCSeconds()).padStart(2, '0');
-          const day = String(jst.getUTCDate()).padStart(2, '0');
-          const month = String(jst.getUTCMonth() + 1).padStart(2, '0');
-          timeOnly = `${hours}:${minutes}:${seconds}`;
-          dateOnly = `${day}/${month}`;
-          dtStr = `${hours}:${minutes} (${day}/${month})`;
-
-          const diffSec = Math.max(0, getServerNowSec() - parsed);
-          if (diffSec < 60) timeAgo = 'Vừa xong';
-          else if (diffSec < 3600) timeAgo = `${Math.floor(diffSec / 60)} phút trước`;
-          else if (diffSec < 86400) timeAgo = `${Math.floor(diffSec / 3600)} giờ trước`;
-          else timeAgo = `${Math.floor(diffSec / 86400)} ngày trước`;
-        }
-      }
-      const labelMap = { 'i': 'Có hàng', 'o': 'Không có', 'n': 'Không bán thẻ', 'u': 'Chưa có tin' };
-      return { code, label: labelMap[code] || 'Chưa có tin', packs, reported_at: dtStr, timeOnly, dateOnly, timeAgo, onsite, timestamp };
-    }
-
     function getStoreStatusInfo(store) {
       let code = (store.status || 'u').toLowerCase();
       let timestamp = Number(store.last_timestamp) || 0;
@@ -3935,7 +3884,6 @@ def render_thongbao_page() -> str:
       if (!listContainer) return;
 
       const allStores = Object.values(storesDict);
-      const effectiveStatus = { ...coldStatus, ...hotStatus };
       const now = Math.floor(Date.now() / 1000);
       const q = query.toLowerCase().trim();
 

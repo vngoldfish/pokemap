@@ -23,6 +23,7 @@ Features:
 import sys
 import os
 import json
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Query, Request
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -47,12 +48,16 @@ from .db import (
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
-# Initialize local SQLite database and populate stores on startup
-init_db()
-seed_stores_if_empty()
-threading.Thread(target=backfill_all_poketan_statuses, daemon=True).start()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Initialize local SQLite database and populate stores on startup
+    init_db()
+    seed_stores_if_empty()
+    threading.Thread(target=backfill_all_poketan_statuses, daemon=True).start()
+    start_background_watcher()
+    yield
 
-app = FastAPI(title="BAWUI POKE APP - Real-Time Stock & Lottery Tracker")
+app = FastAPI(title="BAWUI POKE APP - Real-Time Stock & Lottery Tracker", lifespan=lifespan)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 SETTINGS_FILE = os.path.join(DEFAULT_CACHE_DIR, "settings.json")
@@ -512,10 +517,6 @@ def start_background_watcher():
     return _watcher_thread
 
 
-@app.on_event("startup")
-def startup_event():
-    start_background_watcher()
-
 
 @app.post("/api/record_report")
 async def record_report_endpoint(request: Request):
@@ -806,9 +807,6 @@ def main():
     print("🚀 BAWUI POKE APP - Instant Real-Time Push Dashboard")
     print(f"👉 Mở trình duyệt tại: http://localhost:{port}")
     print("=================================================================")
-
-    # Start 24/7 background Telegram stock watcher daemon
-    start_background_watcher()
 
     uvicorn.run("app.web:app", host="0.0.0.0", port=port, reload=False)
 
