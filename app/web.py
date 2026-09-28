@@ -837,18 +837,19 @@ def get_hot_status(region: Optional[str] = None, pref: Optional[str] = None):
 def get_store_history(store_id: str):
     clean_id = store_id[:-2] if store_id.endswith("_c") else store_id
     try:
-        local_hist = db_get_store_history(clean_id, limit=100)
-        # If fewer than 2 records, backfill from PokéTan and save into SQLite
-        if len(local_hist) < 2:
-            try:
+        remote_hist = None
+        try:
+            remote_hist = fetch_store_history(clean_id)
+            if remote_hist:
                 existing_s = db_get_store_by_id(clean_id)
                 store_pref = existing_s.get("pref") if existing_s else "osaka"
-                remote_hist = fetch_store_history(clean_id)
-                if remote_hist:
-                    save_bulk_history(clean_id, remote_hist, source="poketan", pref=store_pref)
-                    local_hist = db_get_store_history(clean_id, limit=100)
-            except Exception as e:
-                print(f"[DB] Error backfilling history for {clean_id}: {e}")
+                save_bulk_history(clean_id, remote_hist, source="poketan", pref=store_pref)
+        except Exception as e:
+            print(f"[DB] Error syncing remote history for {clean_id}: {e}")
+
+        local_hist = db_get_store_history(clean_id, limit=100)
+        if not local_hist and remote_hist:
+            return JSONResponse(content=remote_hist)
         return JSONResponse(content=local_hist)
     except Exception as e:
         print(f"Error fetching history for {clean_id}:", e)

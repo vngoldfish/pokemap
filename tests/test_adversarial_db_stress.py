@@ -73,7 +73,8 @@ def test_adversarial_concurrent_writes_and_reads_no_locks():
                     status_code=status,
                     timestamp=ts,
                     note=f"Adversarial write {thread_id}-{i}",
-                    source="pytest_adversarial"
+                    source="pytest_adversarial",
+                    notify=False
                 )
                 with counter_lock:
                     completed_writes += 1
@@ -163,23 +164,23 @@ def test_adversarial_concurrent_writes_and_reads_no_locks():
     for rd in range(total_readers):
         threads.append(threading.Thread(target=reader_worker, args=(rd,)))
 
-    # Launch all concurrently
-    for t in threads:
-        t.start()
-    for t in threads:
-        t.join()
-
-    # Clean up test rows
     try:
-        with _db_write_lock:
-            with get_db_connection() as conn:
-                c = conn.cursor()
-                c.execute("DELETE FROM store_history WHERE source = 'pytest_adversarial';")
-                for sid in created_store_ids:
-                    c.execute("DELETE FROM stores WHERE id = ?;", (sid,))
-                conn.commit()
-    except Exception as clean_err:
-        print("Cleanup error:", clean_err)
+        # Launch all concurrently
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+    finally:
+        # Clean up test rows
+        try:
+            with _db_write_lock:
+                with get_db_connection() as conn:
+                    c = conn.cursor()
+                    c.execute("DELETE FROM store_history WHERE source = 'pytest_adversarial' OR store_id LIKE 'adv_stress%';")
+                    c.execute("DELETE FROM stores WHERE id LIKE 'adv_stress%';")
+                    conn.commit()
+        except Exception as clean_err:
+            print("Cleanup error:", clean_err)
 
     # Assertions
     assert len(locked_errors) == 0, f"Encountered database locked errors: {locked_errors}"
@@ -465,7 +466,7 @@ def test_adversarial_wal_checkpoint_concurrency():
         while not stop_event.is_set():
             try:
                 sid = f"wal_stress_w_{i % 3}"
-                record_new_report(sid, "i", int(time.time()) - 5000 + i, source="pytest_wal")
+                record_new_report(sid, "i", int(time.time()) - 5000 + i, source="pytest_wal", notify=False)
                 i += 1
                 time.sleep(0.005)
             except Exception as e:
