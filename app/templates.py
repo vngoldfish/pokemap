@@ -950,6 +950,51 @@ SHARED_MODALS_HTML = """
                 </div>
                 <input type="text" id="tg-cfg-chatid" placeholder="Ví dụ: -1001234567890 (nhóm) hoặc 987654321 (cá nhân)" style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:8px 10px; font-size:0.8rem; outline:none; background:#ffffff; box-shadow:0 1px 2px rgba(0,0,0,0.04);" />
               </div>
+
+              <!-- Anchor Location for Telegram Distance Calculation -->
+              <div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:10px; padding:10px; margin-top:4px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+                  <label style="font-weight:800; font-size:0.75rem; color:#1e293b; display:flex; align-items:center; gap:4px;">
+                    <span>📍</span> <span>Vị trí tính khoảng cách cho Telegram:</span>
+                  </label>
+                  <button type="button" onclick="useCurrentGpsForTelegram()" style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; border-radius:6px; padding:3px 8px; font-size:0.68rem; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:3px;">
+                    <span>🎯</span> <span>Lấy GPS hiện tại</span>
+                  </button>
+                </div>
+                <div style="margin-bottom:6px;">
+                  <input type="text" id="tg-cfg-loc-name" placeholder="Tên vị trí (VD: Ga Imamiya, Nhà riêng...)" style="width:100%; border:1px solid #cbd5e1; border-radius:6px; padding:6px 8px; font-size:0.75rem; outline:none; background:#ffffff;" />
+                </div>
+                <div style="display:flex; gap:8px;">
+                  <div style="flex:1;">
+                    <div style="font-size:0.65rem; color:#64748b; font-weight:700; margin-bottom:2px;">Vĩ độ (Lat):</div>
+                    <input type="number" step="0.0001" id="tg-cfg-lat" placeholder="34.6540" style="width:100%; border:1px solid #cbd5e1; border-radius:6px; padding:6px 8px; font-size:0.75rem; outline:none; background:#ffffff;" />
+                  </div>
+                  <div style="flex:1;">
+                    <div style="font-size:0.65rem; color:#64748b; font-weight:700; margin-bottom:2px;">Kinh độ (Lng):</div>
+                    <input type="number" step="0.0001" id="tg-cfg-lng" placeholder="135.4925" style="width:100%; border:1px solid #cbd5e1; border-radius:6px; padding:6px 8px; font-size:0.75rem; outline:none; background:#ffffff;" />
+                  </div>
+                </div>
+                <div style="display:flex; gap:5px; margin-top:8px; flex-wrap:wrap;">
+                  <button type="button" onclick="setTelegramLocPreset('Ga JR Imamiya', 34.6540, 135.4925)" style="background:#f1f5f9; border:1px solid #e2e8f0; border-radius:12px; padding:2px 8px; font-size:0.65rem; font-weight:700; color:#334155; cursor:pointer;">
+                    📍 Ga Imamiya
+                  </button>
+                  <button type="button" onclick="setTelegramLocPreset('Ga Osaka / Umeda', 34.7025, 135.4959)" style="background:#f1f5f9; border:1px solid #e2e8f0; border-radius:12px; padding:2px 8px; font-size:0.65rem; font-weight:700; color:#334155; cursor:pointer;">
+                    📍 Ga Umeda
+                  </button>
+                  <button type="button" onclick="setTelegramLocPreset('Ga Namba', 34.6667, 135.5000)" style="background:#f1f5f9; border:1px solid #e2e8f0; border-radius:12px; padding:2px 8px; font-size:0.65rem; font-weight:700; color:#334155; cursor:pointer;">
+                    📍 Ga Namba
+                  </button>
+                  <button type="button" onclick="setTelegramLocPreset('Ga Tokyo', 35.6812, 139.7671)" style="background:#f1f5f9; border:1px solid #e2e8f0; border-radius:12px; padding:2px 8px; font-size:0.65rem; font-weight:700; color:#334155; cursor:pointer;">
+                    📍 Ga Tokyo
+                  </button>
+                  <button type="button" onclick="setTelegramLocPreset('Ga Shinjuku', 35.6896, 139.7006)" style="background:#f1f5f9; border:1px solid #e2e8f0; border-radius:12px; padding:2px 8px; font-size:0.65rem; font-weight:700; color:#334155; cursor:pointer;">
+                    📍 Ga Shinjuku
+                  </button>
+                  <button type="button" onclick="setTelegramLocPreset('Ga Nagoya', 35.1709, 136.8815)" style="background:#f1f5f9; border:1px solid #e2e8f0; border-radius:12px; padding:2px 8px; font-size:0.65rem; font-weight:700; color:#334155; cursor:pointer;">
+                    📍 Ga Nagoya
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -2561,6 +2606,42 @@ def render_map_page() -> str:
     }
 
     // 10. MODALS: TELEGRAM & SETTINGS, HISTORY, BULLETIN
+    function setTelegramLocPreset(name, lat, lng) {
+      const nameEl = document.getElementById('tg-cfg-loc-name');
+      const latEl = document.getElementById('tg-cfg-lat');
+      const lngEl = document.getElementById('tg-cfg-lng');
+      if (nameEl) nameEl.value = name;
+      if (latEl) latEl.value = lat;
+      if (lngEl) lngEl.value = lng;
+    }
+
+    function useCurrentGpsForTelegram() {
+      const nameEl = document.getElementById('tg-cfg-loc-name');
+      const latEl = document.getElementById('tg-cfg-lat');
+      const lngEl = document.getElementById('tg-cfg-lng');
+      if (typeof userLat !== 'undefined' && userLat && typeof userLng !== 'undefined' && userLng) {
+        if (latEl) latEl.value = parseFloat(userLat).toFixed(4);
+        if (lngEl) lngEl.value = parseFloat(userLng).toFixed(4);
+        if (nameEl && !nameEl.value.trim()) nameEl.value = 'Vị trí của bạn';
+        return;
+      }
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            if (latEl) latEl.value = pos.coords.latitude.toFixed(4);
+            if (lngEl) lngEl.value = pos.coords.longitude.toFixed(4);
+            if (nameEl && !nameEl.value.trim()) nameEl.value = 'Vị trí của bạn';
+          },
+          (err) => {
+            alert('Không thể lấy vị trí GPS hiện tại từ trình duyệt: ' + err.message);
+          },
+          { enableHighAccuracy: true, timeout: 8000 }
+        );
+      } else {
+        alert('Trình duyệt không hỗ trợ Geolocation.');
+      }
+    }
+
     async function onTelegramToggleChange(checked) {
       const slider = document.getElementById('tg-cfg-slider');
       if (slider) slider.style.background = checked ? '#0284c7' : '#cbd5e1';
@@ -2574,6 +2655,9 @@ def render_map_page() -> str:
       try {
         const token = (document.getElementById('tg-cfg-token') ? document.getElementById('tg-cfg-token').value : (configData.telegramBotToken || '')).trim();
         const chatId = (document.getElementById('tg-cfg-chatid') ? document.getElementById('tg-cfg-chatid').value : (configData.telegramChatId || '')).trim();
+        const locName = (document.getElementById('tg-cfg-loc-name') ? document.getElementById('tg-cfg-loc-name').value : (configData.telegramLocationName || 'Ga Imamiya')).trim();
+        const latVal = (document.getElementById('tg-cfg-lat') && document.getElementById('tg-cfg-lat').value !== '') ? parseFloat(document.getElementById('tg-cfg-lat').value) : (configData.telegramLat || 34.6540);
+        const lngVal = (document.getElementById('tg-cfg-lng') && document.getElementById('tg-cfg-lng').value !== '') ? parseFloat(document.getElementById('tg-cfg-lng').value) : (configData.telegramLng || 135.4925);
         await fetch('/api/settings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -2581,7 +2665,10 @@ def render_map_page() -> str:
             notifications: {
               telegramEnabled: checked,
               telegramBotToken: token,
-              telegramChatId: chatId
+              telegramChatId: chatId,
+              telegramLocationName: locName,
+              telegramLat: latVal,
+              telegramLng: lngVal
             }
           })
         });
@@ -2670,6 +2757,9 @@ def render_map_page() -> str:
       const chainEl = document.getElementById('tg-cfg-chain');
       const timeEl = document.getElementById('tg-cfg-time');
       const regionEl = document.getElementById('tg-cfg-region');
+      const locNameEl = document.getElementById('tg-cfg-loc-name');
+      const latEl = document.getElementById('tg-cfg-lat');
+      const lngEl = document.getElementById('tg-cfg-lng');
 
       if (tokenEl) tokenEl.value = configData.telegramBotToken || '';
       if (chatIdEl) chatIdEl.value = configData.telegramChatId || '';
@@ -2681,6 +2771,9 @@ def render_map_page() -> str:
       if (chainEl) chainEl.value = configData.telegramChain || 'all';
       if (timeEl) timeEl.value = String(configData.telegramTime || '24');
       if (regionEl) regionEl.value = configData.telegramRegion || 'osaka';
+      if (locNameEl) locNameEl.value = configData.telegramLocationName || 'Ga Imamiya';
+      if (latEl) latEl.value = (typeof configData.telegramLat !== 'undefined' && configData.telegramLat !== null) ? configData.telegramLat : 34.6540;
+      if (lngEl) lngEl.value = (typeof configData.telegramLng !== 'undefined' && configData.telegramLng !== null) ? configData.telegramLng : 135.4925;
 
       const rad = document.querySelector(`input[name="set-region-radio"][value="${currentRegion}"]`);
       if (rad) rad.checked = true;
@@ -2761,6 +2854,9 @@ def render_map_page() -> str:
       const chain = document.getElementById('tg-cfg-chain') ? document.getElementById('tg-cfg-chain').value : 'all';
       const time = document.getElementById('tg-cfg-time') ? document.getElementById('tg-cfg-time').value : '24';
       const region = document.getElementById('tg-cfg-region') ? document.getElementById('tg-cfg-region').value : 'osaka';
+      const locName = (document.getElementById('tg-cfg-loc-name') ? document.getElementById('tg-cfg-loc-name').value : 'Ga Imamiya').trim();
+      const latVal = (document.getElementById('tg-cfg-lat') && document.getElementById('tg-cfg-lat').value !== '') ? parseFloat(document.getElementById('tg-cfg-lat').value) : 34.6540;
+      const lngVal = (document.getElementById('tg-cfg-lng') && document.getElementById('tg-cfg-lng').value !== '') ? parseFloat(document.getElementById('tg-cfg-lng').value) : 135.4925;
 
       configData.telegramBotToken = token;
       configData.telegramChatId = chatId;
@@ -2769,6 +2865,9 @@ def render_map_page() -> str:
       configData.telegramChain = chain;
       configData.telegramTime = time;
       configData.telegramRegion = region;
+      configData.telegramLocationName = locName;
+      configData.telegramLat = latVal;
+      configData.telegramLng = lngVal;
 
       const resEl = document.getElementById('tg-test-result');
       if (resEl) {
@@ -2785,7 +2884,8 @@ def render_map_page() -> str:
           body: JSON.stringify({
             notifications: {
               telegramBotToken: token, telegramChatId: chatId, telegramEnabled: enabled,
-              telegramStatus: status, telegramChain: chain, telegramTime: time, telegramRegion: region
+              telegramStatus: status, telegramChain: chain, telegramTime: time, telegramRegion: region,
+              telegramLocationName: locName, telegramLat: latVal, telegramLng: lngVal
             }
           })
         });
@@ -2813,6 +2913,9 @@ def render_map_page() -> str:
       const chain = document.getElementById('tg-cfg-chain') ? document.getElementById('tg-cfg-chain').value : 'all';
       const time = document.getElementById('tg-cfg-time') ? document.getElementById('tg-cfg-time').value : '24';
       const region = document.getElementById('tg-cfg-region') ? document.getElementById('tg-cfg-region').value : 'osaka';
+      const locName = (document.getElementById('tg-cfg-loc-name') ? document.getElementById('tg-cfg-loc-name').value : (configData.telegramLocationName || 'Ga Imamiya')).trim();
+      const latVal = (document.getElementById('tg-cfg-lat') && document.getElementById('tg-cfg-lat').value !== '') ? parseFloat(document.getElementById('tg-cfg-lat').value) : (configData.telegramLat || 34.6540);
+      const lngVal = (document.getElementById('tg-cfg-lng') && document.getElementById('tg-cfg-lng').value !== '') ? parseFloat(document.getElementById('tg-cfg-lng').value) : (configData.telegramLng || 135.4925);
 
       if (!token || !chatId) {
         if (resEl) {
@@ -2837,7 +2940,8 @@ def render_map_page() -> str:
             is_test: true,
             notifications: {
               telegramBotToken: token, telegramChatId: chatId, telegramEnabled: true,
-              telegramStatus: status, telegramChain: chain, telegramTime: time, telegramRegion: region
+              telegramStatus: status, telegramChain: chain, telegramTime: time, telegramRegion: region,
+              telegramLocationName: locName, telegramLat: latVal, telegramLng: lngVal
             },
             store: { id: 'test', name: 'Pokémon Center Test (Osaka)', chain: 'specialty', address: 'Osaka Namba, Chuo-ku', lat: 34.6667, lng: 135.5000, pref: 'osaka' },
             info: { status_code: 'i', code: 'i', onsite: true, reported_at: 'Vừa xong', timeAgo: 'Vừa xong', packs: ['Terastal Festival'] }
@@ -4733,6 +4837,42 @@ def render_thongbao_page() -> str:
       });
     }
 
+    function setTelegramLocPreset(name, lat, lng) {
+      const nameEl = document.getElementById('tg-cfg-loc-name');
+      const latEl = document.getElementById('tg-cfg-lat');
+      const lngEl = document.getElementById('tg-cfg-lng');
+      if (nameEl) nameEl.value = name;
+      if (latEl) latEl.value = lat;
+      if (lngEl) lngEl.value = lng;
+    }
+
+    function useCurrentGpsForTelegram() {
+      const nameEl = document.getElementById('tg-cfg-loc-name');
+      const latEl = document.getElementById('tg-cfg-lat');
+      const lngEl = document.getElementById('tg-cfg-lng');
+      if (typeof userLat !== 'undefined' && userLat && typeof userLng !== 'undefined' && userLng) {
+        if (latEl) latEl.value = parseFloat(userLat).toFixed(4);
+        if (lngEl) lngEl.value = parseFloat(userLng).toFixed(4);
+        if (nameEl && !nameEl.value.trim()) nameEl.value = 'Vị trí của bạn';
+        return;
+      }
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            if (latEl) latEl.value = pos.coords.latitude.toFixed(4);
+            if (lngEl) lngEl.value = pos.coords.longitude.toFixed(4);
+            if (nameEl && !nameEl.value.trim()) nameEl.value = 'Vị trí của bạn';
+          },
+          (err) => {
+            alert('Không thể lấy vị trí GPS hiện tại từ trình duyệt: ' + err.message);
+          },
+          { enableHighAccuracy: true, timeout: 8000 }
+        );
+      } else {
+        alert('Trình duyệt không hỗ trợ Geolocation.');
+      }
+    }
+
     async function onTelegramToggleChange(checked) {
       const slider = document.getElementById('tg-cfg-slider');
       if (slider) slider.style.background = checked ? '#0284c7' : '#cbd5e1';
@@ -4746,6 +4886,9 @@ def render_thongbao_page() -> str:
       try {
         const token = (document.getElementById('tg-cfg-token') ? document.getElementById('tg-cfg-token').value : (configData.telegramBotToken || '')).trim();
         const chatId = (document.getElementById('tg-cfg-chatid') ? document.getElementById('tg-cfg-chatid').value : (configData.telegramChatId || '')).trim();
+        const locName = (document.getElementById('tg-cfg-loc-name') ? document.getElementById('tg-cfg-loc-name').value : (configData.telegramLocationName || 'Ga Imamiya')).trim();
+        const latVal = (document.getElementById('tg-cfg-lat') && document.getElementById('tg-cfg-lat').value !== '') ? parseFloat(document.getElementById('tg-cfg-lat').value) : (configData.telegramLat || 34.6540);
+        const lngVal = (document.getElementById('tg-cfg-lng') && document.getElementById('tg-cfg-lng').value !== '') ? parseFloat(document.getElementById('tg-cfg-lng').value) : (configData.telegramLng || 135.4925);
         await fetch('/api/settings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -4753,7 +4896,10 @@ def render_thongbao_page() -> str:
             notifications: {
               telegramEnabled: checked,
               telegramBotToken: token,
-              telegramChatId: chatId
+              telegramChatId: chatId,
+              telegramLocationName: locName,
+              telegramLat: latVal,
+              telegramLng: lngVal
             }
           })
         });
@@ -4882,6 +5028,9 @@ def render_thongbao_page() -> str:
       const chainEl = document.getElementById('tg-cfg-chain');
       const timeEl = document.getElementById('tg-cfg-time');
       const regionEl = document.getElementById('tg-cfg-region');
+      const locNameEl = document.getElementById('tg-cfg-loc-name');
+      const latEl = document.getElementById('tg-cfg-lat');
+      const lngEl = document.getElementById('tg-cfg-lng');
 
       if (tokenEl) tokenEl.value = configData.telegramBotToken || '';
       if (chatIdEl) chatIdEl.value = configData.telegramChatId || '';
@@ -4893,6 +5042,9 @@ def render_thongbao_page() -> str:
       if (chainEl) chainEl.value = configData.telegramChain || 'all';
       if (timeEl) timeEl.value = String(configData.telegramTime || '24');
       if (regionEl) regionEl.value = configData.telegramRegion || 'osaka';
+      if (locNameEl) locNameEl.value = configData.telegramLocationName || 'Ga Imamiya';
+      if (latEl) latEl.value = (typeof configData.telegramLat !== 'undefined' && configData.telegramLat !== null) ? configData.telegramLat : 34.6540;
+      if (lngEl) lngEl.value = (typeof configData.telegramLng !== 'undefined' && configData.telegramLng !== null) ? configData.telegramLng : 135.4925;
 
       const rad = document.querySelector(`input[name="set-region-radio"][value="${currentRegion}"]`);
       if (rad) rad.checked = true;
@@ -4971,6 +5123,9 @@ def render_thongbao_page() -> str:
       const chain = document.getElementById('tg-cfg-chain') ? document.getElementById('tg-cfg-chain').value : 'all';
       const time = document.getElementById('tg-cfg-time') ? document.getElementById('tg-cfg-time').value : '24';
       const region = document.getElementById('tg-cfg-region') ? document.getElementById('tg-cfg-region').value : 'osaka';
+      const locName = (document.getElementById('tg-cfg-loc-name') ? document.getElementById('tg-cfg-loc-name').value : 'Ga Imamiya').trim();
+      const latVal = (document.getElementById('tg-cfg-lat') && document.getElementById('tg-cfg-lat').value !== '') ? parseFloat(document.getElementById('tg-cfg-lat').value) : 34.6540;
+      const lngVal = (document.getElementById('tg-cfg-lng') && document.getElementById('tg-cfg-lng').value !== '') ? parseFloat(document.getElementById('tg-cfg-lng').value) : 135.4925;
 
       configData.telegramBotToken = token;
       configData.telegramChatId = chatId;
@@ -4979,6 +5134,9 @@ def render_thongbao_page() -> str:
       configData.telegramChain = chain;
       configData.telegramTime = time;
       configData.telegramRegion = region;
+      configData.telegramLocationName = locName;
+      configData.telegramLat = latVal;
+      configData.telegramLng = lngVal;
 
       const resEl = document.getElementById('tg-test-result');
       if (resEl) {
@@ -4995,7 +5153,8 @@ def render_thongbao_page() -> str:
           body: JSON.stringify({
             notifications: {
               telegramBotToken: token, telegramChatId: chatId, telegramEnabled: enabled,
-              telegramStatus: status, telegramChain: chain, telegramTime: time, telegramRegion: region
+              telegramStatus: status, telegramChain: chain, telegramTime: time, telegramRegion: region,
+              telegramLocationName: locName, telegramLat: latVal, telegramLng: lngVal
             }
           })
         });
@@ -5024,6 +5183,9 @@ def render_thongbao_page() -> str:
       const chain = document.getElementById('tg-cfg-chain') ? document.getElementById('tg-cfg-chain').value : 'all';
       const time = document.getElementById('tg-cfg-time') ? document.getElementById('tg-cfg-time').value : '24';
       const region = document.getElementById('tg-cfg-region') ? document.getElementById('tg-cfg-region').value : 'osaka';
+      const locName = (document.getElementById('tg-cfg-loc-name') ? document.getElementById('tg-cfg-loc-name').value : (configData.telegramLocationName || 'Ga Imamiya')).trim();
+      const latVal = (document.getElementById('tg-cfg-lat') && document.getElementById('tg-cfg-lat').value !== '') ? parseFloat(document.getElementById('tg-cfg-lat').value) : (configData.telegramLat || 34.6540);
+      const lngVal = (document.getElementById('tg-cfg-lng') && document.getElementById('tg-cfg-lng').value !== '') ? parseFloat(document.getElementById('tg-cfg-lng').value) : (configData.telegramLng || 135.4925);
 
       if (!token || !chatId) {
         if (resEl) {
@@ -5048,7 +5210,8 @@ def render_thongbao_page() -> str:
             is_test: true,
             notifications: {
               telegramBotToken: token, telegramChatId: chatId, telegramEnabled: true,
-              telegramStatus: status, telegramChain: chain, telegramTime: time, telegramRegion: region
+              telegramStatus: status, telegramChain: chain, telegramTime: time, telegramRegion: region,
+              telegramLocationName: locName, telegramLat: latVal, telegramLng: lngVal
             },
             store: { id: 'test', name: 'Pokémon Center Test (Osaka)', chain: 'specialty', address: 'Osaka Namba, Chuo-ku', lat: 34.6667, lng: 135.5000, pref: 'osaka' },
             info: { status_code: 'i', code: 'i', onsite: true, reported_at: 'Vừa xong', timeAgo: 'Vừa xong', packs: ['Terastal Festival'] }

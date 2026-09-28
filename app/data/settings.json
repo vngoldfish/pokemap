@@ -26,6 +26,9 @@
     "telegramChain": "all",
     "telegramTime": "24",
     "telegramRegion": "osaka",
+    "telegramLat": 34.654,
+    "telegramLng": 135.4925,
+    "telegramLocationName": "Ga Imamiya",
     "notifyPrefs": [
       "osaka",
       "aichi",

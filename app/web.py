@@ -94,6 +94,9 @@ DEFAULT_SETTINGS = {
         "telegramChain": "all",       # 'all', 'conbini', 'seven', ...
         "telegramTime": "24",         # '1', '3', '6', '24', 'all'
         "telegramRegion": "osaka",    # 'osaka', 'tokyo', 'nagoya', 'all'
+        "telegramLat": 34.6540,       # Vĩ độ vị trí neo Telegram (mặc định: Ga JR Imamiya)
+        "telegramLng": 135.4925,      # Kinh độ vị trí neo Telegram (mặc định: Ga JR Imamiya)
+        "telegramLocationName": "Ga Imamiya", # Tên vị trí neo cho Telegram
         "notifyPrefs": ["osaka", "aichi", "kanagawa", "gifu", "mie"]  # Các tỉnh nhận thông báo
     },
 
@@ -221,22 +224,25 @@ def send_telegram_alert(store: dict, info: dict, notif_cfg: dict, is_test: bool 
     if not tg_enabled:
         return {"status": "disabled"}
 
-    # Calculate distance to JR Imamiya Station (lat=34.6540, lng=135.4925)
+    # Calculate distance to configured anchor location (default: Ga JR Imamiya lat=34.6540, lng=135.4925)
     dist_str = "~?km"
     st_lat = store.get("lat")
     st_lng = store.get("lng")
     if st_lat is not None and st_lng is not None:
         try:
             lat1, lon1 = float(st_lat), float(st_lng)
-            lat2, lon2 = 34.6540, 135.4925
+            lat2 = float(notif_cfg.get("telegramLat") if notif_cfg.get("telegramLat") is not None else 34.6540)
+            lon2 = float(notif_cfg.get("telegramLng") if notif_cfg.get("telegramLng") is not None else 135.4925)
             dlat = math.radians(lat2 - lat1)
             dlon = math.radians(lon2 - lon1)
             a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon/2)**2
             dist_km = 6371 * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+            loc_label = (notif_cfg.get("telegramLocationName") or "").strip()
+            loc_suffix = f" ({loc_label})" if loc_label else ""
             if dist_km < 1.0:
-                dist_str = f"~{int(round(dist_km * 1000))}m"
+                dist_str = f"~{int(round(dist_km * 1000))}m{loc_suffix}"
             else:
-                dist_str = f"~{dist_km:.1f}km"
+                dist_str = f"~{dist_km:.1f}km{loc_suffix}"
         except Exception:
             dist_str = "~?km"
 
@@ -759,6 +765,9 @@ def get_config():
         "telegramChain": notif.get("telegramChain", "all"),
         "telegramTime": str(notif.get("telegramTime", "24")),
         "telegramRegion": notif.get("telegramRegion", "osaka"),
+        "telegramLat": float(notif.get("telegramLat") if notif.get("telegramLat") is not None else 34.6540),
+        "telegramLng": float(notif.get("telegramLng") if notif.get("telegramLng") is not None else 135.4925),
+        "telegramLocationName": str(notif.get("telegramLocationName") or "Ga Imamiya"),
         "currentRegion": user_settings.get("currentRegion", "all"),
         "activeFilter": user_settings.get("activeFilter", "all"),
         "activeTime": user_settings.get("activeTime", "all"),

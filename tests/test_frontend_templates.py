@@ -660,6 +660,11 @@ def test_telegram_filter_tab_structure():
         assert 'id="tg-cfg-token"' in html, f"Missing #tg-cfg-token in {name}"
         assert 'id="tg-cfg-chatid"' in html, f"Missing #tg-cfg-chatid in {name}"
 
+        # Anchor Location Controls
+        assert 'id="tg-cfg-loc-name"' in html, f"Missing #tg-cfg-loc-name in {name}"
+        assert 'id="tg-cfg-lat"' in html, f"Missing #tg-cfg-lat in {name}"
+        assert 'id="tg-cfg-lng"' in html, f"Missing #tg-cfg-lng in {name}"
+
         # 3 Filter Groups (Region, Status, Chain - Time filter removed as Telegram is strictly real-time)
         assert 'id="tg-modal-region-group"' in html, f"Missing #tg-modal-region-group in {name}"
         assert 'id="tg-modal-status-group"' in html, f"Missing #tg-modal-status-group in {name}"
@@ -678,6 +683,8 @@ def test_telegram_filter_tab_structure():
         assert "function selectTgModalChain(" in html, f"Missing selectTgModalChain in {name}"
         assert "function saveTelegramConfig(" in html, f"Missing saveTelegramConfig in {name}"
         assert "function testTelegramWebhook(" in html, f"Missing testTelegramWebhook in {name}"
+        assert "function useCurrentGpsForTelegram(" in html, f"Missing useCurrentGpsForTelegram in {name}"
+        assert "function setTelegramLocPreset(" in html, f"Missing setTelegramLocPreset in {name}"
 
 
 # ==============================================================================
@@ -730,6 +737,78 @@ def test_telegram_backend_dispatch_filters():
         report_stale = {"status_code": "i", "timestamp": now - 400, "onsite": False}
         on_csdl_report_added(kanagawa_store, report_stale)
         assert len(sent_alerts) == 1, "Report older than 5m should be rejected as not real-time"
+
+
+def test_send_telegram_alert_custom_anchor_location():
+    """Verify send_telegram_alert calculates distance against custom anchor location and appends label."""
+    from unittest.mock import patch
+    from app.web import send_telegram_alert
+
+    store = {
+        "id": "st_test_1",
+        "name": "FamilyMart Umeda",
+        "lat": 34.7025,
+        "lng": 135.4959,
+        "address": "Osaka Kita-ku",
+        "pref": "osaka"
+    }
+    info = {
+        "status_code": "i",
+        "code": "i",
+        "onsite": True,
+        "reported_at": "12:00 28/09/2026",
+        "timeAgo": "Vừa xong",
+        "packs": ["Terastal Festival"]
+    }
+
+    notif_cfg_tokyo = {
+        "telegramEnabled": True,
+        "telegramBotToken": "dummy_token",
+        "telegramChatId": "dummy_chat",
+        "telegramLat": 35.6812,
+        "telegramLng": 139.7671,
+        "telegramLocationName": "Ga Tokyo"
+    }
+
+    posted_messages = []
+    class MockResp:
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            pass
+        def read(self):
+            return b'{"ok":true}'
+
+    def fake_urlopen(req, timeout=None):
+        data = json.loads(req.data.decode("utf-8"))
+        posted_messages.append(data)
+        return MockResp()
+
+    with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+        res = send_telegram_alert(store, info, notif_cfg_tokyo)
+        assert res["status"] == "ok"
+        assert len(posted_messages) == 1
+        text = posted_messages[0]["text"]
+        assert "Ga Tokyo" in text
+        assert "km (Ga Tokyo)" in text
+
+    notif_cfg_near = {
+        "telegramEnabled": True,
+        "telegramBotToken": "dummy_token",
+        "telegramChatId": "dummy_chat",
+        "telegramLat": 34.7020,
+        "telegramLng": 135.4950,
+        "telegramLocationName": "Nhà riêng"
+    }
+    posted_messages.clear()
+    with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+        res = send_telegram_alert(store, info, notif_cfg_near)
+        assert res["status"] == "ok"
+        assert len(posted_messages) == 1
+        text = posted_messages[0]["text"]
+        assert "Nhà riêng" in text
+        assert "(Nhà riêng)" in text
+
 
 
 
