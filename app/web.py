@@ -106,6 +106,7 @@ DEFAULT_SETTINGS = {
     "currentChain": "",
     "sortMode": "newest",
     "showExpired": False,
+    "currentRegion": "all",
     "stockPinEffectHours": "24"
 }
 
@@ -757,7 +758,7 @@ def get_config():
         "telegramChain": notif.get("telegramChain", "all"),
         "telegramTime": str(notif.get("telegramTime", "24")),
         "telegramRegion": notif.get("telegramRegion", "osaka"),
-        "currentRegion": user_settings.get("currentRegion", "osaka"),
+        "currentRegion": user_settings.get("currentRegion", "all"),
         "activeFilter": user_settings.get("activeFilter", "all"),
         "activeTime": user_settings.get("activeTime", "all"),
         "stockPinEffectHours": str(user_settings.get("stockPinEffectHours", "24"))

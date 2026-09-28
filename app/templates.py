@@ -1684,19 +1684,19 @@ def render_map_page() -> str:
       'osaka': { id: 'osaka', name: '大阪・関西', center: [34.6937, 135.5023], zoom: 13, defaultCity: 'なんば', prefs: ['osaka'] },
       'tokyo': { id: 'tokyo', name: '東京・神奈川', center: [35.6895, 139.6917], zoom: 13, defaultCity: '横浜', prefs: ['tokyo', 'kanagawa'] },
       'nagoya': { id: 'nagoya', name: '名古屋・東海', center: [35.1815, 136.9066], zoom: 13, defaultCity: '名古屋駅', prefs: ['aichi', 'gifu', 'mie'] },
-      'all': { id: 'all', name: '全エリア (全国)', center: [34.6937, 135.5023], zoom: 10, defaultCity: '全エリア', prefs: ['osaka', 'tokyo', 'kanagawa', 'aichi', 'gifu', 'mie'] }
+      'all': { id: 'all', name: '全エリア (全国)', center: [35.18, 137.6], zoom: 7, defaultCity: '全エリア', prefs: ['osaka', 'tokyo', 'kanagawa', 'chiba', 'aichi', 'gifu', 'mie'] }
     };
 
     const urlRegion = new URLSearchParams(window.location.search).get('region');
-    let currentRegion = (urlRegion && REGIONS[urlRegion]) ? urlRegion : (localStorage.getItem('poketan_selected_region') || localStorage.getItem('poketan_map_region') || 'osaka');
-    if (!REGIONS[currentRegion]) currentRegion = 'osaka';
+    let currentRegion = (urlRegion && REGIONS[urlRegion]) ? urlRegion : (localStorage.getItem('poketan_selected_region') || localStorage.getItem('poketan_map_region') || 'all');
+    if (!REGIONS[currentRegion]) currentRegion = 'all';
     if (urlRegion && REGIONS[urlRegion]) {
       try {
         localStorage.setItem('poketan_selected_region', currentRegion);
         localStorage.setItem('poketan_map_region', currentRegion);
       } catch(e) {}
     }
-    let currentPref = REGIONS[currentRegion].prefs[0] || 'osaka';
+    let currentPref = REGIONS[currentRegion].prefs[0] || 'all';
 
     let storesDict = {};
     let configData = {};
@@ -2332,7 +2332,7 @@ def render_map_page() -> str:
     function selectMapModalStatus(val) {}
     function selectMapModalTime(val) {}
     function resetMapFilters() {
-      mapModalTempRegion = 'osaka';
+      mapModalTempRegion = 'all';
       mapModalTempChain = 'all';
       const pinSelect = document.getElementById('set-stock-pin-hours');
       if (pinSelect) pinSelect.value = '24';
@@ -2601,7 +2601,10 @@ def render_map_page() -> str:
 
     function selectRegion(pref) {
       currentRegion = pref;
-      try { localStorage.setItem('poketan_selected_region', pref); } catch(e) {}
+      try {
+        localStorage.setItem('poketan_selected_region', pref);
+        localStorage.setItem('poketan_map_region', pref);
+      } catch(e) {}
       mapRegionFilter = pref;
       if (typeof REGIONS !== 'undefined' && REGIONS[pref] && window.map) {
         map.flyTo(REGIONS[pref].center, REGIONS[pref].zoom || 13, { duration: 1.0 });
@@ -3931,19 +3934,19 @@ def render_thongbao_page() -> str:
       'osaka': { id: 'osaka', name: '大阪・関西', center: [34.6937, 135.5023], zoom: 13, defaultCity: 'なんば', prefs: ['osaka'] },
       'tokyo': { id: 'tokyo', name: '東京・神奈川', center: [35.6895, 139.6917], zoom: 13, defaultCity: '横浜', prefs: ['tokyo', 'kanagawa'] },
       'nagoya': { id: 'nagoya', name: '名古屋・東海', center: [35.1815, 136.9066], zoom: 13, defaultCity: '名古屋駅', prefs: ['aichi', 'gifu', 'mie'] },
-      'all': { id: 'all', name: '全エリア (全国)', center: [34.6937, 135.5023], zoom: 10, defaultCity: '全エリア', prefs: ['osaka', 'tokyo', 'kanagawa', 'aichi', 'gifu', 'mie'] }
+      'all': { id: 'all', name: '全エリア (全国)', center: [35.18, 137.6], zoom: 7, defaultCity: '全エリア', prefs: ['osaka', 'tokyo', 'kanagawa', 'chiba', 'aichi', 'gifu', 'mie'] }
     };
 
     const urlRegion = new URLSearchParams(window.location.search).get('region');
-    let currentRegion = (urlRegion && REGIONS[urlRegion]) ? urlRegion : (localStorage.getItem('poketan_selected_region') || 'osaka');
-    if (!REGIONS[currentRegion]) currentRegion = 'osaka';
+    let currentRegion = (urlRegion && REGIONS[urlRegion]) ? urlRegion : (localStorage.getItem('poketan_selected_region') || 'all');
+    if (!REGIONS[currentRegion]) currentRegion = 'all';
     if (urlRegion && REGIONS[urlRegion]) {
       try {
         localStorage.setItem('poketan_selected_region', currentRegion);
         localStorage.setItem('poketan_map_region', currentRegion);
       } catch(e) {}
     }
-    let currentPref = REGIONS[currentRegion].prefs[0] || 'osaka';
+    let currentPref = REGIONS[currentRegion].prefs[0] || 'all';
 
     let storesDict = {};
     let configData = {};
@@ -4598,7 +4601,7 @@ def render_thongbao_page() -> str:
     function selectMapModalStatus(val) {}
     function selectMapModalTime(val) {}
     function resetMapFilters() {
-      mapModalTempRegion = 'osaka';
+      mapModalTempRegion = 'all';
       mapModalTempChain = 'all';
       const pinSelect = document.getElementById('set-stock-pin-hours');
       if (pinSelect) pinSelect.value = '24';
@@ -4688,7 +4691,10 @@ def render_thongbao_page() -> str:
 
     function selectRegion(pref) {
       currentRegion = pref;
-      try { localStorage.setItem('poketan_selected_region', pref); } catch(e) {}
+      try {
+        localStorage.setItem('poketan_selected_region', pref);
+        localStorage.setItem('poketan_map_region', pref);
+      } catch(e) {}
       listRegionFilter = pref;
       listCurrentPage = 1;
       updateListFilterBadgeUI();

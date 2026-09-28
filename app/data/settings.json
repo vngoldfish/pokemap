@@ -48,6 +48,7 @@
   "currentChain": "",
   "sortMode": "newest",
   "showExpired": false,
+  "currentRegion": "all",
   "stockPinEffectHours": "24",
   "feedFreshnessHours": 9999,
   "feedChain": "",
@@ -55,7 +56,6 @@
   "allStatusFilter": "all",
   "allChain": "",
   "allSortMode": "newest",
-  "currentRegion": "osaka",
   "activeFilter": "onsite",
   "activeTime": 3
 }
