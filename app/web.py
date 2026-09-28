@@ -58,8 +58,14 @@ async def lifespan(app: FastAPI):
     start_background_watcher()
     yield
 
+from fastapi.staticfiles import StaticFiles
+
 app = FastAPI(title="BAWUI POKE APP - Real-Time Stock & Lottery Tracker", lifespan=lifespan)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+if os.path.exists(STATIC_DIR):
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 SETTINGS_FILE = os.path.join(DEFAULT_CACHE_DIR, "settings.json")
 

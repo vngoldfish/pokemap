@@ -8,13 +8,14 @@ All navigated via standard HTTP link routing (<a href="...">) without hidden lay
 
 def get_shared_head(title: str, include_leaflet: bool = False) -> str:
     leaflet_tags = """
-  <!-- Leaflet CSS & JS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Leaflet CSS & JS (Self-hosted for instant 0ms local load) -->
+  <link rel="stylesheet" href="/static/vendor/leaflet.css" />
+  <script src="/static/vendor/leaflet.js"></script>
   
   <!-- Leaflet MarkerCluster -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
-  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <link rel="stylesheet" href="/static/vendor/MarkerCluster.css" />
+  <link rel="stylesheet" href="/static/vendor/MarkerCluster.Default.css" />
+  <script src="/static/vendor/leaflet.markercluster.js"></script>
 """ if include_leaflet else ""
 
     return f"""<!DOCTYPE html>
@@ -25,12 +26,12 @@ def get_shared_head(title: str, include_leaflet: bool = False) -> str:
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <link rel="prefetch" href="/map" />
   <link rel="prefetch" href="/thongbao" />
+  {leaflet_tags}
+  <!-- Font Inter (Non-blocking async load with native fallback) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="dns-prefetch" href="https://unpkg.com">
-  {leaflet_tags}
-  <!-- Font Inter -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"></noscript>
 """
 
 
@@ -1831,8 +1832,8 @@ def render_map_page() -> str:
     };
 
     const urlRegion = new URLSearchParams(window.location.search).get('region');
-    let currentRegion = (urlRegion && REGIONS[urlRegion]) ? urlRegion : (localStorage.getItem('poketan_selected_region') || localStorage.getItem('poketan_map_region') || 'all');
-    if (!REGIONS[currentRegion]) currentRegion = 'all';
+    let currentRegion = (urlRegion && REGIONS[urlRegion]) ? urlRegion : (localStorage.getItem('poketan_selected_region') || localStorage.getItem('poketan_map_region') || 'osaka');
+    if (!REGIONS[currentRegion]) currentRegion = 'osaka';
     if (urlRegion && REGIONS[urlRegion]) {
       try {
         localStorage.setItem('poketan_selected_region', currentRegion);
@@ -4323,8 +4324,8 @@ def render_thongbao_page() -> str:
     };
 
     const urlRegion = new URLSearchParams(window.location.search).get('region');
-    let currentRegion = (urlRegion && REGIONS[urlRegion]) ? urlRegion : (localStorage.getItem('poketan_selected_region') || 'all');
-    if (!REGIONS[currentRegion]) currentRegion = 'all';
+    let currentRegion = (urlRegion && REGIONS[urlRegion]) ? urlRegion : (localStorage.getItem('poketan_selected_region') || 'osaka');
+    if (!REGIONS[currentRegion]) currentRegion = 'osaka';
     if (urlRegion && REGIONS[urlRegion]) {
       try {
         localStorage.setItem('poketan_selected_region', currentRegion);
