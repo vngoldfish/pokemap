@@ -1886,11 +1886,7 @@ def render_map_page() -> str:
           const jstDate = new Date((timestamp + 9 * 3600) * 1000);
           reported_at = `${String(jstDate.getUTCHours()).padStart(2, '0')}:${String(jstDate.getUTCMinutes()).padStart(2, '0')} (${jstDate.getUTCMonth()+1}/${jstDate.getUTCDate()})`;
         }
-        const diffSec = Math.max(0, getServerNowSec() - timestamp);
-        if (diffSec < 60) timeAgo = 'たった今';
-        else if (diffSec < 3600) timeAgo = `${Math.floor(diffSec / 60)}分前`;
-        else if (diffSec < 86400) timeAgo = `${Math.floor(diffSec / 3600)}時間前`;
-        else timeAgo = `${Math.floor(diffSec / 86400)}日前`;
+        timeAgo = formatTimeAgoJp(timestamp);
       }
       const labelMap = { 'i': '在庫あり', 'o': '在庫なし', 'n': '扱ってない', 'u': '未確認' };
       return {
@@ -1956,14 +1952,14 @@ def render_map_page() -> str:
       }
     }
 
-    function createStockPinIcon(timeAgo) {
+    function createStockPinIcon(timeAgo, timestamp) {
       return L.divIcon({
         html: `<div class="poketan-pin-wrapper">
                  <div class="poketan-stock-pin-v2" title="Có hàng">
                    <div class="stock-circle-target">
                      <div class="stock-circle-inner"></div>
                    </div>
-                   <div class="stock-time-badge">${escapeHtml(timeAgo || 'たった今')}</div>
+                   <div class="stock-time-badge" data-timestamp="${timestamp || 0}">${escapeHtml(timeAgo || 'たった今')}</div>
                  </div>
                </div>`,
         className: 'poketan-pin-wrap',
@@ -2098,7 +2094,7 @@ def render_map_page() -> str:
 
         if (info.code === 'i' && hasStockEffect) {
           // Có hàng và trong thời gian hiệu lực -> Hiện vòng tròn mục tiêu chớp nháy + thanh thời gian nổi
-          const pinIcon = createStockPinIcon(info.timeAgo);
+          const pinIcon = createStockPinIcon(info.timeAgo, info.timestamp);
           const m = L.marker([store.lat, store.lng], { icon: pinIcon, zIndexOffset: 3000 });
           m.bindPopup(() => createPopupHtml(store, info), { maxWidth: 300 });
           stockLayer.addLayer(m);
@@ -2179,7 +2175,7 @@ def render_map_page() -> str:
       }
 
       const packs = info.packs.length ? `<div style="font-size:0.74rem; margin-top:4px;"><b>📦 Gói:</b> ${escapeHtml(info.packs.join(', '))}</div>` : '';
-      const time = (info.timestamp > 0 && info.timeAgo) ? `<div style="font-size:0.72rem; color:#64748b; margin-top:3px;">🕒 Báo: <b>${escapeHtml(info.timeAgo)}</b> (${escapeHtml(info.reported_at)})</div>` : '';
+      const time = (info.timestamp > 0 && info.timeAgo) ? `<div style="font-size:0.72rem; color:#64748b; margin-top:3px;">🕒 Báo: <b class="popup-time-ago" data-timestamp="${info.timestamp}">${escapeHtml(info.timeAgo)}</b> (${escapeHtml(info.reported_at)})</div>` : '';
       const chain = (configData.chainNames && configData.chainNames[store.chain]) || store.chain || 'Cửa hàng';
       const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent((store.name || '') + ' ' + (store.address || ''))}`;
 
@@ -3059,7 +3055,7 @@ def render_map_page() -> str:
         <span class="pill-text">で</span>
         <span class="pill-status ${statusClass}">${statusLabel}</span>
         <span class="pill-text">の報告</span>
-        <span class="pill-time">${escapeHtml(timeAgo)}</span>
+        <span class="pill-time" data-timestamp="${repTs}">${escapeHtml(timeAgo)}</span>
         <button type="button" class="pill-close-btn" onclick="event.stopPropagation(); this.closest('.poketan-pill-toast').remove();" title="閉じる">✕</button>
       `;
 
@@ -3091,6 +3087,63 @@ def render_map_page() -> str:
           setTimeout(() => toast.remove(), 250);
         }
       }, 6000);
+    }
+
+    function checkStockPinEffectTransitions() {
+      const stockEffectSetting = String(configData.stockPinEffectHours || localStorage.getItem('poketan_stock_pin_hours') || '24');
+      if (stockEffectSetting === 'all' || stockEffectSetting === '0' || stockEffectSetting === 'off') return;
+      const effectMaxSec = (parseInt(stockEffectSetting, 10) || 24) * 3600;
+      const now = getServerNowSec();
+
+      let needsRerender = false;
+      document.querySelectorAll('.poketan-stock-pin-v2 .stock-time-badge[data-timestamp]').forEach(el => {
+        const ts = Number(el.getAttribute('data-timestamp')) || 0;
+        if (ts > 0 && (now - ts) > effectMaxSec) {
+          needsRerender = true;
+        }
+      });
+
+      if (needsRerender && typeof renderMapMarkers === 'function') {
+        renderMapMarkers();
+      }
+    }
+
+    function updateLiveRelativeTimes() {
+      // 1. Update In-Stock Pin badges on Leaflet markers
+      document.querySelectorAll('.stock-time-badge[data-timestamp]').forEach(el => {
+        const ts = Number(el.getAttribute('data-timestamp')) || 0;
+        if (ts > 0) {
+          const newStr = formatTimeAgoJp(ts);
+          if (el.textContent !== newStr) {
+            el.textContent = newStr;
+          }
+        }
+      });
+
+      // 2. Update popup relative time if popup is open
+      document.querySelectorAll('.popup-time-ago[data-timestamp]').forEach(el => {
+        const ts = Number(el.getAttribute('data-timestamp')) || 0;
+        if (ts > 0) {
+          const newStr = formatTimeAgoJp(ts);
+          if (el.textContent !== newStr) {
+            el.textContent = newStr;
+          }
+        }
+      });
+
+      // 3. Update pill toasts (if any)
+      document.querySelectorAll('.pill-time[data-timestamp]').forEach(el => {
+        const ts = Number(el.getAttribute('data-timestamp')) || 0;
+        if (ts > 0) {
+          const newStr = formatTimeAgoJp(ts);
+          if (el.textContent !== newStr) {
+            el.textContent = newStr;
+          }
+        }
+      });
+
+      // 4. Check if any In-Stock Pin has aged beyond stockPinEffectHours
+      checkStockPinEffectTransitions();
     }
 
     window.focusStoreOnMap = function(sid) {
@@ -3232,6 +3285,9 @@ def render_map_page() -> str:
         lastDbPollTs = getServerNowSec();
         if (!window._dbPollInterval) {
           window._dbPollInterval = setInterval(pollDatabaseUpdates, 5000);
+        }
+        if (!window._liveTimeInterval) {
+          window._liveTimeInterval = setInterval(updateLiveRelativeTimes, 15000);
         }
 
         // Check URL Query String: ?focus=store_id or ?store_id=... or ?hunt=1
@@ -3946,6 +4002,15 @@ def render_thongbao_page() -> str:
     } catch(e) {}
 
     // 2. HELPERS
+    function formatTimeAgoVi(timestamp) {
+      if (!timestamp) return 'Vừa xong';
+      const diffSec = Math.max(0, getServerNowSec() - Number(timestamp));
+      if (diffSec < 60) return 'Vừa xong';
+      if (diffSec < 3600) return `${Math.floor(diffSec / 60)} phút trước`;
+      if (diffSec < 86400) return `${Math.floor(diffSec / 3600)} giờ trước`;
+      return `${Math.floor(diffSec / 86400)} ngày trước`;
+    }
+
     function getStoreStatusInfo(store) {
       let code = (store.status || 'u').toLowerCase();
       let timestamp = Number(store.last_timestamp) || 0;
@@ -3965,11 +4030,7 @@ def render_thongbao_page() -> str:
         dateOnly = `${day}/${month}`;
         if (!reported_at) reported_at = `${hours}:${minutes} (${day}/${month})`;
 
-        const diffSec = Math.max(0, getServerNowSec() - timestamp);
-        if (diffSec < 60) timeAgo = 'Vừa xong';
-        else if (diffSec < 3600) timeAgo = `${Math.floor(diffSec / 60)} phút trước`;
-        else if (diffSec < 86400) timeAgo = `${Math.floor(diffSec / 3600)} giờ trước`;
-        else timeAgo = `${Math.floor(diffSec / 86400)} ngày trước`;
+        timeAgo = formatTimeAgoVi(timestamp);
       }
       const labelMap = { 'i': 'Có hàng', 'o': 'Không có', 'n': 'Không bán thẻ', 'u': 'Chưa có tin' };
       return {
@@ -4207,7 +4268,7 @@ def render_thongbao_page() -> str:
                 <b>${escapeHtml(info.timeOnly || info.reported_at)}</b>
                 ${info.dateOnly ? `<span style="color:#64748b; font-size:0.68rem;">(${escapeHtml(info.dateOnly)})</span>` : ''}
                 <span>•</span>
-                <span class="time-ago-highlight">${escapeHtml(info.timeAgo)}</span>
+                <span class="time-ago-highlight" data-timestamp="${info.timestamp || 0}">${escapeHtml(info.timeAgo)}</span>
               </span>
             </div>
           `;
@@ -5034,7 +5095,7 @@ def render_thongbao_page() -> str:
         <span class="pill-text">で</span>
         <span class="pill-status ${statusClass}">${statusLabel}</span>
         <span class="pill-text">の報告</span>
-        <span class="pill-time">${escapeHtml(timeAgo)}</span>
+        <span class="pill-time" data-timestamp="${repTs}">${escapeHtml(timeAgo)}</span>
         <button type="button" class="pill-close-btn" onclick="event.stopPropagation(); this.closest('.poketan-pill-toast').remove();" title="閉じる">✕</button>
       `;
 
@@ -5066,6 +5127,30 @@ def render_thongbao_page() -> str:
           setTimeout(() => toast.remove(), 250);
         }
       }, 6000);
+    }
+
+    function updateLiveRelativeTimes() {
+      // 1. Update relative time pills on store list cards
+      document.querySelectorAll('.time-ago-highlight[data-timestamp]').forEach(el => {
+        const ts = Number(el.getAttribute('data-timestamp')) || 0;
+        if (ts > 0) {
+          const newStr = formatTimeAgoVi(ts);
+          if (el.textContent !== newStr) {
+            el.textContent = newStr;
+          }
+        }
+      });
+
+      // 2. Update pill toasts (if any)
+      document.querySelectorAll('.pill-time[data-timestamp]').forEach(el => {
+        const ts = Number(el.getAttribute('data-timestamp')) || 0;
+        if (ts > 0) {
+          const newStr = formatTimeAgoJp(ts);
+          if (el.textContent !== newStr) {
+            el.textContent = newStr;
+          }
+        }
+      });
     }
 
     const seenToastKeys = new Set();
@@ -5202,6 +5287,9 @@ def render_thongbao_page() -> str:
         lastDbPollTs = getServerNowSec();
         if (!window._dbPollInterval) {
           window._dbPollInterval = setInterval(pollDatabaseUpdates, 5000);
+        }
+        if (!window._liveTimeInterval) {
+          window._liveTimeInterval = setInterval(updateLiveRelativeTimes, 15000);
         }
 
         // Mark all notifications as read when viewing Thongbao page

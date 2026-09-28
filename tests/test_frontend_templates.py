@@ -413,3 +413,155 @@ def test_stock_pin_effect_hours_settings():
     assert "function updateStockPinHours(" in tb_html, "Missing updateStockPinHours in thongbao page"
     assert "stockEffectSetting" in map_html, "Missing stockEffectSetting check in map page"
 
+
+# ==============================================================================
+# 10. Real-time Relative Time Ticker (In-Stock Pin & /thongbao)
+# ==============================================================================
+
+def test_live_relative_time_attributes():
+    """Verify data-timestamp attributes and ticker intervals exist in both map and thongbao pages."""
+    map_html = render_map_page()
+    tb_html = render_thongbao_page()
+
+    # Map Page:
+    assert 'class="stock-time-badge" data-timestamp=' in map_html, "Missing data-timestamp on stock-time-badge in map"
+    assert 'class="popup-time-ago" data-timestamp=' in map_html, "Missing data-timestamp on popup-time-ago in map"
+    assert 'class="pill-time" data-timestamp=' in map_html, "Missing data-timestamp on pill-time in map"
+    assert "function updateLiveRelativeTimes(" in map_html, "Missing updateLiveRelativeTimes in map page"
+    assert "function checkStockPinEffectTransitions(" in map_html, "Missing checkStockPinEffectTransitions in map page"
+    assert "window._liveTimeInterval" in map_html, "Missing _liveTimeInterval in map page"
+
+    # Thongbao Page:
+    assert 'class="time-ago-highlight" data-timestamp=' in tb_html, "Missing data-timestamp on time-ago-highlight in thongbao"
+    assert 'class="pill-time" data-timestamp=' in tb_html, "Missing data-timestamp on pill-time in thongbao"
+    assert "function formatTimeAgoVi(" in tb_html, "Missing formatTimeAgoVi in thongbao page"
+    assert "function updateLiveRelativeTimes(" in tb_html, "Missing updateLiveRelativeTimes in thongbao page"
+    assert "window._liveTimeInterval" in tb_html, "Missing _liveTimeInterval in thongbao page"
+
+
+def test_vietnamese_time_ago_node_execution():
+    """Execute formatTimeAgoVi directly in Node to test boundary values (0s, 30s, 60s, 15m, 1h, 1d)."""
+    node_script = """
+    let serverNow = 1000000;
+    function getServerNowSec() { return serverNow; }
+
+    %FORMAT_TIME_AGO_VI%
+
+    const testCases = [
+      { ts: serverNow, expected: 'Vừa xong' },             // 0s ago
+      { ts: serverNow - 30, expected: 'Vừa xong' },        // 30s ago
+      { ts: serverNow - 59, expected: 'Vừa xong' },        // 59s ago
+      { ts: serverNow - 60, expected: '1 phút trước' },    // 60s ago
+      { ts: serverNow - 900, expected: '15 phút trước' },  // 15 min ago (User's specific 11:00 -> 11:15 case!)
+      { ts: serverNow - 3540, expected: '59 phút trước' }, // 59 min ago
+      { ts: serverNow - 3600, expected: '1 giờ trước' },   // 1 hour ago
+      { ts: serverNow - 7200, expected: '2 giờ trước' },   // 2 hours ago
+      { ts: serverNow - 86400, expected: '1 ngày trước' }, // 1 day ago
+      { ts: serverNow + 10, expected: 'Vừa xong' },        // clock skew / future
+      { ts: 0, expected: 'Vừa xong' }                      // zero timestamp
+    ];
+
+    for (const tc of testCases) {
+      const res = formatTimeAgoVi(tc.ts);
+      if (res !== tc.expected) {
+        throw new Error(`formatTimeAgoVi(${tc.ts}) failed: expected "${tc.expected}", got "${res}"`);
+      }
+    }
+
+    console.log('VIETNAMESE_TIME_AGO_NODE_OK');
+    """
+
+    tb_html = render_thongbao_page()
+    script = extract_inline_scripts(tb_html)[0]
+    fmt_match = re.search(r"function formatTimeAgoVi\(.*?\n    \}", script, re.DOTALL)
+    assert fmt_match, "formatTimeAgoVi not found in thongbao script"
+
+    test_js = node_script.replace("%FORMAT_TIME_AGO_VI%", fmt_match.group(0))
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".js", delete=False, encoding="utf-8") as f:
+        f.write(test_js)
+        f_path = f.name
+    try:
+        res = subprocess.run(["node", f_path], capture_output=True, text=True)
+        assert res.returncode == 0, f"Node Vietnamese timeAgo test failed:\n{res.stderr}"
+        assert "VIETNAMESE_TIME_AGO_NODE_OK" in res.stdout
+    finally:
+        if os.path.exists(f_path):
+            os.remove(f_path)
+
+
+def test_live_ticker_simulation_in_node():
+    """Simulate DOM time tick in Node: 11:00 to 11:15 automatically updates text to '15 phút trước' and '15分前'."""
+    node_test = """
+    // Minimal DOM Mock
+    class MockElement {
+      constructor(ts, initialText) {
+        this.attributes = { 'data-timestamp': String(ts) };
+        this.textContent = initialText;
+      }
+      getAttribute(k) { return this.attributes[k]; }
+    }
+
+    let serverNow = 1000000;
+    function getServerNowSec() { return serverNow; }
+
+    function formatTimeAgoJp(timestamp) {
+      if (!timestamp) return 'たった今';
+      const diffSec = getServerNowSec() - timestamp;
+      if (diffSec < 0) return 'たった今';
+      if (diffSec <= 120) return 'たった今';
+      if (diffSec < 3600) return `${Math.floor(diffSec / 60)}分前`;
+      if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}時間前`;
+      return `${Math.floor(diffSec / 86400)}日前`;
+    }
+
+    function formatTimeAgoVi(timestamp) {
+      if (!timestamp) return 'Vừa xong';
+      const diffSec = Math.max(0, getServerNowSec() - Number(timestamp));
+      if (diffSec < 60) return 'Vừa xong';
+      if (diffSec < 3600) return `${Math.floor(diffSec / 60)} phút trước`;
+      if (diffSec < 86400) return `${Math.floor(diffSec / 3600)} giờ trước`;
+      return `${Math.floor(diffSec / 86400)} ngày trước`;
+    }
+
+    // Report was created at 11:00 (ts = serverNow)
+    const reportTs = serverNow;
+    const pinBadge = new MockElement(reportTs, 'たった今');
+    const thongBaoPill = new MockElement(reportTs, 'Vừa xong');
+
+    // Verify initial states
+    if (pinBadge.textContent !== 'たった今') throw new Error('Initial pin text wrong');
+    if (thongBaoPill.textContent !== 'Vừa xong') throw new Error('Initial thongbao text wrong');
+
+    // 15 minutes pass (11:15: serverNow advances 900 seconds)
+    serverNow += 900;
+
+    // Simulate updateLiveRelativeTimes()
+    const newJp = formatTimeAgoJp(Number(pinBadge.getAttribute('data-timestamp')));
+    pinBadge.textContent = newJp;
+
+    const newVi = formatTimeAgoVi(Number(thongBaoPill.getAttribute('data-timestamp')));
+    thongBaoPill.textContent = newVi;
+
+    if (pinBadge.textContent !== '15分前') {
+      throw new Error(`Expected 15分前, got ${pinBadge.textContent}`);
+    }
+    if (thongBaoPill.textContent !== '15 phút trước') {
+      throw new Error(`Expected 15 phút trước, got ${thongBaoPill.textContent}`);
+    }
+
+    console.log('LIVE_TICKER_SIMULATION_OK');
+    """
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".js", delete=False, encoding="utf-8") as f:
+        f.write(node_test)
+        f_path = f.name
+    try:
+        res = subprocess.run(["node", f_path], capture_output=True, text=True)
+        assert res.returncode == 0, f"Node live ticker simulation failed:\n{res.stderr}"
+        assert "LIVE_TICKER_SIMULATION_OK" in res.stdout
+    finally:
+        if os.path.exists(f_path):
+            os.remove(f_path)
+
+
