@@ -564,4 +564,34 @@ def test_live_ticker_simulation_in_node():
         if os.path.exists(f_path):
             os.remove(f_path)
 
+# ==============================================================================
+# 11. Settings Modal Map Filter Tab
+# ==============================================================================
 
+def test_settings_map_filter_tab_structure():
+    """Verify Map Filter is integrated as a dedicated tab inside Settings modal in both templates."""
+    map_html = render_map_page()
+    tb_html = render_thongbao_page()
+
+    for name, html in [("map", map_html), ("thongbao", tb_html)]:
+        # Tab buttons
+        assert 'id="tab-btn-set-map"' in html, f"Missing #tab-btn-set-map in {name}"
+        assert 'id="tab-btn-set-telegram"' in html, f"Missing #tab-btn-set-telegram in {name}"
+        assert 'id="tab-btn-set-system"' in html, f"Missing #tab-btn-set-system in {name}"
+
+        # Tab panes
+        assert 'id="settings-pane-map"' in html, f"Missing #settings-pane-map in {name}"
+        assert 'id="settings-pane-telegram"' in html, f"Missing #settings-pane-telegram in {name}"
+        assert 'id="settings-pane-system"' in html, f"Missing #settings-pane-system in {name}"
+
+        # Map filter controls inside the pane
+        assert 'id="map-modal-region-group"' in html, f"Missing #map-modal-region-group in {name}"
+        assert 'id="map-modal-status-group"' in html, f"Missing #map-modal-status-group in {name}"
+        assert 'id="map-modal-chain-group"' in html, f"Missing #map-modal-chain-group in {name}"
+        assert 'id="map-modal-time-group"' in html, f"Missing #map-modal-time-group in {name}"
+        assert 'id="set-stock-pin-hours"' in html, f"Missing #set-stock-pin-hours in {name}"
+
+        # JS functions
+        assert "function switchSettingsTab(" in html, f"Missing switchSettingsTab in {name}"
+        assert "function applyAndCloseMapFilterModal(" in html, f"Missing applyAndCloseMapFilterModal in {name}"
+        assert "function resetMapFilters(" in html, f"Missing resetMapFilters in {name}"

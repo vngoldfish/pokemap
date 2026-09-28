@@ -47,6 +47,7 @@
   "currentChain": "",
   "sortMode": "newest",
   "showExpired": false,
+  "stockPinEffectHours": "24",
   "feedFreshnessHours": 9999,
   "feedChain": "",
   "feedSortMode": "newest",

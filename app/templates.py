@@ -456,6 +456,50 @@ SHARED_BASE_CSS = """
       background: #1d4ed8;
     }
 
+    /* SETTINGS MODAL TAB BAR & PANES */
+    .settings-tab-bar {
+      display: flex;
+      background: #f8fafc;
+      border-bottom: 1px solid #e2e8f0;
+      padding: 0 12px;
+      gap: 4px;
+      flex-shrink: 0;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .settings-tab-btn {
+      padding: 11px 14px;
+      font-weight: 700;
+      font-size: 0.82rem;
+      border: none;
+      background: none;
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      color: #64748b;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+    }
+    .settings-tab-btn:hover {
+      color: #0f172a;
+    }
+    .settings-tab-btn.active {
+      color: #2563eb;
+      border-bottom-color: #2563eb;
+      font-weight: 800;
+      background: rgba(37, 99, 235, 0.04);
+    }
+    .settings-tab-pane {
+      display: none;
+    }
+    .settings-tab-pane.active {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
     /* REGION TOAST */
     #region-load-toast {
       display: none;
@@ -749,189 +793,316 @@ SHARED_MODALS_HTML = """
     </div>
   </div>
 
-  <!-- 8. SETTINGS & TELEGRAM MODAL (⚙️ Cài đặt hệ thống & Telegram 24/7) -->
+  <!-- 8. SETTINGS MODAL (⚙️ Cài đặt & Bộ lọc PokéMap) -->
   <div id="settings-modal" class="modal-overlay" onclick="if(event.target===this) closeSettingsModal()">
-    <div class="modal-card" style="max-width:480px; max-height:88vh; max-height:88dvh; display:flex; flex-direction:column;">
-      <div class="modal-header" style="background:#0f172a; color:#ffffff;">
+    <div class="modal-card" style="max-width:520px; width:95%; max-height:88vh; max-height:88dvh; display:flex; flex-direction:column; padding:0; overflow:hidden;">
+      <div class="modal-header" style="background:#0f172a; color:#ffffff; padding:14px 18px; flex-shrink:0;">
         <div style="display:flex; align-items:center; gap:8px;">
           <span style="font-size:1.15rem;">⚙️</span>
           <div>
-            <h3 style="font-weight:800; font-size:1.02rem; color:#ffffff; margin:0;">Cài đặt hệ thống &amp; Telegram</h3>
-            <div style="font-size:0.7rem; color:#94a3b8; font-weight:600; margin-top:1px;">Cấu hình báo tin Telegram 24/7 &amp; tùy chọn hiển thị</div>
+            <h3 style="font-weight:800; font-size:1.02rem; color:#ffffff; margin:0;">Cài đặt &amp; Bộ lọc</h3>
+            <div style="font-size:0.7rem; color:#94a3b8; font-weight:600; margin-top:1px;">Bộ lọc bản đồ, thông báo Telegram 24/7 &amp; tùy chọn hệ thống</div>
           </div>
         </div>
         <button class="modal-close-btn" style="color:#ffffff;" onclick="closeSettingsModal()">✕</button>
       </div>
-      <div class="modal-body" style="font-size:0.82rem; max-height:75vh; overflow-y:auto; display:flex; flex-direction:column; gap:16px; padding:16px;">
+
+      <!-- TAB NAVIGATION -->
+      <div class="settings-tab-bar">
+        <button type="button" class="settings-tab-btn active" id="tab-btn-set-map" data-tab="map" onclick="switchSettingsTab('map')">
+          <span>🗺️</span> <span>Bộ lọc Bản đồ</span>
+        </button>
+        <button type="button" class="settings-tab-btn" id="tab-btn-set-telegram" data-tab="telegram" onclick="switchSettingsTab('telegram')">
+          <span>✈️</span> <span>Telegram 24/7</span>
+        </button>
+        <button type="button" class="settings-tab-btn" id="tab-btn-set-system" data-tab="system" onclick="switchSettingsTab('system')">
+          <span>⚙️</span> <span>Cài đặt chung</span>
+        </button>
+      </div>
+
+      <!-- TAB CONTENT PANES -->
+      <div class="modal-body" style="font-size:0.82rem; max-height:75vh; overflow-y:auto; flex:1; padding:16px;">
         
-        <!-- SECTION 1: CẤU HÌNH THÔNG BÁO TELEGRAM 24/7 -->
-        <div style="border:1px solid #bae6fd; background:#f0f9ff; border-radius:12px; padding:14px;">
-          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
-            <div style="display:flex; align-items:center; gap:6px;">
-              <span style="font-size:1.15rem;">✈️</span>
-              <span style="font-weight:800; font-size:0.92rem; color:#0369a1;">Thông báo Telegram 24/7</span>
-            </div>
-            <!-- Switch toggle -->
-            <label style="position:relative; display:inline-block; width:44px; height:24px; margin:0; flex-shrink:0;">
-              <input type="checkbox" id="tg-cfg-enabled" onchange="onTelegramToggleChange(this.checked)" style="opacity:0; width:0; height:0;">
-              <span style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background:#cbd5e1; transition:.3s; border-radius:24px;" id="tg-cfg-slider"></span>
-            </label>
-          </div>
-
-          <div style="font-size:0.72rem; color:#0369a1; margin-bottom:12px; line-height:1.4;">
-            Tự động gửi tin nhắn báo quán có hàng vào chat hoặc nhóm Telegram ngay khi phát hiện.
-          </div>
-
-          <!-- Token & Chat ID -->
-          <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:12px;">
-            <div>
-              <label style="font-weight:800; font-size:0.75rem; color:#334155; display:block; margin-bottom:4px;">Telegram Bot Token:</label>
-              <input type="text" id="tg-cfg-token" placeholder="Ví dụ: 123456789:ABCdefGhIJKlmNoPQRstuVWXyz..." style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:8px 10px; font-size:0.8rem; outline:none; background:#ffffff;" />
-            </div>
-            <div>
-              <label style="font-weight:800; font-size:0.75rem; color:#334155; display:block; margin-bottom:4px;">Telegram Chat ID (Nhóm hoặc Cá nhân):</label>
-              <input type="text" id="tg-cfg-chatid" placeholder="Ví dụ: -1001234567890 hoặc 987654321" style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:8px 10px; font-size:0.8rem; outline:none; background:#ffffff;" />
-            </div>
-          </div>
-
-          <!-- Bộ lọc tin nhắn gửi Telegram -->
-          <div style="border-top:1px dashed #bae6fd; padding-top:10px; margin-bottom:10px;">
-            <div style="font-weight:800; color:#0f172a; font-size:0.78rem; margin-bottom:8px; display:flex; align-items:center; gap:5px;">
-              <span>🎯</span> <span>Bộ lọc cảnh báo gửi Telegram:</span>
-            </div>
-
-            <!-- Grid 2 cột -->
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-              <div>
-                <label style="font-size:0.7rem; font-weight:700; color:#475569; display:block; margin-bottom:3px;">📍 Khu vực:</label>
-                <select id="tg-cfg-region" style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:6px 8px; font-size:0.75rem; font-weight:700; color:#1e293b; background:#ffffff;">
-                  <option value="osaka">📍 Osaka &amp; Kansai</option>
-                  <option value="tokyo">📍 Tokyo &amp; Kanto</option>
-                  <option value="nagoya">📍 Nagoya &amp; Tokai</option>
-                  <option value="all">🗾 Toàn quốc</option>
-                </select>
-              </div>
-
-              <div>
-                <label style="font-size:0.7rem; font-weight:700; color:#475569; display:block; margin-bottom:3px;">📊 Trạng thái:</label>
-                <select id="tg-cfg-status" style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:6px 8px; font-size:0.75rem; font-weight:700; color:#1e293b; background:#ffffff;">
-                  <option value="in">🟢 Chỉ khi có hàng</option>
-                  <option value="onsite">📸 Chỉ tin tại quán (GPS)</option>
-                  <option value="recent">★ Có hàng &amp; Từng có</option>
-                  <option value="all">🌐 Nhận tất cả tin</option>
-                </select>
-              </div>
-
-              <div>
-                <label style="font-size:0.7rem; font-weight:700; color:#475569; display:block; margin-bottom:3px;">🏢 Chuỗi:</label>
-                <select id="tg-cfg-chain" style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:6px 8px; font-size:0.75rem; font-weight:700; color:#1e293b; background:#ffffff;">
-                  <option value="all">🏢 Tất cả các chuỗi</option>
-                  <option value="conbini">🏪 Tất cả Conbini</option>
-                  <option value="seven">🏪 7-Eleven</option>
-                  <option value="lawson">🏪 Lawson</option>
-                  <option value="familymart">🏪 FamilyMart</option>
-                  <option value="ministop">🏪 Ministop</option>
-                  <option value="specialty">🃏 Card Shop chuyên</option>
-                  <option value="electronics">🎮 Điện máy, GEO</option>
-                </select>
-              </div>
-
-              <div>
-                <label style="font-size:0.7rem; font-weight:700; color:#475569; display:block; margin-bottom:3px;">⏱️ Độ mới:</label>
-                <select id="tg-cfg-time" style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:6px 8px; font-size:0.75rem; font-weight:700; color:#1e293b; background:#ffffff;">
-                  <option value="1">⚡ Trong vòng 1 giờ</option>
-                  <option value="3">⏱ Trong vòng 3 giờ</option>
-                  <option value="6">⏱ Trong vòng 6 giờ</option>
-                  <option value="24" selected>📅 Trong vòng 24 giờ</option>
-                  <option value="all">⏳ Toàn bộ thời gian</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <div id="tg-test-result" style="display:none; padding:8px 10px; border-radius:8px; font-size:0.75rem; font-weight:700; margin-top:8px;"></div>
-
-          <!-- Buttons test & save -->
-          <div style="display:flex; gap:8px; margin-top:10px;">
-            <button type="button" onclick="testTelegramWebhook()" style="flex:1; padding:9px 10px; background:#ffffff; color:#0369a1; border:1px solid #bae6fd; border-radius:8px; font-weight:800; font-size:0.78rem; cursor:pointer;">
-              🔔 Gửi test
-            </button>
-            <button type="button" onclick="saveTelegramConfig()" style="flex:2; padding:9px 10px; background:#0284c7; color:#ffffff; border:none; border-radius:8px; font-weight:800; font-size:0.78rem; cursor:pointer;">
-              💾 Lưu cấu hình Telegram
-            </button>
-          </div>
-        </div>
-
-        <!-- SECTION: GHIM CÓ HÀNG (IN-STOCK PIN EFFECT) -->
-        <div style="border:1px solid #bbf7d0; background:#f0fdf4; border-radius:12px; padding:14px;">
-          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
-            <div style="display:flex; align-items:center; gap:6px;">
-              <span style="font-size:1.15rem;">🎯</span>
-              <span style="font-weight:800; font-size:0.92rem; color:#15803d;">Ghim có hàng (In-Stock Pin)</span>
-            </div>
-            <span style="font-size:0.68rem; font-weight:800; background:#dcfce7; color:#166534; padding:2px 8px; border-radius:20px; border:1px solid #86efac;">
-              Bản đồ
-            </span>
-          </div>
-          <div style="font-size:0.72rem; color:#166534; margin-bottom:10px; line-height:1.4;">
-            Cài đặt thời gian hiển thị hiệu ứng vòng tròn mục tiêu chớp nháy (pulsing ripple) &amp; thanh thời gian nổi cho các quán đang có hàng.
-          </div>
+        <!-- PANE 1: BỘ LỌC BẢN ĐỒ -->
+        <div id="settings-pane-map" class="settings-tab-pane active" style="display:flex; flex-direction:column; gap:16px;">
+          <!-- KHU VỰC BẢN ĐỒ -->
           <div>
-            <label style="font-size:0.72rem; font-weight:800; color:#334155; display:block; margin-bottom:4px;">
-              ⏱️ Thời gian hiệu lực hiệu ứng (tính từ thời gian hiện tại):
-            </label>
-            <select id="set-stock-pin-hours" onchange="updateStockPinHours(this.value)" style="width:100%; border:1px solid #86efac; border-radius:8px; padding:8px 10px; font-size:0.78rem; font-weight:700; color:#14532d; background:#ffffff; outline:none; box-shadow:0 1px 2px rgba(0,0,0,0.05); cursor:pointer;">
-              <option value="1">⚡ Trong vòng 1 giờ (báo mới nhất)</option>
-              <option value="3">⏱️ Trong vòng 3 giờ</option>
-              <option value="6">⏱️ Trong vòng 6 giờ</option>
-              <option value="12">⏱️ Trong vòng 12 giờ</option>
-              <option value="24" selected>📅 Trong vòng 24 giờ (mặc định)</option>
-              <option value="all">✨ Luôn luôn có hiệu ứng (tất cả quán có hàng)</option>
-              <option value="0">🚫 Tắt hiệu ứng chớp nháy (chỉ hiện chấm xanh tĩnh)</option>
-            </select>
-            <div style="font-size:0.68rem; color:#64748b; margin-top:4px;">
-              * Các quán có hàng báo trước khoảng thời gian này vẫn hiện màu xanh nhưng không chớp nháy để tránh rối mắt.
+            <div class="filter-group-title">📍 Khu vực hiển thị (地域・エリア)</div>
+            <div class="filter-options-grid" id="map-modal-region-group">
+              <button class="filter-option-btn active" data-val="osaka" onclick="selectMapModalRegion('osaka')">
+                🔵 Osaka &amp; Kansai
+              </button>
+              <button class="filter-option-btn" data-val="tokyo" onclick="selectMapModalRegion('tokyo')">
+                🟣 Tokyo &amp; Kanto
+              </button>
+              <button class="filter-option-btn" data-val="nagoya" onclick="selectMapModalRegion('nagoya')">
+                🟢 Nagoya &amp; Tokai
+              </button>
+              <button class="filter-option-btn" data-val="all" onclick="selectMapModalRegion('all')">
+                🌐 Toàn quốc (19.860+ quán)
+              </button>
+            </div>
+          </div>
+
+          <!-- TRẠNG THÁI HÀNG HÓA -->
+          <div>
+            <div class="filter-group-title">📊 Trạng thái hàng hóa (在庫状況)</div>
+            <div class="filter-options-grid" id="map-modal-status-group">
+              <button class="filter-option-btn active" data-val="all" onclick="selectMapModalStatus('all')">
+                🌐 Tất cả quán
+              </button>
+              <button class="filter-option-btn" data-val="in" onclick="selectMapModalStatus('in')">
+                <span class="chip-dot dot-green"></span> 🟢 Có hàng (あった)
+              </button>
+              <button class="filter-option-btn" data-val="out" onclick="selectMapModalStatus('out')">
+                <span class="chip-dot dot-red"></span> 🔴 Không có (なかった)
+              </button>
+              <button class="filter-option-btn" data-val="n" onclick="selectMapModalStatus('n')">
+                <span class="chip-dot" style="background:#f59e0b;"></span> 🟡 Không bán thẻ (扱ってない)
+              </button>
+              <button class="filter-option-btn" data-val="unknown" onclick="selectMapModalStatus('unknown')">
+                <span class="chip-dot dot-gray"></span> ⚪ Chưa có báo cáo (未確認)
+              </button>
+              <button class="filter-option-btn" data-val="onsite" onclick="selectMapModalStatus('onsite')">
+                📍 Báo cáo tại quán (GPS)
+              </button>
+              <button class="filter-option-btn" data-val="recent" onclick="selectMapModalStatus('recent')">
+                ⚡ Có tin báo gần đây (7 ngày)
+              </button>
+            </div>
+          </div>
+
+          <!-- CHUỖI & THƯƠNG HIỆU -->
+          <div>
+            <div class="filter-group-title">🏢 Chuỗi cửa hàng & Thương hiệu</div>
+            <div class="filter-options-grid" id="map-modal-chain-group">
+              <button class="filter-option-btn active" data-val="all" onclick="selectMapModalChain('all')">
+                🏢 Tất cả chuỗi
+              </button>
+              <button class="filter-option-btn" data-val="conbini" onclick="selectMapModalChain('conbini')">
+                🏪 Tất cả Conbini
+              </button>
+              <button class="filter-option-btn" data-val="seven" onclick="selectMapModalChain('seven')">
+                🏪 7-Eleven
+              </button>
+              <button class="filter-option-btn" data-val="lawson" onclick="selectMapModalChain('lawson')">
+                🏪 Lawson
+              </button>
+              <button class="filter-option-btn" data-val="familymart" onclick="selectMapModalChain('familymart')">
+                🏪 FamilyMart
+              </button>
+              <button class="filter-option-btn" data-val="ministop" onclick="selectMapModalChain('ministop')">
+                🏪 Ministop
+              </button>
+              <button class="filter-option-btn" data-val="specialty" onclick="selectMapModalChain('specialty')">
+                🃏 Card Shop chuyên
+              </button>
+              <button class="filter-option-btn" data-val="electronics" onclick="selectMapModalChain('electronics')">
+                🎮 Điện máy, GEO
+              </button>
+            </div>
+          </div>
+
+          <!-- THỜI GIAN / ĐỘ MỚI TIN BÁO -->
+          <div>
+            <div class="filter-group-title">⏱️ Thời gian có hàng / Độ tươi mới (報告経過時間)</div>
+            <div class="filter-options-grid" id="map-modal-time-group">
+              <button class="filter-option-btn" data-val="1" onclick="selectMapModalTime('1')">
+                ⚡ Trong 1 giờ qua
+              </button>
+              <button class="filter-option-btn" data-val="3" onclick="selectMapModalTime('3')">
+                ⏱ Trong 3 giờ qua
+              </button>
+              <button class="filter-option-btn" data-val="6" onclick="selectMapModalTime('6')">
+                ⏱ Trong 6 giờ qua
+              </button>
+              <button class="filter-option-btn" data-val="12" onclick="selectMapModalTime('12')">
+                ⏱ Trong 12 giờ qua
+              </button>
+              <button class="filter-option-btn" data-val="24" onclick="selectMapModalTime('24')">
+                📅 Trong 24 giờ qua
+              </button>
+              <button class="filter-option-btn active" data-val="all" onclick="selectMapModalTime('all')">
+                ⏳ Mọi lúc (Toàn bộ)
+              </button>
+            </div>
+          </div>
+
+          <!-- HIỆU LỰC GHIM CÓ HÀNG -->
+          <div style="border:1px solid #bbf7d0; background:#f0fdf4; border-radius:12px; padding:12px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span style="font-size:1.1rem;">🎯</span>
+                <span style="font-weight:800; font-size:0.88rem; color:#15803d;">Ghim có hàng (In-Stock Pin)</span>
+              </div>
+            </div>
+            <div style="font-size:0.72rem; color:#166534; margin-bottom:8px; line-height:1.4;">
+              Thời gian hiển thị hiệu ứng chớp nháy mục tiêu cho các quán đang có hàng.
+            </div>
+            <div>
+              <select id="set-stock-pin-hours" onchange="updateStockPinHours(this.value)" style="width:100%; border:1px solid #86efac; border-radius:8px; padding:7px 10px; font-size:0.78rem; font-weight:700; color:#14532d; background:#ffffff; outline:none; box-shadow:0 1px 2px rgba(0,0,0,0.05); cursor:pointer;">
+                <option value="1">⚡ Trong vòng 1 giờ (báo mới nhất)</option>
+                <option value="3">⏱️ Trong vòng 3 giờ</option>
+                <option value="6">⏱️ Trong vòng 6 giờ</option>
+                <option value="12">⏱️ Trong vòng 12 giờ</option>
+                <option value="24" selected>📅 Trong vòng 24 giờ (mặc định)</option>
+                <option value="all">✨ Luôn luôn có hiệu ứng (tất cả quán có hàng)</option>
+                <option value="0">🚫 Tắt hiệu ứng chớp nháy (chỉ hiện chấm xanh tĩnh)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- FOOTER BUTTONS CHO BỘ LỌC BẢN ĐỒ -->
+          <div style="padding-top:10px; border-top:1px solid #e2e8f0; display:flex; gap:10px; margin-top:4px;">
+            <button type="button" class="btn-reset-filter" onclick="resetMapFilters()" style="flex:1; padding:9px 12px; background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; border-radius:8px; font-weight:700; font-size:0.8rem; cursor:pointer;">
+              🔄 Đặt lại
+            </button>
+            <button type="button" class="btn-apply-filter" onclick="applyAndCloseMapFilterModal()" style="flex:2; padding:9px 12px; background:#2563eb; color:#ffffff; border:none; border-radius:8px; font-weight:800; font-size:0.8rem; cursor:pointer;">
+              ✅ Áp dụng bộ lọc
+            </button>
+          </div>
+        </div>
+
+        <!-- PANE 2: CẤU HÌNH THÔNG BÁO TELEGRAM 24/7 -->
+        <div id="settings-pane-telegram" class="settings-tab-pane" style="display:none; flex-direction:column; gap:16px;">
+          <div style="border:1px solid #bae6fd; background:#f0f9ff; border-radius:12px; padding:14px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span style="font-size:1.15rem;">✈️</span>
+                <span style="font-weight:800; font-size:0.92rem; color:#0369a1;">Thông báo Telegram 24/7</span>
+              </div>
+              <!-- Switch toggle -->
+              <label style="position:relative; display:inline-block; width:44px; height:24px; margin:0; flex-shrink:0;">
+                <input type="checkbox" id="tg-cfg-enabled" onchange="onTelegramToggleChange(this.checked)" style="opacity:0; width:0; height:0;">
+                <span style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background:#cbd5e1; transition:.3s; border-radius:24px;" id="tg-cfg-slider"></span>
+              </label>
+            </div>
+
+            <div style="font-size:0.72rem; color:#0369a1; margin-bottom:12px; line-height:1.4;">
+              Tự động gửi tin nhắn báo quán có hàng vào chat hoặc nhóm Telegram ngay khi phát hiện.
+            </div>
+
+            <!-- Token & Chat ID -->
+            <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:12px;">
+              <div>
+                <label style="font-weight:800; font-size:0.75rem; color:#334155; display:block; margin-bottom:4px;">Telegram Bot Token:</label>
+                <input type="text" id="tg-cfg-token" placeholder="Ví dụ: 123456789:ABCdefGhIJKlmNoPQRstuVWXyz..." style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:8px 10px; font-size:0.8rem; outline:none; background:#ffffff;" />
+              </div>
+              <div>
+                <label style="font-weight:800; font-size:0.75rem; color:#334155; display:block; margin-bottom:4px;">Telegram Chat ID (Nhóm hoặc Cá nhân):</label>
+                <input type="text" id="tg-cfg-chatid" placeholder="Ví dụ: -1001234567890 hoặc 987654321" style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:8px 10px; font-size:0.8rem; outline:none; background:#ffffff;" />
+              </div>
+            </div>
+
+            <!-- Bộ lọc tin nhắn gửi Telegram -->
+            <div style="border-top:1px dashed #bae6fd; padding-top:10px; margin-bottom:10px;">
+              <div style="font-weight:800; color:#0f172a; font-size:0.78rem; margin-bottom:8px; display:flex; align-items:center; gap:5px;">
+                <span>🎯</span> <span>Bộ lọc cảnh báo gửi Telegram:</span>
+              </div>
+
+              <!-- Grid 2 cột -->
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                <div>
+                  <label style="font-size:0.7rem; font-weight:700; color:#475569; display:block; margin-bottom:3px;">📍 Khu vực:</label>
+                  <select id="tg-cfg-region" style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:6px 8px; font-size:0.75rem; font-weight:700; color:#1e293b; background:#ffffff;">
+                    <option value="osaka">📍 Osaka &amp; Kansai</option>
+                    <option value="tokyo">📍 Tokyo &amp; Kanto</option>
+                    <option value="nagoya">📍 Nagoya &amp; Tokai</option>
+                    <option value="all">🗾 Toàn quốc</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style="font-size:0.7rem; font-weight:700; color:#475569; display:block; margin-bottom:3px;">📊 Trạng thái:</label>
+                  <select id="tg-cfg-status" style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:6px 8px; font-size:0.75rem; font-weight:700; color:#1e293b; background:#ffffff;">
+                    <option value="in">🟢 Chỉ khi có hàng</option>
+                    <option value="onsite">📸 Chỉ tin tại quán (GPS)</option>
+                    <option value="recent">★ Có hàng &amp; Từng có</option>
+                    <option value="all">🌐 Nhận tất cả tin</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style="font-size:0.7rem; font-weight:700; color:#475569; display:block; margin-bottom:3px;">🏢 Chuỗi:</label>
+                  <select id="tg-cfg-chain" style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:6px 8px; font-size:0.75rem; font-weight:700; color:#1e293b; background:#ffffff;">
+                    <option value="all">🏢 Tất cả các chuỗi</option>
+                    <option value="conbini">🏪 Tất cả Conbini</option>
+                    <option value="seven">🏪 7-Eleven</option>
+                    <option value="lawson">🏪 Lawson</option>
+                    <option value="familymart">🏪 FamilyMart</option>
+                    <option value="ministop">🏪 Ministop</option>
+                    <option value="specialty">🃏 Card Shop chuyên</option>
+                    <option value="electronics">🎮 Điện máy, GEO</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style="font-size:0.7rem; font-weight:700; color:#475569; display:block; margin-bottom:3px;">⏱️ Độ mới:</label>
+                  <select id="tg-cfg-time" style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:6px 8px; font-size:0.75rem; font-weight:700; color:#1e293b; background:#ffffff;">
+                    <option value="1">⚡ Trong vòng 1 giờ</option>
+                    <option value="3">⏱ Trong vòng 3 giờ</option>
+                    <option value="6">⏱ Trong vòng 6 giờ</option>
+                    <option value="24" selected>📅 Trong vòng 24 giờ</option>
+                    <option value="all">⏳ Toàn bộ thời gian</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div id="tg-test-result" style="display:none; padding:8px 10px; border-radius:8px; font-size:0.75rem; font-weight:700; margin-top:8px;"></div>
+
+            <!-- Buttons test & save -->
+            <div style="display:flex; gap:8px; margin-top:10px;">
+              <button type="button" onclick="testTelegramWebhook()" style="flex:1; padding:9px 10px; background:#ffffff; color:#0369a1; border:1px solid #bae6fd; border-radius:8px; font-weight:800; font-size:0.78rem; cursor:pointer;">
+                🔔 Gửi test
+              </button>
+              <button type="button" onclick="saveTelegramConfig()" style="flex:2; padding:9px 10px; background:#0284c7; color:#ffffff; border:none; border-radius:8px; font-weight:800; font-size:0.78rem; cursor:pointer;">
+                💾 Lưu cấu hình Telegram
+              </button>
             </div>
           </div>
         </div>
 
-        <!-- SECTION 2: ÂM THANH TRÊN WEB -->
-        <div>
-          <div class="filter-group-title">🔔 Thông báo âm thanh trên Web</div>
-          <label style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; font-weight:700; background:#f8fafc; padding:10px 12px; border-radius:8px; border:1px solid #e2e8f0;">
-            <span>🔊 Âm thanh khi phát hiện có hàng</span>
-            <input type="checkbox" id="set-sound-check" onchange="updateSettings('soundEnabled', this.checked)">
-          </label>
-        </div>
-
-        <!-- SECTION 3: VÙNG DỮ LIỆU HIỂN THỊ -->
-        <div>
-          <div class="filter-group-title">📍 Vùng dữ liệu hiển thị (地域・エリア)</div>
-          <div style="display:flex; flex-direction:column; gap:8px;">
-            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:700;">
-              <input type="radio" name="set-region-radio" value="osaka" onchange="selectRegion('osaka')">
-              <span>📍 Osaka &amp; Kansai (大阪府周辺 - 4,050 quán)</span>
-            </label>
-            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:700;">
-              <input type="radio" name="set-region-radio" value="tokyo" onchange="selectRegion('tokyo')">
-              <span>🗼 Tokyo &amp; Kanto (東京都・神奈川 - 9,450 quán)</span>
-            </label>
-            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:700;">
-              <input type="radio" name="set-region-radio" value="nagoya" onchange="selectRegion('nagoya')">
-              <span>🏯 Nagoya &amp; Tokai (愛知県・岐阜・三重 - 6,360 quán)</span>
-            </label>
-            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:700;">
-              <input type="radio" name="set-region-radio" value="all" onchange="selectRegion('all')">
-              <span>🗾 Toàn quốc (全国エリア - 19,860+ quán)</span>
+        <!-- PANE 3: CÀI ĐẶT CHUNG HỆ THỐNG -->
+        <div id="settings-pane-system" class="settings-tab-pane" style="display:none; flex-direction:column; gap:16px;">
+          <!-- SECTION 2: ÂM THANH TRÊN WEB -->
+          <div>
+            <div class="filter-group-title">🔔 Thông báo âm thanh trên Web</div>
+            <label style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; font-weight:700; background:#f8fafc; padding:10px 12px; border-radius:8px; border:1px solid #e2e8f0;">
+              <span>🔊 Âm thanh khi phát hiện có hàng</span>
+              <input type="checkbox" id="set-sound-check" onchange="updateSettings('soundEnabled', this.checked)">
             </label>
           </div>
-        </div>
 
-        <!-- SECTION 4: CẬP NHẬT DỮ LIỆU -->
-        <div>
-          <button type="button" onclick="refreshData(); closeSettingsModal();" style="width:100%; padding:10px 14px; background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; border-radius:10px; font-weight:800; font-size:0.82rem; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;">
-            <span>🔄 Cập nhật dữ liệu mới nhất</span>
-          </button>
+          <!-- SECTION 3: VÙNG DỮ LIỆU HIỂN THỊ -->
+          <div>
+            <div class="filter-group-title">📍 Vùng dữ liệu mặc định (地域・エリア)</div>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:700;">
+                <input type="radio" name="set-region-radio" value="osaka" onchange="selectRegion('osaka')">
+                <span>📍 Osaka &amp; Kansai (大阪府周辺 - 4,050 quán)</span>
+              </label>
+              <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:700;">
+                <input type="radio" name="set-region-radio" value="tokyo" onchange="selectRegion('tokyo')">
+                <span>🗼 Tokyo &amp; Kanto (東京都・神奈川 - 9,450 quán)</span>
+              </label>
+              <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:700;">
+                <input type="radio" name="set-region-radio" value="nagoya" onchange="selectRegion('nagoya')">
+                <span>🏯 Nagoya &amp; Tokai (愛知県・岐阜・三重 - 6,360 quán)</span>
+              </label>
+              <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:700;">
+                <input type="radio" name="set-region-radio" value="all" onchange="selectRegion('all')">
+                <span>🗾 Toàn quốc (全国エリア - 19,860+ quán)</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- SECTION 4: CẬP NHẬT DỮ LIỆU -->
+          <div>
+            <button type="button" onclick="refreshData(); closeSettingsModal();" style="width:100%; padding:10px 14px; background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; border-radius:10px; font-weight:800; font-size:0.82rem; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;">
+              <span>🔄 Cập nhật dữ liệu mới nhất</span>
+            </button>
+          </div>
         </div>
 
       </div>
@@ -1553,135 +1724,8 @@ def render_map_page() -> str:
     footer = render_shared_footer("map")
 
     map_filter_modal = """
-  <!-- MAP FILTER MODAL (⚙️ Bộ lọc bản đồ) -->
-  <div id="map-filter-modal" class="modal-overlay" onclick="if(event.target===this) closeMapFilterModal()">
-    <div class="modal-card">
-      <div class="modal-header">
-        <div style="display:flex; align-items:center; gap:8px;">
-          <span style="font-size:1.15rem;">⚙️</span>
-          <div>
-            <h3 style="font-weight:800; font-size:1.02rem; color:#0f172a; margin:0;">Bộ lọc Bản đồ (地図フィルター)</h3>
-            <div style="font-size:0.7rem; color:#64748b; font-weight:600; margin-top:1px;">Tùy chỉnh hiển thị ghim và cửa hàng trên bản đồ</div>
-          </div>
-        </div>
-        <button class="modal-close-btn" onclick="closeMapFilterModal()">✕</button>
-      </div>
-
-      <div class="modal-body" style="display:flex; flex-direction:column; gap:16px;">
-        <!-- KHU VỰC BẢN ĐỒ -->
-        <div>
-          <div class="filter-group-title">📍 Khu vực hiển thị (地域・エリア)</div>
-          <div class="filter-options-grid" id="map-modal-region-group">
-            <button class="filter-option-btn active" data-val="osaka" onclick="selectMapModalRegion('osaka')">
-              🔵 Osaka &amp; Kansai
-            </button>
-            <button class="filter-option-btn" data-val="tokyo" onclick="selectMapModalRegion('tokyo')">
-              🟣 Tokyo &amp; Kanto
-            </button>
-            <button class="filter-option-btn" data-val="nagoya" onclick="selectMapModalRegion('nagoya')">
-              🟢 Nagoya &amp; Tokai
-            </button>
-            <button class="filter-option-btn" data-val="all" onclick="selectMapModalRegion('all')">
-              🌐 Toàn quốc (19.860+ quán)
-            </button>
-          </div>
-        </div>
-
-        <!-- TRẠNG THÁI HÀNG HÓA -->
-        <div>
-          <div class="filter-group-title">📊 Trạng thái hàng hóa (在庫状況)</div>
-          <div class="filter-options-grid" id="map-modal-status-group">
-            <button class="filter-option-btn active" data-val="all" onclick="selectMapModalStatus('all')">
-              🌐 Tất cả quán
-            </button>
-            <button class="filter-option-btn" data-val="in" onclick="selectMapModalStatus('in')">
-              <span class="chip-dot dot-green"></span> 🟢 Có hàng (あった)
-            </button>
-            <button class="filter-option-btn" data-val="out" onclick="selectMapModalStatus('out')">
-              <span class="chip-dot dot-red"></span> 🔴 Không có (なかった)
-            </button>
-            <button class="filter-option-btn" data-val="n" onclick="selectMapModalStatus('n')">
-              <span class="chip-dot" style="background:#f59e0b;"></span> 🟡 Không bán thẻ (扱ってない)
-            </button>
-            <button class="filter-option-btn" data-val="unknown" onclick="selectMapModalStatus('unknown')">
-              <span class="chip-dot dot-gray"></span> ⚪ Chưa có báo cáo (未確認)
-            </button>
-            <button class="filter-option-btn" data-val="onsite" onclick="selectMapModalStatus('onsite')">
-              📍 Báo cáo tại quán (GPS)
-            </button>
-            <button class="filter-option-btn" data-val="recent" onclick="selectMapModalStatus('recent')">
-              ⚡ Có tin báo gần đây (7 ngày)
-            </button>
-          </div>
-        </div>
-
-        <!-- CHUỖI & THƯƠNG HIỆU -->
-        <div>
-          <div class="filter-group-title">🏢 Chuỗi cửa hàng & Thương hiệu</div>
-          <div class="filter-options-grid" id="map-modal-chain-group">
-            <button class="filter-option-btn active" data-val="all" onclick="selectMapModalChain('all')">
-              🏢 Tất cả chuỗi
-            </button>
-            <button class="filter-option-btn" data-val="conbini" onclick="selectMapModalChain('conbini')">
-              🏪 Tất cả Conbini
-            </button>
-            <button class="filter-option-btn" data-val="seven" onclick="selectMapModalChain('seven')">
-              🏪 7-Eleven
-            </button>
-            <button class="filter-option-btn" data-val="lawson" onclick="selectMapModalChain('lawson')">
-              🏪 Lawson
-            </button>
-            <button class="filter-option-btn" data-val="familymart" onclick="selectMapModalChain('familymart')">
-              🏪 FamilyMart
-            </button>
-            <button class="filter-option-btn" data-val="ministop" onclick="selectMapModalChain('ministop')">
-              🏪 Ministop
-            </button>
-            <button class="filter-option-btn" data-val="specialty" onclick="selectMapModalChain('specialty')">
-              🃏 Card Shop chuyên
-            </button>
-            <button class="filter-option-btn" data-val="electronics" onclick="selectMapModalChain('electronics')">
-              🎮 Điện máy, GEO
-            </button>
-          </div>
-        </div>
-
-        <!-- THỜI GIAN / ĐỘ MỚI TIN BÁO -->
-        <div>
-          <div class="filter-group-title">⏱️ Thời gian có hàng / Độ tươi mới (報告経過時間)</div>
-          <div class="filter-options-grid" id="map-modal-time-group">
-            <button class="filter-option-btn" data-val="1" onclick="selectMapModalTime('1')">
-              ⚡ Trong 1 giờ qua
-            </button>
-            <button class="filter-option-btn" data-val="3" onclick="selectMapModalTime('3')">
-              ⏱ Trong 3 giờ qua
-            </button>
-            <button class="filter-option-btn" data-val="6" onclick="selectMapModalTime('6')">
-              ⏱ Trong 6 giờ qua
-            </button>
-            <button class="filter-option-btn" data-val="12" onclick="selectMapModalTime('12')">
-              ⏱ Trong 12 giờ qua
-            </button>
-            <button class="filter-option-btn" data-val="24" onclick="selectMapModalTime('24')">
-              📅 Trong 24 giờ qua
-            </button>
-            <button class="filter-option-btn active" data-val="all" onclick="selectMapModalTime('all')">
-              ⏳ Mọi lúc (Toàn bộ)
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div style="padding:12px 16px; border-top:1px solid #f1f5f9; background:#f8fafc; display:flex; gap:10px;">
-        <button type="button" class="btn-reset-filter" onclick="resetMapFilters()">
-          🔄 Đặt lại
-        </button>
-        <button type="button" class="btn-apply-filter" onclick="applyAndCloseMapFilterModal()">
-          ✅ Áp dụng bộ lọc
-        </button>
-      </div>
-    </div>
-  </div>
+  <!-- MAP FILTER MODAL CONTAINER (Aliased to Settings Modal Map Tab) -->
+  <div id="map-filter-modal" style="display:none;"></div>
 """
 
     return head + SHARED_BASE_CSS + MAP_PAGE_CSS + """
@@ -2347,18 +2391,17 @@ def render_map_page() -> str:
       }
     }
 
-    // Map Filter Modal
+    // Map Filter Modal (Integrated as tab in Settings Modal)
     let mapModalTempRegion = currentRegion, mapModalTempStatus = 'all', mapModalTempChain = 'all', mapModalTempTime = 'all';
     function openMapFilterModal() {
       mapModalTempRegion = mapRegionFilter || currentRegion;
       mapModalTempStatus = mapStatusFilter;
       mapModalTempChain = mapChainFilter;
       mapModalTempTime = mapTimeFilter;
-      syncMapFilterModalUI();
-      document.getElementById('map-filter-modal').classList.add('open');
+      openSettingsModal('map');
     }
     function closeMapFilterModal() {
-      document.getElementById('map-filter-modal').classList.remove('open');
+      closeSettingsModal();
     }
     function syncMapFilterModalUI() {
       document.querySelectorAll('#map-modal-region-group .filter-option-btn').forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-val') === mapModalTempRegion));
@@ -2542,13 +2585,28 @@ def render_map_page() -> str:
     }
 
     function openTelegramModal() {
-      openSettingsModal();
+      openSettingsModal('telegram');
     }
     function closeTelegramModal() {
       closeSettingsModal();
     }
 
-    function openSettingsModal() {
+    function switchSettingsTab(tabName) {
+      document.querySelectorAll('.settings-tab-btn').forEach(btn => {
+        const isActive = (btn.dataset.tab === tabName || btn.id === `tab-btn-set-${tabName}`);
+        btn.classList.toggle('active', isActive);
+      });
+      document.querySelectorAll('.settings-tab-pane').forEach(pane => {
+        const isTarget = (pane.id === `settings-pane-${tabName}`);
+        pane.classList.toggle('active', isTarget);
+        pane.style.display = isTarget ? 'flex' : 'none';
+      });
+      if (tabName === 'map' && typeof syncMapFilterModalUI === 'function') {
+        syncMapFilterModalUI();
+      }
+    }
+
+    function openSettingsModal(initialTab = 'map') {
       const tokenEl = document.getElementById('tg-cfg-token');
       const chatIdEl = document.getElementById('tg-cfg-chatid');
       const enabledEl = document.getElementById('tg-cfg-enabled');
@@ -2588,6 +2646,12 @@ def render_map_page() -> str:
         pinHoursSelect.value = curHours;
       }
 
+      mapModalTempRegion = mapRegionFilter || currentRegion;
+      mapModalTempStatus = mapStatusFilter;
+      mapModalTempChain = mapChainFilter;
+      mapModalTempTime = mapTimeFilter;
+
+      switchSettingsTab(initialTab || 'map');
       document.getElementById('settings-modal').classList.add('open');
     }
     function closeSettingsModal() { document.getElementById('settings-modal').classList.remove('open'); }
@@ -4569,13 +4633,66 @@ def render_thongbao_page() -> str:
     }
 
     function openTelegramModal() {
-      openSettingsModal();
+      openSettingsModal('telegram');
     }
     function closeTelegramModal() {
       closeSettingsModal();
     }
 
-    function openSettingsModal() {
+    // Settings Modal Tab Switcher & Map Filter Handlers for /thongbao
+    function switchSettingsTab(tabName) {
+      document.querySelectorAll('.settings-tab-btn').forEach(btn => {
+        const isActive = (btn.dataset.tab === tabName || btn.id === `tab-btn-set-${tabName}`);
+        btn.classList.toggle('active', isActive);
+      });
+      document.querySelectorAll('.settings-tab-pane').forEach(pane => {
+        const isTarget = (pane.id === `settings-pane-${tabName}`);
+        pane.classList.toggle('active', isTarget);
+        pane.style.display = isTarget ? 'flex' : 'none';
+      });
+      if (tabName === 'map' && typeof syncMapFilterModalUI === 'function') {
+        syncMapFilterModalUI();
+      }
+    }
+
+    let mapModalTempRegion = currentRegion, mapModalTempStatus = 'all', mapModalTempChain = 'all', mapModalTempTime = 'all';
+    try {
+      mapModalTempRegion = localStorage.getItem('poketan_map_region') || currentRegion;
+      mapModalTempStatus = localStorage.getItem('poketan_map_status') || 'all';
+      mapModalTempChain = localStorage.getItem('poketan_map_chain') || 'all';
+      mapModalTempTime = localStorage.getItem('poketan_map_time') || 'all';
+    } catch(e) {}
+
+    function syncMapFilterModalUI() {
+      document.querySelectorAll('#map-modal-region-group .filter-option-btn').forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-val') === mapModalTempRegion));
+      document.querySelectorAll('#map-modal-status-group .filter-option-btn').forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-val') === mapModalTempStatus));
+      document.querySelectorAll('#map-modal-chain-group .filter-option-btn').forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-val') === mapModalTempChain));
+      document.querySelectorAll('#map-modal-time-group .filter-option-btn').forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-val') === mapModalTempTime));
+    }
+    function selectMapModalRegion(val) { mapModalTempRegion = val; syncMapFilterModalUI(); }
+    function selectMapModalStatus(val) { mapModalTempStatus = val; syncMapFilterModalUI(); }
+    function selectMapModalChain(val) { mapModalTempChain = val; syncMapFilterModalUI(); }
+    function selectMapModalTime(val) { mapModalTempTime = val; syncMapFilterModalUI(); }
+    function resetMapFilters() {
+      mapModalTempRegion = currentRegion;
+      mapModalTempStatus = 'all';
+      mapModalTempChain = 'all';
+      mapModalTempTime = 'all';
+      syncMapFilterModalUI();
+    }
+    function applyAndCloseMapFilterModal() {
+      try {
+        localStorage.setItem('poketan_selected_region', mapModalTempRegion);
+        localStorage.setItem('poketan_map_region', mapModalTempRegion);
+        localStorage.setItem('poketan_map_status', mapModalTempStatus);
+        localStorage.setItem('poketan_map_chain', mapModalTempChain);
+        localStorage.setItem('poketan_map_time', String(mapModalTempTime));
+      } catch(e) {}
+      closeSettingsModal();
+      window.location.href = `/?region=${encodeURIComponent(mapModalTempRegion)}`;
+    }
+
+    function openSettingsModal(initialTab = 'map') {
       const tokenEl = document.getElementById('tg-cfg-token');
       const chatIdEl = document.getElementById('tg-cfg-chatid');
       const enabledEl = document.getElementById('tg-cfg-enabled');
@@ -4615,6 +4732,14 @@ def render_thongbao_page() -> str:
         pinHoursSelect.value = curHours;
       }
 
+      try {
+        mapModalTempRegion = localStorage.getItem('poketan_map_region') || currentRegion;
+        mapModalTempStatus = localStorage.getItem('poketan_map_status') || 'all';
+        mapModalTempChain = localStorage.getItem('poketan_map_chain') || 'all';
+        mapModalTempTime = localStorage.getItem('poketan_map_time') || 'all';
+      } catch(e) {}
+
+      switchSettingsTab(initialTab || 'map');
       document.getElementById('settings-modal').classList.add('open');
     }
     function closeSettingsModal() { document.getElementById('settings-modal').classList.remove('open'); }
