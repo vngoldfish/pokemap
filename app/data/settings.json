@@ -33,7 +33,8 @@
       "gifu",
       "mie"
     ],
-    "discordEnabled": false
+    "discordEnabled": false,
+    "stockPinEffectHours": "1"
   },
   "sidebarTab": "feed",
   "statusFilter": {

@@ -584,12 +584,12 @@ def test_settings_map_filter_tab_structure():
         assert 'id="settings-pane-telegram"' in html, f"Missing #settings-pane-telegram in {name}"
         assert 'id="settings-pane-system"' in html, f"Missing #settings-pane-system in {name}"
 
-        # Map filter controls inside the pane
+        # Map filter controls inside the pane (strictly Region, Chain, and In-Stock Pin)
         assert 'id="map-modal-region-group"' in html, f"Missing #map-modal-region-group in {name}"
-        assert 'id="map-modal-status-group"' in html, f"Missing #map-modal-status-group in {name}"
         assert 'id="map-modal-chain-group"' in html, f"Missing #map-modal-chain-group in {name}"
-        assert 'id="map-modal-time-group"' in html, f"Missing #map-modal-time-group in {name}"
         assert 'id="set-stock-pin-hours"' in html, f"Missing #set-stock-pin-hours in {name}"
+        assert 'id="map-modal-status-group"' not in html, f"Obsolete #map-modal-status-group should be removed from {name}"
+        assert 'id="map-modal-time-group"' not in html, f"Obsolete #map-modal-time-group should be removed from {name}"
 
         # JS functions
         assert "function switchSettingsTab(" in html, f"Missing switchSettingsTab in {name}"

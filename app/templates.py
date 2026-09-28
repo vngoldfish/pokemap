@@ -844,34 +844,6 @@ SHARED_MODALS_HTML = """
             </div>
           </div>
 
-          <!-- TRẠNG THÁI HÀNG HÓA -->
-          <div>
-            <div class="filter-group-title">📊 Trạng thái hàng hóa (在庫状況)</div>
-            <div class="filter-options-grid" id="map-modal-status-group">
-              <button class="filter-option-btn active" data-val="all" onclick="selectMapModalStatus('all')">
-                🌐 Tất cả quán
-              </button>
-              <button class="filter-option-btn" data-val="in" onclick="selectMapModalStatus('in')">
-                <span class="chip-dot dot-green"></span> 🟢 Có hàng (あった)
-              </button>
-              <button class="filter-option-btn" data-val="out" onclick="selectMapModalStatus('out')">
-                <span class="chip-dot dot-red"></span> 🔴 Không có (なかった)
-              </button>
-              <button class="filter-option-btn" data-val="n" onclick="selectMapModalStatus('n')">
-                <span class="chip-dot" style="background:#f59e0b;"></span> 🟡 Không bán thẻ (扱ってない)
-              </button>
-              <button class="filter-option-btn" data-val="unknown" onclick="selectMapModalStatus('unknown')">
-                <span class="chip-dot dot-gray"></span> ⚪ Chưa có báo cáo (未確認)
-              </button>
-              <button class="filter-option-btn" data-val="onsite" onclick="selectMapModalStatus('onsite')">
-                📍 Báo cáo tại quán (GPS)
-              </button>
-              <button class="filter-option-btn" data-val="recent" onclick="selectMapModalStatus('recent')">
-                ⚡ Có tin báo gần đây (7 ngày)
-              </button>
-            </div>
-          </div>
-
           <!-- CHUỖI & THƯƠNG HIỆU -->
           <div>
             <div class="filter-group-title">🏢 Chuỗi cửa hàng & Thương hiệu</div>
@@ -899,31 +871,6 @@ SHARED_MODALS_HTML = """
               </button>
               <button class="filter-option-btn" data-val="electronics" onclick="selectMapModalChain('electronics')">
                 🎮 Điện máy, GEO
-              </button>
-            </div>
-          </div>
-
-          <!-- THỜI GIAN / ĐỘ MỚI TIN BÁO -->
-          <div>
-            <div class="filter-group-title">⏱️ Thời gian có hàng / Độ tươi mới (報告経過時間)</div>
-            <div class="filter-options-grid" id="map-modal-time-group">
-              <button class="filter-option-btn" data-val="1" onclick="selectMapModalTime('1')">
-                ⚡ Trong 1 giờ qua
-              </button>
-              <button class="filter-option-btn" data-val="3" onclick="selectMapModalTime('3')">
-                ⏱ Trong 3 giờ qua
-              </button>
-              <button class="filter-option-btn" data-val="6" onclick="selectMapModalTime('6')">
-                ⏱ Trong 6 giờ qua
-              </button>
-              <button class="filter-option-btn" data-val="12" onclick="selectMapModalTime('12')">
-                ⏱ Trong 12 giờ qua
-              </button>
-              <button class="filter-option-btn" data-val="24" onclick="selectMapModalTime('24')">
-                📅 Trong 24 giờ qua
-              </button>
-              <button class="filter-option-btn active" data-val="all" onclick="selectMapModalTime('all')">
-                ⏳ Mọi lúc (Toàn bộ)
               </button>
             </div>
           </div>
@@ -2345,13 +2292,11 @@ def render_map_page() -> str:
       }
     }
 
-    // Map Filter Modal (Integrated as tab in Settings Modal)
-    let mapModalTempRegion = currentRegion, mapModalTempStatus = 'all', mapModalTempChain = 'all', mapModalTempTime = 'all';
+    // Map Filter Modal (Integrated as tab in Settings Modal: Region, Chain & In-Stock Pin)
+    let mapModalTempRegion = currentRegion, mapModalTempChain = 'all';
     function openMapFilterModal() {
       mapModalTempRegion = mapRegionFilter || currentRegion;
-      mapModalTempStatus = mapStatusFilter;
       mapModalTempChain = mapChainFilter;
-      mapModalTempTime = mapTimeFilter;
       openSettingsModal('map');
     }
     function closeMapFilterModal() {
@@ -2359,27 +2304,25 @@ def render_map_page() -> str:
     }
     function syncMapFilterModalUI() {
       document.querySelectorAll('#map-modal-region-group .filter-option-btn').forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-val') === mapModalTempRegion));
-      document.querySelectorAll('#map-modal-status-group .filter-option-btn').forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-val') === mapModalTempStatus));
       document.querySelectorAll('#map-modal-chain-group .filter-option-btn').forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-val') === mapModalTempChain));
-      document.querySelectorAll('#map-modal-time-group .filter-option-btn').forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-val') === mapModalTempTime));
     }
     function selectMapModalRegion(val) { mapModalTempRegion = val; syncMapFilterModalUI(); }
-    function selectMapModalStatus(val) { mapModalTempStatus = val; syncMapFilterModalUI(); }
     function selectMapModalChain(val) { mapModalTempChain = val; syncMapFilterModalUI(); }
-    function selectMapModalTime(val) { mapModalTempTime = val; syncMapFilterModalUI(); }
+    function selectMapModalStatus(val) {}
+    function selectMapModalTime(val) {}
     function resetMapFilters() {
       mapModalTempRegion = currentRegion;
-      mapModalTempStatus = 'all';
       mapModalTempChain = 'all';
-      mapModalTempTime = 'all';
+      mapStatusFilter = 'all';
+      mapTimeFilter = 'all';
       syncMapFilterModalUI();
     }
     function applyAndCloseMapFilterModal() {
       const regionChanged = (mapModalTempRegion !== mapRegionFilter);
       mapRegionFilter = mapModalTempRegion;
-      mapStatusFilter = mapModalTempStatus;
       mapChainFilter = mapModalTempChain;
-      mapTimeFilter = mapModalTempTime;
+      mapStatusFilter = 'all';
+      mapTimeFilter = 'all';
       saveMapFiltersToStorage();
       closeMapFilterModal();
       updateMapFilterUI();
@@ -2601,9 +2544,7 @@ def render_map_page() -> str:
       }
 
       mapModalTempRegion = mapRegionFilter || currentRegion;
-      mapModalTempStatus = mapStatusFilter;
       mapModalTempChain = mapChainFilter;
-      mapModalTempTime = mapTimeFilter;
 
       switchSettingsTab(initialTab || 'map');
       document.getElementById('settings-modal').classList.add('open');
@@ -4609,38 +4550,30 @@ def render_thongbao_page() -> str:
       }
     }
 
-    let mapModalTempRegion = currentRegion, mapModalTempStatus = 'all', mapModalTempChain = 'all', mapModalTempTime = 'all';
+    let mapModalTempRegion = currentRegion, mapModalTempChain = 'all';
     try {
       mapModalTempRegion = localStorage.getItem('poketan_map_region') || currentRegion;
-      mapModalTempStatus = localStorage.getItem('poketan_map_status') || 'all';
       mapModalTempChain = localStorage.getItem('poketan_map_chain') || 'all';
-      mapModalTempTime = localStorage.getItem('poketan_map_time') || 'all';
     } catch(e) {}
 
     function syncMapFilterModalUI() {
       document.querySelectorAll('#map-modal-region-group .filter-option-btn').forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-val') === mapModalTempRegion));
-      document.querySelectorAll('#map-modal-status-group .filter-option-btn').forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-val') === mapModalTempStatus));
       document.querySelectorAll('#map-modal-chain-group .filter-option-btn').forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-val') === mapModalTempChain));
-      document.querySelectorAll('#map-modal-time-group .filter-option-btn').forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-val') === mapModalTempTime));
     }
     function selectMapModalRegion(val) { mapModalTempRegion = val; syncMapFilterModalUI(); }
-    function selectMapModalStatus(val) { mapModalTempStatus = val; syncMapFilterModalUI(); }
     function selectMapModalChain(val) { mapModalTempChain = val; syncMapFilterModalUI(); }
-    function selectMapModalTime(val) { mapModalTempTime = val; syncMapFilterModalUI(); }
+    function selectMapModalStatus(val) {}
+    function selectMapModalTime(val) {}
     function resetMapFilters() {
       mapModalTempRegion = currentRegion;
-      mapModalTempStatus = 'all';
       mapModalTempChain = 'all';
-      mapModalTempTime = 'all';
       syncMapFilterModalUI();
     }
     function applyAndCloseMapFilterModal() {
       try {
         localStorage.setItem('poketan_selected_region', mapModalTempRegion);
         localStorage.setItem('poketan_map_region', mapModalTempRegion);
-        localStorage.setItem('poketan_map_status', mapModalTempStatus);
         localStorage.setItem('poketan_map_chain', mapModalTempChain);
-        localStorage.setItem('poketan_map_time', String(mapModalTempTime));
       } catch(e) {}
       closeSettingsModal();
       window.location.href = `/?region=${encodeURIComponent(mapModalTempRegion)}`;
@@ -4688,9 +4621,7 @@ def render_thongbao_page() -> str:
 
       try {
         mapModalTempRegion = localStorage.getItem('poketan_map_region') || currentRegion;
-        mapModalTempStatus = localStorage.getItem('poketan_map_status') || 'all';
         mapModalTempChain = localStorage.getItem('poketan_map_chain') || 'all';
-        mapModalTempTime = localStorage.getItem('poketan_map_time') || 'all';
       } catch(e) {}
 
       switchSettingsTab(initialTab || 'map');
