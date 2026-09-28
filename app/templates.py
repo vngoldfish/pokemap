@@ -3495,10 +3495,24 @@ def render_map_page() -> str:
       if (!s || !s.lat || !s.lng) return;
       map.flyTo([s.lat, s.lng], 16, { duration: 0.8 });
       setTimeout(() => {
-        stockLayer.eachLayer(m => {
-          const ll = m.getLatLng();
-          if (Math.abs(ll.lat - s.lat) < 0.0001 && Math.abs(ll.lng - s.lng) < 0.0001) m.openPopup();
-        });
+        let opened = false;
+        if (stockLayer) {
+          stockLayer.eachLayer(m => {
+            const ll = m.getLatLng();
+            if (Math.abs(ll.lat - s.lat) < 0.0001 && Math.abs(ll.lng - s.lng) < 0.0001) {
+              m.openPopup();
+              opened = true;
+            }
+          });
+        }
+        if (!opened && clusterGroup) {
+          clusterGroup.eachLayer(m => {
+            const ll = m.getLatLng();
+            if (Math.abs(ll.lat - s.lat) < 0.0001 && Math.abs(ll.lng - s.lng) < 0.0001) {
+              m.openPopup();
+            }
+          });
+        }
       }, 850);
     };
 
@@ -3525,6 +3539,11 @@ def render_map_page() -> str:
 
             const sid = rep.store_id;
             let st = storesDict[sid];
+            const repPref = (rep.pref || (st && st.pref) || '').toLowerCase();
+            const targetRegion = mapRegionFilter || currentRegion || 'osaka';
+            const allowedPrefs = (REGIONS[targetRegion] ? REGIONS[targetRegion].prefs : [targetRegion]) || ['osaka'];
+            const matchesRegion = (targetRegion === 'all') || (repPref && allowedPrefs.includes(repPref));
+
             if (!st && rep.lat && rep.lng) {
               storesDict[sid] = {
                 id: sid,
@@ -3541,7 +3560,7 @@ def render_map_page() -> str:
                 last_reported_at: rep.reported_at || rep.formatted_time || ''
               };
               st = storesDict[sid];
-              shouldReRender = true;
+              if (matchesRegion) shouldReRender = true;
             } else if (st) {
               if (!st.last_timestamp || (rep.timestamp && rep.timestamp >= st.last_timestamp)) {
                 st.status = rep.status_code;
@@ -3549,19 +3568,25 @@ def render_map_page() -> str:
                 st.onsite = !!rep.onsite;
                 st.packs = rep.packs || [];
                 st.last_reported_at = rep.reported_at || rep.formatted_time || '';
-                shouldReRender = true;
+                if (matchesRegion) shouldReRender = true;
               }
             }
 
-            // Real-time toast check:
-            // 1. Must be in-stock (i)
-            // 2. Deduplicate strictly by composite key (store_id, timestamp, status_code)
-            // 3. Must be genuinely real-time: reported within the last 120 seconds (2 minutes)
+            // Real-time toast & audio alert check:
+            // 1. Must belong to the currently active map region/prefecture!
+            // 2. Must match active chain filter if selected
+            // 3. Must be in-stock (i)
+            // 4. Deduplicate strictly by composite key (store_id, timestamp, status_code)
+            // 5. Must be genuinely real-time: reported within the last 120 seconds (2 minutes)
+            const repChain = ((st ? st.chain : rep.chain) || '').toLowerCase();
+            const matchesChain = (!mapChainFilter || mapChainFilter === 'all') || 
+                                 (repChain === mapChainFilter.toLowerCase());
+
             const toastKey = `${rep.store_id}_${rep.timestamp}_${rep.status_code}`;
             const reportAgeSec = rep.timestamp > 0 ? (nowSec - rep.timestamp) : 0;
             const isFreshRealtime = reportAgeSec >= 0 && reportAgeSec <= 120;
 
-            if (rep.status_code === 'i' && !seenToastKeys.has(toastKey) && isFreshRealtime) {
+            if (matchesRegion && matchesChain && rep.status_code === 'i' && !seenToastKeys.has(toastKey) && isFreshRealtime) {
               seenToastKeys.add(toastKey);
               candidateStockReps.push(rep);
             }
@@ -5818,6 +5843,11 @@ def render_thongbao_page() -> str:
 
             const sid = rep.store_id;
             let st = storesDict[sid];
+            const repPref = (rep.pref || (st && st.pref) || '').toLowerCase();
+            const targetRegion = listRegionFilter || currentRegion || 'osaka';
+            const allowedPrefs = (REGIONS[targetRegion] ? REGIONS[targetRegion].prefs : [targetRegion]) || ['osaka'];
+            const matchesRegion = (targetRegion === 'all') || (repPref && allowedPrefs.includes(repPref));
+
             if (!st && rep.lat && rep.lng) {
               storesDict[sid] = {
                 id: sid,
@@ -5834,7 +5864,7 @@ def render_thongbao_page() -> str:
                 last_reported_at: rep.reported_at || rep.formatted_time || ''
               };
               st = storesDict[sid];
-              shouldReRender = true;
+              if (matchesRegion) shouldReRender = true;
             } else if (st) {
               if (!st.last_timestamp || (rep.timestamp && rep.timestamp >= st.last_timestamp)) {
                 st.status = rep.status_code;
@@ -5842,19 +5872,25 @@ def render_thongbao_page() -> str:
                 st.onsite = !!rep.onsite;
                 st.packs = rep.packs || [];
                 st.last_reported_at = rep.reported_at || rep.formatted_time || '';
-                shouldReRender = true;
+                if (matchesRegion) shouldReRender = true;
               }
             }
 
-            // Real-time toast check:
-            // 1. Must be in-stock (i)
-            // 2. Deduplicate strictly by composite key (store_id, timestamp, status_code)
-            // 3. Must be genuinely real-time: reported within the last 120 seconds (2 minutes)
+            // Real-time toast & audio alert check:
+            // 1. Must belong to the currently active list region/prefecture!
+            // 2. Must match active chain filter if selected
+            // 3. Must be in-stock (i)
+            // 4. Deduplicate strictly by composite key (store_id, timestamp, status_code)
+            // 5. Must be genuinely real-time: reported within the last 120 seconds (2 minutes)
+            const repChain = ((st ? st.chain : rep.chain) || '').toLowerCase();
+            const matchesChain = (!listChainFilter || listChainFilter === 'all') || 
+                                 (repChain === listChainFilter.toLowerCase());
+
             const toastKey = `${rep.store_id}_${rep.timestamp}_${rep.status_code}`;
             const reportAgeSec = rep.timestamp > 0 ? (nowSec - rep.timestamp) : 0;
             const isFreshRealtime = reportAgeSec >= 0 && reportAgeSec <= 120;
 
-            if (rep.status_code === 'i' && !seenToastKeys.has(toastKey) && isFreshRealtime) {
+            if (matchesRegion && matchesChain && rep.status_code === 'i' && !seenToastKeys.has(toastKey) && isFreshRealtime) {
               seenToastKeys.add(toastKey);
               candidateStockReps.push(rep);
             }
