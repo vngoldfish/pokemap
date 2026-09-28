@@ -1687,8 +1687,15 @@ def render_map_page() -> str:
       'all': { id: 'all', name: '全エリア (全国)', center: [34.6937, 135.5023], zoom: 10, defaultCity: '全エリア', prefs: ['osaka', 'tokyo', 'kanagawa', 'aichi', 'gifu', 'mie'] }
     };
 
-    let currentRegion = localStorage.getItem('poketan_selected_region') || localStorage.getItem('poketan_map_region') || 'osaka';
+    const urlRegion = new URLSearchParams(window.location.search).get('region');
+    let currentRegion = (urlRegion && REGIONS[urlRegion]) ? urlRegion : (localStorage.getItem('poketan_selected_region') || localStorage.getItem('poketan_map_region') || 'osaka');
     if (!REGIONS[currentRegion]) currentRegion = 'osaka';
+    if (urlRegion && REGIONS[urlRegion]) {
+      try {
+        localStorage.setItem('poketan_selected_region', currentRegion);
+        localStorage.setItem('poketan_map_region', currentRegion);
+      } catch(e) {}
+    }
     let currentPref = REGIONS[currentRegion].prefs[0] || 'osaka';
 
     let storesDict = {};
@@ -1713,14 +1720,6 @@ def render_map_page() -> str:
         localStorage.setItem('poketan_map_chain', mapChainFilter || 'all');
         localStorage.setItem('poketan_map_status', mapStatusFilter || 'all');
         localStorage.setItem('poketan_map_time', String(mapTimeFilter || 'all'));
-        fetch('/api/settings', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            currentRegion: mapRegionFilter,
-            currentChain: mapChainFilter || 'all'
-          })
-        }).catch(() => {});
       } catch(e) {}
     }
 
@@ -2041,7 +2040,7 @@ def render_map_page() -> str:
         const currentZoom = map.getZoom();
 
         // 🟢 CÓ HÀNG (i): Kiểm tra hiệu lực thời gian hiệu ứng Ghim Có hàng (In-Stock Pin)
-        const stockEffectSetting = String(configData.stockPinEffectHours || localStorage.getItem('poketan_stock_pin_hours') || '24');
+        const stockEffectSetting = String(localStorage.getItem('poketan_stock_pin_hours') || configData.stockPinEffectHours || '24');
         let hasStockEffect = false;
         if (info.code === 'i') {
           if (stockEffectSetting === 'all') {
@@ -2352,7 +2351,7 @@ def render_map_page() -> str:
         map.flyTo(REGIONS[mapRegionFilter].center, REGIONS[mapRegionFilter].zoom || 13, { duration: 1.0 });
       }
       const pinSelect = document.getElementById('set-stock-pin-hours');
-      const stockHours = pinSelect ? pinSelect.value : (configData.stockPinEffectHours || '24');
+      const stockHours = pinSelect ? pinSelect.value : (localStorage.getItem('poketan_stock_pin_hours') || configData.stockPinEffectHours || '24');
       updateStockPinHours(stockHours);
       closeMapFilterModal();
       updateMapFilterUI();
@@ -2566,7 +2565,7 @@ def render_map_page() -> str:
 
       const pinHoursSelect = document.getElementById('set-stock-pin-hours');
       if (pinHoursSelect) {
-        const curHours = String(configData.stockPinEffectHours || localStorage.getItem('poketan_stock_pin_hours') || '24');
+        const curHours = String(localStorage.getItem('poketan_stock_pin_hours') || configData.stockPinEffectHours || '24');
         pinHoursSelect.value = curHours;
       }
 
@@ -2581,7 +2580,6 @@ def render_map_page() -> str:
     function updateStockPinHours(val) {
       configData.stockPinEffectHours = String(val);
       try { localStorage.setItem('poketan_stock_pin_hours', String(val)); } catch(e) {}
-      updateSettings('stockPinEffectHours', String(val));
       if (typeof renderMapMarkers === 'function') {
         renderMapMarkers();
       }
@@ -2604,13 +2602,6 @@ def render_map_page() -> str:
     function selectRegion(pref) {
       currentRegion = pref;
       try { localStorage.setItem('poketan_selected_region', pref); } catch(e) {}
-      try {
-        fetch('/api/settings', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ currentRegion: pref })
-        }).catch(() => {});
-      } catch(e) {}
       mapRegionFilter = pref;
       if (typeof REGIONS !== 'undefined' && REGIONS[pref] && window.map) {
         map.flyTo(REGIONS[pref].center, REGIONS[pref].zoom || 13, { duration: 1.0 });
@@ -3076,7 +3067,7 @@ def render_map_page() -> str:
     }
 
     function checkStockPinEffectTransitions() {
-      const stockEffectSetting = String(configData.stockPinEffectHours || localStorage.getItem('poketan_stock_pin_hours') || '24');
+      const stockEffectSetting = String(localStorage.getItem('poketan_stock_pin_hours') || configData.stockPinEffectHours || '24');
       if (stockEffectSetting === 'all' || stockEffectSetting === '0' || stockEffectSetting === 'off') return;
       const effectMaxSec = (parseInt(stockEffectSetting, 10) || 24) * 3600;
       const now = getServerNowSec();
@@ -3943,8 +3934,15 @@ def render_thongbao_page() -> str:
       'all': { id: 'all', name: '全エリア (全国)', center: [34.6937, 135.5023], zoom: 10, defaultCity: '全エリア', prefs: ['osaka', 'tokyo', 'kanagawa', 'aichi', 'gifu', 'mie'] }
     };
 
-    let currentRegion = localStorage.getItem('poketan_selected_region') || 'osaka';
+    const urlRegion = new URLSearchParams(window.location.search).get('region');
+    let currentRegion = (urlRegion && REGIONS[urlRegion]) ? urlRegion : (localStorage.getItem('poketan_selected_region') || 'osaka');
     if (!REGIONS[currentRegion]) currentRegion = 'osaka';
+    if (urlRegion && REGIONS[urlRegion]) {
+      try {
+        localStorage.setItem('poketan_selected_region', currentRegion);
+        localStorage.setItem('poketan_map_region', currentRegion);
+      } catch(e) {}
+    }
     let currentPref = REGIONS[currentRegion].prefs[0] || 'osaka';
 
     let storesDict = {};
@@ -4613,19 +4611,8 @@ def render_thongbao_page() -> str:
         localStorage.setItem('poketan_map_chain', mapModalTempChain);
       } catch(e) {}
       const pinSelect = document.getElementById('set-stock-pin-hours');
-      const stockHours = pinSelect ? pinSelect.value : (configData.stockPinEffectHours || '24');
+      const stockHours = pinSelect ? pinSelect.value : (localStorage.getItem('poketan_stock_pin_hours') || configData.stockPinEffectHours || '24');
       updateStockPinHours(stockHours);
-      try {
-        fetch('/api/settings', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            currentRegion: mapModalTempRegion,
-            currentChain: mapModalTempChain,
-            stockPinEffectHours: String(stockHours)
-          })
-        }).catch(() => {});
-      } catch(e) {}
       closeSettingsModal();
       window.location.href = `/?region=${encodeURIComponent(mapModalTempRegion)}`;
     }
@@ -4666,7 +4653,7 @@ def render_thongbao_page() -> str:
 
       const pinHoursSelect = document.getElementById('set-stock-pin-hours');
       if (pinHoursSelect) {
-        const curHours = String(configData.stockPinEffectHours || localStorage.getItem('poketan_stock_pin_hours') || '24');
+        const curHours = String(localStorage.getItem('poketan_stock_pin_hours') || configData.stockPinEffectHours || '24');
         pinHoursSelect.value = curHours;
       }
 
@@ -4683,7 +4670,6 @@ def render_thongbao_page() -> str:
     function updateStockPinHours(val) {
       configData.stockPinEffectHours = String(val);
       try { localStorage.setItem('poketan_stock_pin_hours', String(val)); } catch(e) {}
-      updateSettings('stockPinEffectHours', String(val));
     }
 
     function updateSettings(key, val) {
@@ -4703,13 +4689,6 @@ def render_thongbao_page() -> str:
     function selectRegion(pref) {
       currentRegion = pref;
       try { localStorage.setItem('poketan_selected_region', pref); } catch(e) {}
-      try {
-        fetch('/api/settings', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ currentRegion: pref })
-        }).catch(() => {});
-      } catch(e) {}
       listRegionFilter = pref;
       listCurrentPage = 1;
       updateListFilterBadgeUI();
