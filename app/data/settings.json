@@ -21,9 +21,9 @@
     "discordWebhookUrl": "",
     "telegramBotToken": "8888535478:AAFtlcFhwjhlAvLZ4lPf7tGQtnZ8XIoKvSE",
     "telegramChatId": "5572197416",
-    "telegramEnabled": false,
-    "telegramStatus": "in",
-    "telegramChain": "conbini",
+    "telegramEnabled": true,
+    "telegramStatus": "all",
+    "telegramChain": "all",
     "telegramTime": "24",
     "telegramRegion": "osaka",
     "notifyPrefs": [
@@ -34,7 +34,8 @@
       "mie"
     ],
     "discordEnabled": false,
-    "stockPinEffectHours": "1"
+    "stockPinEffectHours": "1",
+    "telegramEnabledAt": 1790587671
   },
   "sidebarTab": "feed",
   "statusFilter": {

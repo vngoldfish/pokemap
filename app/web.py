@@ -87,9 +87,9 @@ DEFAULT_SETTINGS = {
         "maxReportAgeHours": 24.0,    # Độ mới tin báo (giờ, 24h mặc định)
         "onlyOnsiteGps": False,       # Chỉ thông báo tin có GPS tại quán
         "discordWebhookUrl": "",      # Webhook URL của kênh Discord
-        "telegramBotToken": "",       # Token bot Telegram (từ @BotFather)
-        "telegramChatId": "",         # ID chat hoặc nhóm Telegram
-        "telegramEnabled": False,     # Bật gửi Telegram khi có hàng
+        "telegramBotToken": "8888535478:AAFtlcFhwjhlAvLZ4lPf7tGQtnZ8XIoKvSE",       # Token bot Telegram (từ @BotFather)
+        "telegramChatId": "5572197416",         # ID chat hoặc nhóm Telegram
+        "telegramEnabled": True,                # Mặc định BẬT gửi Telegram khi có hàng
         "telegramStatus": "in",       # 'in' (chỉ có hàng), 'onsite' (tại quán), 'recent', 'all'
         "telegramChain": "all",       # 'all', 'conbini', 'seven', ...
         "telegramTime": "24",         # '1', '3', '6', '24', 'all'

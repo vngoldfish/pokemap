@@ -2561,7 +2561,7 @@ def render_map_page() -> str:
     }
 
     // 10. MODALS: TELEGRAM & SETTINGS, HISTORY, BULLETIN
-    function onTelegramToggleChange(checked) {
+    async function onTelegramToggleChange(checked) {
       const slider = document.getElementById('tg-cfg-slider');
       if (slider) slider.style.background = checked ? '#0284c7' : '#cbd5e1';
       const badge = document.getElementById('tg-status-badge');
@@ -2569,6 +2569,24 @@ def render_map_page() -> str:
         badge.innerText = checked ? '🟢 Đang BẬT' : '⚪ Đang TẮT';
         badge.style.background = checked ? '#dcfce7' : '#e2e8f0';
         badge.style.color = checked ? '#15803d' : '#475569';
+      }
+      configData.telegramEnabled = checked;
+      try {
+        const token = (document.getElementById('tg-cfg-token') ? document.getElementById('tg-cfg-token').value : (configData.telegramBotToken || '')).trim();
+        const chatId = (document.getElementById('tg-cfg-chatid') ? document.getElementById('tg-cfg-chatid').value : (configData.telegramChatId || '')).trim();
+        await fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            notifications: {
+              telegramEnabled: checked,
+              telegramBotToken: token,
+              telegramChatId: chatId
+            }
+          })
+        });
+      } catch (e) {
+        console.warn('Auto-save telegram toggle error:', e);
       }
     }
 
@@ -4715,7 +4733,7 @@ def render_thongbao_page() -> str:
       });
     }
 
-    function onTelegramToggleChange(checked) {
+    async function onTelegramToggleChange(checked) {
       const slider = document.getElementById('tg-cfg-slider');
       if (slider) slider.style.background = checked ? '#0284c7' : '#cbd5e1';
       const badge = document.getElementById('tg-status-badge');
@@ -4723,6 +4741,24 @@ def render_thongbao_page() -> str:
         badge.innerText = checked ? '🟢 Đang BẬT' : '⚪ Đang TẮT';
         badge.style.background = checked ? '#dcfce7' : '#e2e8f0';
         badge.style.color = checked ? '#15803d' : '#475569';
+      }
+      configData.telegramEnabled = checked;
+      try {
+        const token = (document.getElementById('tg-cfg-token') ? document.getElementById('tg-cfg-token').value : (configData.telegramBotToken || '')).trim();
+        const chatId = (document.getElementById('tg-cfg-chatid') ? document.getElementById('tg-cfg-chatid').value : (configData.telegramChatId || '')).trim();
+        await fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            notifications: {
+              telegramEnabled: checked,
+              telegramBotToken: token,
+              telegramChatId: chatId
+            }
+          })
+        });
+      } catch (e) {
+        console.warn('Auto-save telegram toggle error:', e);
       }
     }
 

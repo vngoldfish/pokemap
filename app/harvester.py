@@ -164,6 +164,10 @@ def harvest_all_statuses_and_history(prefs: List[str] = ALL_HARVEST_PREFS) -> Di
             confirms = parsed.get("confirms") or 1
             packs = parsed.get("packs") or []
             rep_time = parsed.get("reported_at") or ""
+            if ts > 0:
+                from datetime import datetime as dt_cls, timezone as tz_cls, timedelta as td_cls
+                JST_TZ = tz_cls(td_cls(hours=9))
+                rep_time = dt_cls.fromtimestamp(ts, tz=JST_TZ).strftime("%H:%M %d/%m/%Y")
             label = parsed.get("status_label") or ("🟢 Có hàng" if code == "i" else ("🔴 Hết hàng" if code == "o" else "🟡 Không bán thẻ"))
             hist_id = f"{sid}_{ts}_{code}"
 
