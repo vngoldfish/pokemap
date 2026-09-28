@@ -158,6 +158,17 @@ def init_db():
                     SET created_at = timestamp
                     WHERE created_at > timestamp + 120 AND timestamp > 0;
                 """)
+                # Auto-clean any corrupted rows in store_history and stores
+                cursor.execute("""
+                    DELETE FROM store_history
+                    WHERE typeof(timestamp) != 'integer' 
+                       OR typeof(created_at) != 'integer'
+                       OR timestamp <= 0;
+                """)
+                cursor.execute("""
+                    DELETE FROM stores
+                    WHERE typeof(last_timestamp) != 'integer' AND last_timestamp IS NOT NULL;
+                """)
             except Exception as e:
                 print("  [DB] Unique index setup note:", e)
 
@@ -858,10 +869,11 @@ def save_bulk_history(store_id: str, history_list: List[Dict[str, Any]], source:
                 s_code = item_row[2]
                 s_ts = item_row[10]
                 if s_ts > 0:
+                    stub_id = f"{s_id}_{s_ts}_{s_code}"
                     cursor.execute("""
                         DELETE FROM store_history
-                        WHERE store_id = ? AND timestamp = ? AND status_code = ? AND id != ?;
-                    """, (s_id, s_ts, s_code, h_id))
+                        WHERE store_id = ? AND (timestamp = ? OR id = ?) AND status_code = ? AND id != ?;
+                    """, (s_id, s_ts, stub_id, s_code, h_id))
 
             cursor.executemany("""
                 INSERT OR REPLACE INTO store_history (

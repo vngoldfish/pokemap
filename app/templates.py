@@ -1777,6 +1777,48 @@ def render_map_page() -> str:
       updateGpsBtnState();
     });
 
+    // Automatically prefetch store history and dynamically update count bar when popup opens
+    map.on('popupopen', (e) => {
+      try {
+        const popupNode = e.popup.getElement();
+        if (!popupNode) return;
+        const countBar = popupNode.querySelector('[id^="popup-counts-"]');
+        if (!countBar) return;
+        const storeId = countBar.id.replace('popup-counts-', '');
+        if (!storeId) return;
+
+        if (!storeHistoryCache[storeId]) {
+          fetch(`/api/store_history/${storeId}`)
+            .then(r => r.ok ? r.json() : null)
+            .then(hist => {
+              if (!hist || !Array.isArray(hist)) return;
+              storeHistoryCache[storeId] = hist;
+              let cIn = 0, cOut = 0;
+              const seenIn = new Set(), seenOut = new Set();
+              hist.forEach(item => {
+                const ts = item.timestamp || item.formatted_time;
+                if (item.status_code === 'i') {
+                  if (!seenIn.has(ts)) { seenIn.add(ts); cIn++; }
+                } else if (item.status_code === 'o') {
+                  if (!seenOut.has(ts)) { seenOut.add(ts); cOut++; }
+                }
+              });
+              storeCountsCache[storeId] = { in: cIn, out: cOut };
+              const activeBar = document.getElementById(`popup-counts-${storeId}`);
+              if (activeBar) {
+                activeBar.innerHTML = `
+                  <span class="report-count-tag tag-green">🟢 Có: <b>${cIn}</b> lần</span>
+                  <span class="report-count-tag tag-red">🔴 Hết: <b>${cOut}</b> lần</span>
+                `;
+              }
+            })
+            .catch(() => {});
+        }
+      } catch (err) {
+        console.warn('Popup count sync error:', err);
+      }
+    });
+
     let clusterGroup = L.markerClusterGroup({
       maxClusterRadius: 52,
       disableClusteringAtZoom: 17,
@@ -2081,14 +2123,28 @@ def render_map_page() -> str:
       const chain = (configData.chainNames && configData.chainNames[store.chain]) || store.chain || 'Cửa hàng';
       const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent((store.name || '') + ' ' + (store.address || ''))}`;
 
-      const counts = storeCountsCache[store.id] || { in: info.code === 'i' ? 1 : 0, out: info.code === 'o' ? 1 : 0 };
+      let counts = storeCountsCache[store.id];
+      if (!counts && storeHistoryCache[store.id]) {
+        let cIn = 0, cOut = 0;
+        const sIn = new Set(), sOut = new Set();
+        storeHistoryCache[store.id].forEach(item => {
+          const ts = item.timestamp || item.formatted_time;
+          if (item.status_code === 'i') { if (!sIn.has(ts)) { sIn.add(ts); cIn++; } }
+          else if (item.status_code === 'o') { if (!sOut.has(ts)) { sOut.add(ts); cOut++; } }
+        });
+        counts = { in: cIn, out: cOut };
+        storeCountsCache[store.id] = counts;
+      }
+      if (!counts) {
+        counts = { in: info.code === 'i' ? 1 : 0, out: info.code === 'o' ? 1 : 0 };
+      }
 
       return `
         <div>
           <div class="popup-store-title">${escapeHtml(store.name || '')}</div>
           <div class="popup-store-chain">${escapeHtml(chain)}</div>
           <div class="popup-status-badge" style="background:${statusBg}; color:${statusColor};">${statusText}</div>
-          <div class="popup-report-counts-bar">
+          <div class="popup-report-counts-bar" id="popup-counts-${escapeHtml(store.id)}">
             <span class="report-count-tag tag-green">🟢 Có: <b>${counts.in}</b> lần</span>
             <span class="report-count-tag tag-red">🔴 Hết: <b>${counts.out}</b> lần</span>
           </div>
@@ -2768,6 +2824,15 @@ def render_map_page() -> str:
             }
           });
           storeCountsCache[storeId] = { in: countIn, out: countOut };
+
+          // Dynamically synchronize count tag in active map popup if currently open
+          const openPopupBar = document.getElementById(`popup-counts-${storeId}`);
+          if (openPopupBar) {
+            openPopupBar.innerHTML = `
+              <span class="report-count-tag tag-green">🟢 Có: <b>${countIn}</b> lần</span>
+              <span class="report-count-tag tag-red">🔴 Hết: <b>${countOut}</b> lần</span>
+            `;
+          }
 
           // Propagate newest history record to local store object and refresh map marker
           if (typeof storesDict !== 'undefined' && storesDict[storeId]) {
@@ -4040,7 +4105,21 @@ def render_thongbao_page() -> str:
           ? `<span class="card-badge" style="background:#dcfce7; color:#15803d; border:1px solid #bbf7d0; padding:2px 6px; font-size:0.68rem;">📸 Tại chỗ</span>`
           : '';
 
-        const counts = storeCountsCache[store.id] || { in: info.code === 'i' ? 1 : 0, out: info.code === 'o' ? 1 : 0 };
+        let counts = storeCountsCache[store.id];
+        if (!counts && storeHistoryCache[store.id]) {
+          let cIn = 0, cOut = 0;
+          const sIn = new Set(), sOut = new Set();
+          storeHistoryCache[store.id].forEach(item => {
+            const ts = item.timestamp || item.formatted_time;
+            if (item.status_code === 'i') { if (!sIn.has(ts)) { sIn.add(ts); cIn++; } }
+            else if (item.status_code === 'o') { if (!sOut.has(ts)) { sOut.add(ts); cOut++; } }
+          });
+          counts = { in: cIn, out: cOut };
+          storeCountsCache[store.id] = counts;
+        }
+        if (!counts) {
+          counts = { in: info.code === 'i' ? 1 : 0, out: info.code === 'o' ? 1 : 0 };
+        }
         const chain = (configData.chainNames && configData.chainNames[store.chain]) || store.chain || 'Cửa hàng';
         const distStr = dist !== null ? ` • 📍 Cách ${formatDist(dist)}` : '';
         
@@ -4690,8 +4769,14 @@ def render_thongbao_page() -> str:
               if (!seenOutTs.has(ts)) { seenOutTs.add(ts); countOut++; }
             }
           });
+          if (typeof storeCountsCache !== 'undefined') {
+            storeCountsCache[storeId] = { in: countIn, out: countOut };
+          }
           if (typeof reportCounts !== 'undefined') {
             reportCounts[storeId] = { in: countIn, out: countOut };
+          }
+          if (typeof renderStoreList === 'function') {
+            renderStoreList();
           }
 
           // Propagate newest history record to local store object and refresh list
