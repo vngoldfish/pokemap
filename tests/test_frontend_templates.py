@@ -376,3 +376,40 @@ def test_orphaned_dom_references_cleanup():
     map_script = extract_inline_scripts(map_html)[0]
     assert "map-chain-select" not in map_script, "orphaned map-chain-select still queried in map script"
     assert "map-time-select" not in map_script, "orphaned map-time-select still queried in map script"
+
+
+# ==============================================================================
+# 9. In-Stock Pin Effect Duration Settings (Ghim có hàng)
+# ==============================================================================
+
+def test_stock_pin_effect_hours_settings():
+    """Verify In-Stock Pin effect duration setting is present in HTML, JS and API."""
+    from app.web import app
+    from starlette.testclient import TestClient
+
+    client = TestClient(app)
+
+    # 1. API: /api/config returns stockPinEffectHours
+    cfg = client.get("/api/config").json()
+    assert "stockPinEffectHours" in cfg, "stockPinEffectHours missing from /api/config"
+
+    # 2. API: /api/settings updates stockPinEffectHours
+    res = client.post("/api/settings", json={"stockPinEffectHours": "6"})
+    assert res.status_code == 200
+    cfg2 = client.get("/api/config").json()
+    assert cfg2["stockPinEffectHours"] == "6"
+
+    # Reset back to default
+    client.post("/api/settings", json={"stockPinEffectHours": "24"})
+
+    # 3. HTML: Verify #set-stock-pin-hours in both templates
+    map_html = render_map_page()
+    tb_html = render_thongbao_page()
+    assert 'id="set-stock-pin-hours"' in map_html, "Missing #set-stock-pin-hours in map page"
+    assert 'id="set-stock-pin-hours"' in tb_html, "Missing #set-stock-pin-hours in thongbao page"
+
+    # 4. JS: Verify updateStockPinHours function in both scripts
+    assert "function updateStockPinHours(" in map_html, "Missing updateStockPinHours in map page"
+    assert "function updateStockPinHours(" in tb_html, "Missing updateStockPinHours in thongbao page"
+    assert "stockEffectSetting" in map_html, "Missing stockEffectSetting check in map page"
+

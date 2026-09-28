@@ -862,6 +862,39 @@ SHARED_MODALS_HTML = """
           </div>
         </div>
 
+        <!-- SECTION: GHIM CÓ HÀNG (IN-STOCK PIN EFFECT) -->
+        <div style="border:1px solid #bbf7d0; background:#f0fdf4; border-radius:12px; padding:14px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span style="font-size:1.15rem;">🎯</span>
+              <span style="font-weight:800; font-size:0.92rem; color:#15803d;">Ghim có hàng (In-Stock Pin)</span>
+            </div>
+            <span style="font-size:0.68rem; font-weight:800; background:#dcfce7; color:#166534; padding:2px 8px; border-radius:20px; border:1px solid #86efac;">
+              Bản đồ
+            </span>
+          </div>
+          <div style="font-size:0.72rem; color:#166534; margin-bottom:10px; line-height:1.4;">
+            Cài đặt thời gian hiển thị hiệu ứng vòng tròn mục tiêu chớp nháy (pulsing ripple) &amp; thanh thời gian nổi cho các quán đang có hàng.
+          </div>
+          <div>
+            <label style="font-size:0.72rem; font-weight:800; color:#334155; display:block; margin-bottom:4px;">
+              ⏱️ Thời gian hiệu lực hiệu ứng (tính từ thời gian hiện tại):
+            </label>
+            <select id="set-stock-pin-hours" onchange="updateStockPinHours(this.value)" style="width:100%; border:1px solid #86efac; border-radius:8px; padding:8px 10px; font-size:0.78rem; font-weight:700; color:#14532d; background:#ffffff; outline:none; box-shadow:0 1px 2px rgba(0,0,0,0.05); cursor:pointer;">
+              <option value="1">⚡ Trong vòng 1 giờ (báo mới nhất)</option>
+              <option value="3">⏱️ Trong vòng 3 giờ</option>
+              <option value="6">⏱️ Trong vòng 6 giờ</option>
+              <option value="12">⏱️ Trong vòng 12 giờ</option>
+              <option value="24" selected>📅 Trong vòng 24 giờ (mặc định)</option>
+              <option value="all">✨ Luôn luôn có hiệu ứng (tất cả quán có hàng)</option>
+              <option value="0">🚫 Tắt hiệu ứng chớp nháy (chỉ hiện chấm xanh tĩnh)</option>
+            </select>
+            <div style="font-size:0.68rem; color:#64748b; margin-top:4px;">
+              * Các quán có hàng báo trước khoảng thời gian này vẫn hiện màu xanh nhưng không chớp nháy để tránh rối mắt.
+            </div>
+          </div>
+        </div>
+
         <!-- SECTION 2: ÂM THANH TRÊN WEB -->
         <div>
           <div class="filter-group-title">🔔 Thông báo âm thanh trên Web</div>
@@ -2049,12 +2082,39 @@ def render_map_page() -> str:
 
         const currentZoom = map.getZoom();
 
-        // 🟢 CÓ HÀNG (i): TẤT CẢ CỬA HÀNG CÓ HÀNG TRONG CSDL ĐỀU HIỆN VÒNG TRÒN MỤC TIÊU CHỚP NHÁY + THANH THỜI GIAN NỔI!
+        // 🟢 CÓ HÀNG (i): Kiểm tra hiệu lực thời gian hiệu ứng Ghim Có hàng (In-Stock Pin)
+        const stockEffectSetting = String(configData.stockPinEffectHours || localStorage.getItem('poketan_stock_pin_hours') || '24');
+        let hasStockEffect = false;
         if (info.code === 'i') {
+          if (stockEffectSetting === 'all') {
+            hasStockEffect = true;
+          } else if (stockEffectSetting === '0' || stockEffectSetting === 'off') {
+            hasStockEffect = false;
+          } else {
+            const effectMaxSec = (parseInt(stockEffectSetting, 10) || 24) * 3600;
+            hasStockEffect = (info.timestamp > 0) ? (reportAge <= effectMaxSec) : true;
+          }
+        }
+
+        if (info.code === 'i' && hasStockEffect) {
+          // Có hàng và trong thời gian hiệu lực -> Hiện vòng tròn mục tiêu chớp nháy + thanh thời gian nổi
           const pinIcon = createStockPinIcon(info.timeAgo);
           const m = L.marker([store.lat, store.lng], { icon: pinIcon, zIndexOffset: 3000 });
           m.bindPopup(() => createPopupHtml(store, info), { maxWidth: 300 });
           stockLayer.addLayer(m);
+        } else if (info.code === 'i') {
+          // Có hàng nhưng đã quá hạn thời gian hiệu ứng -> Hiện chấm ghim xanh tĩnh không chớp nháy
+          let pin;
+          if (currentZoom >= 16 || mapChainFilter !== 'all') {
+            pin = createChainPinIcon(store, info, false);
+          } else if (currentZoom >= 14) {
+            pin = createMiniChainPinIcon(store, info, false);
+          } else {
+            pin = greenDotIcon;
+          }
+          const sm = L.marker([store.lat, store.lng], { icon: pin, hasStock: true, zIndexOffset: 2500 });
+          sm.bindPopup(() => createPopupHtml(store, info), { maxWidth: 300 });
+          stockLayer.addLayer(sm);
         } else {
           // 🔴 ĐỎ: HẾT HÀNG (o) | 🟡 VÀNG: KHÔNG BÁN THẺ (n) | ⚪ XÁM: CHƯA CÓ BÁO CÁO (u)
           let pin;
@@ -2526,9 +2586,24 @@ def render_map_page() -> str:
         }
       }
 
+      const pinHoursSelect = document.getElementById('set-stock-pin-hours');
+      if (pinHoursSelect) {
+        const curHours = String(configData.stockPinEffectHours || localStorage.getItem('poketan_stock_pin_hours') || '24');
+        pinHoursSelect.value = curHours;
+      }
+
       document.getElementById('settings-modal').classList.add('open');
     }
     function closeSettingsModal() { document.getElementById('settings-modal').classList.remove('open'); }
+
+    function updateStockPinHours(val) {
+      configData.stockPinEffectHours = String(val);
+      try { localStorage.setItem('poketan_stock_pin_hours', String(val)); } catch(e) {}
+      updateSettings('stockPinEffectHours', String(val));
+      if (typeof renderMapMarkers === 'function') {
+        renderMapMarkers();
+      }
+    }
 
     function updateSettings(key, val) {
       if (!configData.notifications) configData.notifications = {};
@@ -4473,9 +4548,21 @@ def render_thongbao_page() -> str:
         }
       }
 
+      const pinHoursSelect = document.getElementById('set-stock-pin-hours');
+      if (pinHoursSelect) {
+        const curHours = String(configData.stockPinEffectHours || localStorage.getItem('poketan_stock_pin_hours') || '24');
+        pinHoursSelect.value = curHours;
+      }
+
       document.getElementById('settings-modal').classList.add('open');
     }
     function closeSettingsModal() { document.getElementById('settings-modal').classList.remove('open'); }
+
+    function updateStockPinHours(val) {
+      configData.stockPinEffectHours = String(val);
+      try { localStorage.setItem('poketan_stock_pin_hours', String(val)); } catch(e) {}
+      updateSettings('stockPinEffectHours', String(val));
+    }
 
     function updateSettings(key, val) {
       if (!configData.notifications) configData.notifications = {};
