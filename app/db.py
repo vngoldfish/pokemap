@@ -36,6 +36,36 @@ def invalidate_stores_cache():
     _report_counts_cache.clear()
 
 
+_store_catalog_cache = None
+
+def get_store_catalog() -> Dict[str, Dict[str, Any]]:
+    """Return dictionary of store metadata keyed by store ID from all cached stores_*.json files."""
+    global _store_catalog_cache
+    if _store_catalog_cache is None:
+        _store_catalog_cache = {}
+        pref_files = {
+            "osaka": "stores_osaka.json",
+            "tokyo": "stores_tokyo.json",
+            "kanagawa": "stores_kanagawa.json",
+            "chiba": "stores_chiba.json",
+            "aichi": "stores_aichi.json",
+            "gifu": "stores_gifu.json",
+            "mie": "stores_mie.json"
+        }
+        for pref, fname in pref_files.items():
+            fpath = os.path.join(DATA_DIR, fname)
+            if os.path.exists(fpath):
+                try:
+                    with open(fpath, "r", encoding="utf-8") as f:
+                        for s in json.load(f):
+                            if s.get("id"):
+                                s["pref"] = pref
+                                _store_catalog_cache[s["id"]] = s
+                except Exception:
+                    pass
+    return _store_catalog_cache
+
+
 @contextmanager
 def get_db_connection():
     """Create a thread-safe connection to the SQLite database with WAL mode."""
@@ -264,17 +294,11 @@ def seed_regions_if_empty():
 
 
 def seed_stores_if_empty():
-    """Seed stores from stores_*.json files into SQLite database if table is empty."""
+    """Seed stores from stores_*.json files into SQLite database and update any stores with placeholder metadata."""
     seed_regions_if_empty()
     with _db_write_lock:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM stores;")
-            existing_count = cursor.fetchone()[0]
-            if existing_count > 0:
-                return existing_count
-
-            total_inserted = 0
             pref_files = {
                 "osaka": "stores_osaka.json",
                 "tokyo": "stores_tokyo.json",
@@ -287,6 +311,7 @@ def seed_stores_if_empty():
 
             now_ts = int(time.time())
             batch = []
+            update_batch = []
             for pref, fname in pref_files.items():
                 fpath = os.path.join(DATA_DIR, fname)
                 if not os.path.exists(fpath):
@@ -298,13 +323,18 @@ def seed_stores_if_empty():
                         sid = s.get("id")
                         if not sid:
                             continue
+                        s_name = s.get("name") or "Cửa hàng"
+                        s_chain = s.get("chain") or "other"
+                        s_addr = s.get("address") or ""
+                        s_lat = s.get("lat")
+                        s_lng = s.get("lng")
                         batch.append((
                             sid,
-                            s.get("name") or "Cửa hàng",
-                            s.get("chain") or "",
-                            s.get("address") or "",
-                            s.get("lat"),
-                            s.get("lng"),
+                            s_name,
+                            s_chain,
+                            s_addr,
+                            s_lat,
+                            s_lng,
                             pref,
                             s.get("city") or "",
                             s.get("zip") or "",
@@ -316,6 +346,15 @@ def seed_stores_if_empty():
                             json.dumps([]),
                             now_ts
                         ))
+                        update_batch.append((
+                            s_name,
+                            s_chain,
+                            s_addr,
+                            s_lat,
+                            s_lng,
+                            pref,
+                            sid
+                        ))
                 except Exception as e:
                     print(f"  [DB] Error loading {fname}: {e}")
 
@@ -326,10 +365,23 @@ def seed_stores_if_empty():
                         current_status, last_timestamp, last_reported_at, onsite, packs_json, updated_at
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """, batch)
+
+                cursor.executemany("""
+                    UPDATE stores
+                    SET name = ?,
+                        chain = ?,
+                        address = ?,
+                        lat = ?,
+                        lng = ?,
+                        pref = CASE WHEN pref IS NULL OR pref = '' THEN ? ELSE pref END
+                    WHERE id = ? AND (name = id OR name = 'Cửa hàng' OR lat IS NULL);
+                """, update_batch)
                 conn.commit()
-                total_inserted = len(batch)
-                print(f"  [DB] Successfully seeded {total_inserted} stores into SQLite database!")
-            return total_inserted
+                invalidate_stores_cache()
+            
+            cursor.execute("SELECT COUNT(*) FROM stores;")
+            total_count = cursor.fetchone()[0]
+            return total_count
 
 
 def backfill_all_poketan_statuses(force: bool = False) -> int:
@@ -381,7 +433,19 @@ def backfill_all_poketan_statuses(force: bool = False) -> int:
                 hist_id = f"{sid}_{ts}_{code}"
 
                 if sid not in existing_store_ids and sid not in new_stores_map:
-                    new_stores_map[sid] = (sid, sid, 'other', '', p, code, now_ts)
+                    catalog = get_store_catalog()
+                    meta = catalog.get(sid) or {}
+                    new_stores_map[sid] = (
+                        sid,
+                        meta.get("name") or sid,
+                        meta.get("chain") or "other",
+                        meta.get("address") or "",
+                        meta.get("lat"),
+                        meta.get("lng"),
+                        meta.get("pref") or p,
+                        code,
+                        now_ts
+                    )
 
                 created_at_val = now_ts if (0 <= now_ts - ts <= 120) else (ts if ts > 0 else now_ts)
 
@@ -419,8 +483,8 @@ def backfill_all_poketan_statuses(force: bool = False) -> int:
             cursor = conn.cursor()
             if new_stores_map:
                 cursor.executemany("""
-                    INSERT OR IGNORE INTO stores (id, name, chain, address, pref, current_status, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?);
+                    INSERT OR IGNORE INTO stores (id, name, chain, address, lat, lng, pref, current_status, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """, list(new_stores_map.values()))
 
             if history_batch:
@@ -701,13 +765,30 @@ def record_new_report(
             if existing_hist:
                 return False, {"id": existing_hist["id"], "store_id": clean_id, "status_code": status_code, "timestamp": timestamp}
 
-            # Ensure store exists in stores table to satisfy foreign key
-            cursor.execute("SELECT id FROM stores WHERE id = ?;", (clean_id,))
-            if not cursor.fetchone():
+            # Ensure store exists in stores table to satisfy foreign key and has real metadata
+            catalog = get_store_catalog()
+            meta = catalog.get(clean_id) or {}
+            st_name = meta.get("name") or clean_id
+            st_chain = meta.get("chain") or "other"
+            st_addr = meta.get("address") or ""
+            st_lat = meta.get("lat")
+            st_lng = meta.get("lng")
+            st_pref = meta.get("pref") or pref
+
+            cursor.execute("SELECT id, name FROM stores WHERE id = ?;", (clean_id,))
+            st_row = cursor.fetchone()
+            if not st_row:
                 cursor.execute("""
-                    INSERT OR IGNORE INTO stores (id, name, chain, address, pref, current_status, updated_at)
-                    VALUES (?, ?, 'other', '', ?, ?, ?);
-                """, (clean_id, clean_id, pref, status_code, now_ts))
+                    INSERT OR IGNORE INTO stores (id, name, chain, address, lat, lng, pref, current_status, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+                """, (clean_id, st_name, st_chain, st_addr, st_lat, st_lng, st_pref, status_code, now_ts))
+            elif st_row[1] == clean_id or st_row[1] == "Cửa hàng":
+                if meta:
+                    cursor.execute("""
+                        UPDATE stores
+                        SET name = ?, chain = ?, address = ?, lat = ?, lng = ?, pref = ?
+                        WHERE id = ?;
+                    """, (st_name, st_chain, st_addr, st_lat, st_lng, st_pref, clean_id))
 
             # Insert new history item
             cursor.execute("""
@@ -855,12 +936,29 @@ def save_bulk_history(store_id: str, history_list: List[Dict[str, Any]], source:
     with _db_write_lock:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT id FROM stores WHERE id = ?;", (clean_id,))
-            if not cursor.fetchone():
+            catalog = get_store_catalog()
+            meta = catalog.get(clean_id) or {}
+            st_name = meta.get("name") or clean_id
+            st_chain = meta.get("chain") or "other"
+            st_addr = meta.get("address") or ""
+            st_lat = meta.get("lat")
+            st_lng = meta.get("lng")
+            st_pref = meta.get("pref") or pref
+
+            cursor.execute("SELECT id, name FROM stores WHERE id = ?;", (clean_id,))
+            st_row = cursor.fetchone()
+            if not st_row:
                 cursor.execute("""
-                    INSERT OR IGNORE INTO stores (id, name, chain, address, pref, current_status, updated_at)
-                    VALUES (?, ?, 'other', '', ?, 'u', ?);
-                """, (clean_id, clean_id, pref, now_ts))
+                    INSERT OR IGNORE INTO stores (id, name, chain, address, lat, lng, pref, current_status, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 'u', ?);
+                """, (clean_id, st_name, st_chain, st_addr, st_lat, st_lng, st_pref, now_ts))
+            elif st_row[1] == clean_id or st_row[1] == "Cửa hàng":
+                if meta:
+                    cursor.execute("""
+                        UPDATE stores
+                        SET name = ?, chain = ?, address = ?, lat = ?, lng = ?, pref = ?
+                        WHERE id = ?;
+                    """, (st_name, st_chain, st_addr, st_lat, st_lng, st_pref, clean_id))
 
             # Clean up any existing synthetic stub row or old row with same (store_id, timestamp, status_code)
             for item_row in batch:

@@ -37,7 +37,8 @@ from .db import (
     get_db_connection,
     _db_write_lock,
     invalidate_stores_cache,
-    save_bulk_history
+    save_bulk_history,
+    get_store_catalog
 )
 
 ALL_HARVEST_PREFS = ["osaka", "tokyo", "kanagawa", "chiba", "aichi", "gifu", "mie"]
@@ -170,7 +171,19 @@ def harvest_all_statuses_and_history(prefs: List[str] = ALL_HARVEST_PREFS) -> Di
                 in_stock_store_ids.append((sid, pref))
 
             if sid not in existing_store_ids and sid not in new_stores_map:
-                new_stores_map[sid] = (sid, sid, "other", "", pref, code, now_ts)
+                catalog = get_store_catalog()
+                meta = catalog.get(sid) or {}
+                new_stores_map[sid] = (
+                    sid,
+                    meta.get("name") or sid,
+                    meta.get("chain") or "other",
+                    meta.get("address") or "",
+                    meta.get("lat"),
+                    meta.get("lng"),
+                    meta.get("pref") or pref,
+                    code,
+                    now_ts
+                )
 
             # Historical reports have created_at = timestamp so web toasts NEVER trigger
             created_at_val = ts if ts > 0 else now_ts
@@ -207,8 +220,8 @@ def harvest_all_statuses_and_history(prefs: List[str] = ALL_HARVEST_PREFS) -> Di
                 cursor = conn.cursor()
                 if new_stores_map:
                     cursor.executemany("""
-                        INSERT OR IGNORE INTO stores (id, name, chain, address, pref, current_status, updated_at)
-                        VALUES (?, ?, ?, ?, ?, ?, ?);
+                        INSERT OR IGNORE INTO stores (id, name, chain, address, lat, lng, pref, current_status, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
                     """, list(new_stores_map.values()))
 
                 if history_batch:
