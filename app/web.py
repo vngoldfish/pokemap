@@ -933,6 +933,38 @@ def get_stats_history_logs_route(
         return JSONResponse(status_code=500, content={"error": str(e)})
 
 
+@app.get("/api/stats/predictions")
+def get_stats_predictions_route(
+    pref: Optional[str] = None,
+    chain: Optional[str] = None,
+    hour: Optional[int] = None,
+    window: Optional[str] = None,
+    user_lat: Optional[float] = None,
+    user_lng: Optional[float] = None,
+    max_dist_km: Optional[float] = None,
+    min_score: int = 40,
+    limit: int = 60,
+    sort: str = "score"
+):
+    try:
+        from .db import db_get_restock_predictions
+        return JSONResponse(content=db_get_restock_predictions(
+            pref=pref,
+            chain=chain,
+            target_hour=hour,
+            time_window=window,
+            user_lat=user_lat,
+            user_lng=user_lng,
+            max_dist_km=max_dist_km,
+            min_score=min_score,
+            limit=limit,
+            sort_by=sort
+        ))
+    except Exception as e:
+        print("[Stats] Error getting restock predictions:", e)
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+
 @app.get("/api/stats/export_csv")
 def export_stats_history_csv():
     try:
@@ -1032,11 +1064,13 @@ def get_calendar(include_expired: bool = False):
 
 from .templates import render_map_page, render_thongbao_page
 from .templates_stats import render_thongke_page
+from .templates_prediction import render_dudoan_page
 
 
 _cached_map_html = None
 _cached_thongbao_html = None
 _cached_thongke_html = None
+_cached_dudoan_html = None
 
 
 def get_map_html():
@@ -1058,6 +1092,13 @@ def get_thongke_html():
     if _cached_thongke_html is None:
         _cached_thongke_html = render_thongke_page()
     return _cached_thongke_html
+
+
+def get_dudoan_html():
+    global _cached_dudoan_html
+    if _cached_dudoan_html is None:
+        _cached_dudoan_html = render_dudoan_page()
+    return _cached_dudoan_html
 
 
 PAGE_CACHE_HEADERS = {
@@ -1085,6 +1126,14 @@ def thongbao_page():
 @app.get("/stats", response_class=HTMLResponse)
 def thongke_page():
     return HTMLResponse(content=get_thongke_html(), headers=PAGE_CACHE_HEADERS)
+
+
+@app.get("/dudoan", response_class=HTMLResponse)
+@app.get("/goiy", response_class=HTMLResponse)
+@app.get("/radar", response_class=HTMLResponse)
+@app.get("/predict", response_class=HTMLResponse)
+def dudoan_page():
+    return HTMLResponse(content=get_dudoan_html(), headers=PAGE_CACHE_HEADERS)
 
 
 def main():

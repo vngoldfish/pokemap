@@ -10,10 +10,11 @@ import sqlite3
 import os
 import json
 import time
+import math
 import threading
 from contextlib import contextmanager
 from datetime import datetime, timezone, timedelta
-from collections import Counter
+from collections import Counter, defaultdict
 from typing import Dict, Any, List, Optional, Tuple
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "data", "pokemap.db")
@@ -28,13 +29,16 @@ _db_write_lock = threading.Lock()
 # In-memory query TTL cache for stores and report counts
 _stores_cache: Dict[str, Tuple[float, Dict[str, Any]]] = {}
 _report_counts_cache: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+_predictions_cache: Dict[str, Tuple[float, Dict[str, Any]]] = {}
 _CACHE_TTL = 15.0  # seconds
+_PRED_CACHE_TTL = 30.0  # seconds
 
 def invalidate_stores_cache():
-    """Invalidate in-memory cache for stores and report counts."""
-    global _stores_cache, _report_counts_cache
+    """Invalidate in-memory cache for stores, report counts, and predictions."""
+    global _stores_cache, _report_counts_cache, _predictions_cache
     _stores_cache.clear()
     _report_counts_cache.clear()
+    _predictions_cache.clear()
 
 
 _store_catalog_cache = None
@@ -1489,5 +1493,304 @@ def db_search_history_logs(
             "total_pages": (total_items + limit - 1) // limit if total_items > 0 else 1,
             "items": items
         }
+
+
+def _calc_haversine_dist(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Calculate the great circle distance between two points in kilometers."""
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = math.sin(dlat / 2.0) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2.0) ** 2
+    return 6371.0 * 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
+
+
+def db_get_restock_predictions(
+    pref: Optional[str] = None,
+    chain: Optional[str] = None,
+    target_hour: Optional[int] = None,
+    time_window: Optional[str] = None,
+    user_lat: Optional[float] = None,
+    user_lng: Optional[float] = None,
+    max_dist_km: Optional[float] = None,
+    min_score: int = 40,
+    limit: int = 60,
+    sort_by: str = "score"
+) -> Dict[str, Any]:
+    """
+    Predict stores most likely to have stock or restock today in upcoming/selected hours.
+    Based on historical in-stock distribution, day-of-week affinity, restock turnaround cycles,
+    current stock status, and GPS proximity.
+    """
+    global _predictions_cache
+    from .config import CHAIN_NAMES
+
+    # Normalize parameters
+    clean_pref = (pref or "").strip().lower()
+    clean_chain = (chain or "").strip().lower()
+    clean_window = (time_window or "").strip().lower()
+    if clean_pref in ("all", "", "tatca"):
+        clean_pref = None
+    if clean_chain in ("all", "", "tatca"):
+        clean_chain = None
+    if target_hour is not None and (target_hour < 0 or target_hour > 23):
+        target_hour = None
+
+    cache_key = f"{clean_pref}_{clean_chain}_{target_hour}_{clean_window}_{user_lat}_{user_lng}_{max_dist_km}_{min_score}_{limit}_{sort_by}"
+    now_ts = int(time.time())
+
+    if cache_key in _predictions_cache:
+        cached_ts, cached_data = _predictions_cache[cache_key]
+        if now_ts - cached_ts < _PRED_CACHE_TTL:
+            return cached_data
+
+    now_dt = datetime.fromtimestamp(now_ts, tz=JST)
+    current_dow = now_dt.weekday()  # 0 = Monday, 1 = Tuesday...
+    current_hour = now_dt.hour
+    dow_names = ["Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy", "Chủ Nhật"]
+    dow_jp_names = ["月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日", "日曜日"]
+
+    # 1. Fetch historical in-stock records
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        where_clauses = ["h.timestamp > 0", "h.status_code = 'i'"]
+        params = []
+
+        if clean_pref:
+            where_clauses.append("s.pref = ?")
+            params.append(clean_pref)
+        if clean_chain:
+            where_clauses.append("s.chain = ?")
+            params.append(clean_chain)
+
+        where_sql = " AND ".join(where_clauses)
+        cursor.execute(f"""
+            SELECT h.store_id, h.timestamp, h.packs_json,
+                   s.name, s.pref, s.chain, s.address, s.lat, s.lng, s.current_status
+            FROM store_history h
+            JOIN stores s ON h.store_id = s.id
+            WHERE {where_sql}
+            ORDER BY h.timestamp ASC;
+        """, params)
+        rows = cursor.fetchall()
+
+    # 2. Aggregate store data and calculate 24h restock distribution
+    stores_data = defaultdict(lambda: {
+        "timestamps": [],
+        "packs": [],
+        "name": "",
+        "pref": "",
+        "chain": "",
+        "address": "",
+        "lat": None,
+        "lng": None,
+        "current_status": "u"
+    })
+    hourly_distribution = [0] * 24
+
+    for sid, ts, packs_json, name, spref, schain, addr, lat, lng, st in rows:
+        jst_h = (ts + 32400) % 86400 // 3600
+        hourly_distribution[jst_h] += 1
+        d = stores_data[sid]
+        d["name"] = name or sid
+        d["pref"] = spref or ""
+        d["chain"] = schain or "other"
+        d["address"] = addr or ""
+        d["lat"] = lat
+        d["lng"] = lng
+        d["current_status"] = st or "u"
+        d["timestamps"].append(ts)
+        if packs_json:
+            try:
+                p_list = json.loads(packs_json)
+                if isinstance(p_list, list):
+                    d["packs"].extend(p_list)
+            except Exception:
+                pass
+
+    # 3. Analyze each candidate store
+    candidates = []
+
+    # Prepare window bounds if window filter selected
+    allowed_hours = None
+    if target_hour is not None:
+        allowed_hours = [target_hour]
+    elif clean_window:
+        if clean_window == "now":
+            allowed_hours = [(current_hour - 1) % 24, current_hour, (current_hour + 1) % 24, (current_hour + 2) % 24]
+        elif clean_window == "morning":
+            allowed_hours = list(range(6, 11))
+        elif clean_window == "noon":
+            allowed_hours = list(range(11, 14))
+        elif clean_window == "afternoon":
+            allowed_hours = list(range(14, 18))
+        elif clean_window == "evening":
+            allowed_hours = list(range(18, 24))
+        elif clean_window == "all":
+            allowed_hours = None
+
+    for sid, d in stores_data.items():
+        in_ts = d["timestamps"]
+        if not in_ts:
+            continue
+
+        last_ts = in_ts[-1]
+        days_since = (now_ts - last_ts) / 86400.0
+        hours = [(t + 32400) % 86400 // 3600 for t in in_ts]
+        dows = [datetime.fromtimestamp(t, tz=JST).weekday() for t in in_ts]
+
+        # Calculate turnaround cycle (interval between shipments)
+        if len(in_ts) >= 2:
+            diffs = [(in_ts[i] - in_ts[i - 1]) / 86400.0 for i in range(1, len(in_ts))]
+            avg_cycle = sum(diffs) / len(diffs)
+        else:
+            avg_cycle = 4.0
+
+        hour_counts = Counter(hours)
+        best_h = max(hour_counts.keys(), key=lambda h: hour_counts[h])
+        best_h_count = hour_counts[best_h]
+
+        # Hour scoring & filtering
+        if target_hour is not None:
+            m0 = hour_counts.get(target_hour, 0)
+            m1 = hour_counts.get((target_hour - 1) % 24, 0) + hour_counts.get((target_hour + 1) % 24, 0)
+            if m0 == 0 and m1 == 0:
+                continue
+            s_hour = min(35, m0 * 18 + m1 * 8)
+            display_h = target_hour
+        elif allowed_hours is not None:
+            window_matches = sum(hour_counts.get(h, 0) for h in allowed_hours)
+            if window_matches == 0:
+                continue
+            s_hour = min(35, window_matches * 12)
+            display_h = best_h if best_h in allowed_hours else max(allowed_hours, key=lambda h: hour_counts.get(h, 0))
+        else:
+            s_hour = min(35, best_h_count * 12)
+            display_h = best_h
+            if abs(display_h - current_hour) <= 1:
+                s_hour = min(35, s_hour + 5)
+
+        # Day of week affinity scoring
+        dow_count = sum(1 for dw in dows if dw == current_dow)
+        if dow_count >= 2:
+            s_dow = 25
+        elif dow_count == 1:
+            s_dow = 16
+        else:
+            s_dow = 6
+
+        # Cycle / interval turnaround scoring
+        if 0.8 <= days_since <= max(7.0, avg_cycle * 1.5):
+            s_cycle = 25  # Prime arrival cycle window
+        elif days_since < 0.8:
+            s_cycle = 14  # Fresh shipment today
+        elif days_since <= avg_cycle * 2.5:
+            s_cycle = 15  # Slightly overdue
+        else:
+            s_cycle = 8
+
+        # Current status scoring
+        st = d["current_status"]
+        if st == "i":
+            s_status = 20  # In-stock report active!
+        elif st == "o":
+            s_status = 15  # Shelves clear, ready for shipment
+        else:
+            s_status = 5
+
+        # Restock frequency / consistency bonus
+        s_cluster = 6 if len(in_ts) >= 4 else 0
+
+        # Calculate final confidence score
+        total_score = min(99, max(20, s_hour + s_dow + s_cycle + s_status + s_cluster))
+        if total_score < min_score:
+            continue
+
+        # Proximity & Walking Distance calculation
+        dist_km = None
+        dist_m = None
+        dist_str = ""
+        walk_min = None
+        if user_lat is not None and user_lng is not None and d["lat"] is not None and d["lng"] is not None:
+            try:
+                dist_km = _calc_haversine_dist(user_lat, user_lng, float(d["lat"]), float(d["lng"]))
+                if max_dist_km and dist_km > max_dist_km:
+                    continue
+                dist_m = int(round(dist_km * 1000))
+                dist_str = f"~{dist_m}m" if dist_km < 1.0 else f"~{dist_km:.1f}km"
+                walk_min = max(1, int(round(dist_km * 12.5)))
+            except Exception:
+                dist_km, dist_m, dist_str, walk_min = None, None, "", None
+
+        # Extract top cards/packs
+        pack_counter = Counter(d["packs"])
+        top_packs = [p for p, _ in pack_counter.most_common(2)]
+
+        # Human-readable AI reasons
+        reasons = []
+        if dow_count > 0:
+            reasons.append(f"🎯 Đã {dow_count} lần có hàng vào {dow_names[current_dow]}")
+        h_freq = hour_counts.get(display_h, 1)
+        reasons.append(f"⏰ Giờ quen thuộc: {display_h:02d}:00 - {(display_h + 1) % 24:02d}:30 ({h_freq} lần)")
+        if 0.8 <= days_since <= max(7.0, avg_cycle * 1.5):
+            reasons.append(f"🔄 Điểm rơi chu kỳ: TB {avg_cycle:.1f} ngày/đợt (cách {days_since:.1f} ngày)")
+        elif days_since < 0.8:
+            reasons.append("⚡ Vừa có hàng trong ngày hôm nay!")
+        if st == "i":
+            reasons.append("🟢 Đang có báo cáo CÓ HÀNG gần đây!")
+        elif st == "o":
+            reasons.append("📦 Vừa hết hàng - Chuẩn bị nhận đợt mới")
+        if top_packs:
+            reasons.append(f"🃏 Thẻ hay về: {', '.join(top_packs)}")
+
+        is_prime_now = abs(display_h - current_hour) <= 1
+        confidence_level = "prime" if total_score >= 85 else ("high" if total_score >= 70 else "medium")
+
+        candidates.append({
+            "store_id": sid,
+            "name": d["name"],
+            "pref": d["pref"],
+            "chain": d["chain"],
+            "chain_name": CHAIN_NAMES.get(d["chain"], d["chain"]),
+            "address": d["address"],
+            "lat": d["lat"],
+            "lng": d["lng"],
+            "current_status": st,
+            "score": total_score,
+            "confidence_level": confidence_level,
+            "predicted_hour": display_h,
+            "predicted_window": f"{display_h:02d}:00 - {(display_h + 1) % 24:02d}:30 JST",
+            "is_prime_now": is_prime_now,
+            "days_since_last_in": round(days_since, 1),
+            "avg_interval_days": round(avg_cycle, 1),
+            "total_in_reports": len(in_ts),
+            "top_packs": top_packs,
+            "reasons": reasons,
+            "distance_km": round(dist_km, 2) if dist_km is not None else None,
+            "distance_m": dist_m,
+            "distance_str": dist_str,
+            "walk_time_min": walk_min
+        })
+
+    # Sort results
+    if sort_by == "distance" and user_lat is not None:
+        candidates.sort(key=lambda x: (x["distance_km"] if x["distance_km"] is not None else 99999, -x["score"]))
+    elif sort_by == "time":
+        candidates.sort(key=lambda x: (x["predicted_hour"], -x["score"]))
+    else:
+        candidates.sort(key=lambda x: (-x["score"], x["predicted_hour"]))
+
+    result_payload = {
+        "server_time_jst": now_dt.strftime("%H:%M %d/%m/%Y"),
+        "current_hour": current_hour,
+        "current_dow": current_dow,
+        "current_dow_name": dow_names[current_dow],
+        "current_dow_jp": dow_jp_names[current_dow],
+        "hourly_distribution": hourly_distribution,
+        "total_candidates": len(candidates),
+        "predictions": candidates[:limit]
+    }
+
+    _predictions_cache[cache_key] = (now_ts, result_payload)
+    return result_payload
+
 
 

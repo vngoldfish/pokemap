@@ -702,6 +702,7 @@ def render_shared_header() -> str:
 def render_shared_footer(active_page: str) -> str:
     map_active = " active" if active_page == "map" else ""
     list_active = " active" if active_page == "thongbao" else ""
+    dudoan_active = " active" if active_page in ("dudoan", "predict", "radar", "goiy") else ""
     stats_active = " active" if active_page in ("thongke", "admin", "stats", "quanly") else ""
     return f"""
   <!-- 5. FOOTER BOTTOM NAVIGATION -->
@@ -715,6 +716,12 @@ def render_shared_footer(active_page: str) -> str:
       <span class="tab-icon">📋</span>
       <span class="tab-label">Thông báo</span>
       <span id="footer-unread-badge" class="footer-unread-badge" style="display:none;">0</span>
+    </a>
+
+    <a href="/dudoan" class="footer-tab-btn{dudoan_active}" id="f-tab-dudoan" title="Gợi ý &amp; Dự đoán Restock theo giờ (AI予測)">
+      <span class="tab-icon">🎯</span>
+      <span class="tab-label">Dự đoán</span>
+      <span class="footer-hot-badge" style="position:absolute; top:2px; right:50%; transform:translateX(16px); background:linear-gradient(135deg, #ef4444, #f59e0b); color:#fff; font-size:0.5rem; font-weight:900; padding:1px 3px; border-radius:4px; line-height:1;">AI</span>
     </a>
 
     <a href="/thongke" class="footer-tab-btn{stats_active}" id="f-tab-stats" title="Quản lý &amp; Thống kê (統計・管理)">
