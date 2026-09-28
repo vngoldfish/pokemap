@@ -503,12 +503,14 @@ def resolve_google_maps_or_address(raw_input: str) -> dict:
         except Exception as e:
             return {"status": "error", "error": f"Không thể giải mã link Google Maps: {str(e)}"}
 
+    clean_raw = raw.replace("Ga ", "").replace("ga ", "").strip()
+
     # 3. Search in local stores database (names or addresses)
     try:
         from .db import get_db_connection
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT name, lat, lng FROM stores WHERE name LIKE ? OR address LIKE ? LIMIT 1;", (f"%{raw}%", f"%{raw}%"))
+            cursor.execute("SELECT name, lat, lng FROM stores WHERE name LIKE ? OR address LIKE ? LIMIT 1;", (f"%{clean_raw}%", f"%{clean_raw}%"))
             row = cursor.fetchone()
             if row and row["lat"] and row["lng"]:
                 return {
@@ -520,12 +522,13 @@ def resolve_google_maps_or_address(raw_input: str) -> dict:
     except Exception:
         pass
 
-    # 4. OpenStreetMap Nominatim Geocoding
+    # 4. OpenStreetMap Nominatim Geocoding (prioritize Japan)
     try:
         url = "https://nominatim.openstreetmap.org/search?" + urllib.parse.urlencode({
-            "q": raw,
+            "q": clean_raw,
             "format": "json",
             "limit": 1,
+            "countrycodes": "jp",
             "addressdetails": 1
         })
         req = urllib.request.Request(url, headers={"User-Agent": "BawuiPokeMap/1.0 (contact@bawui.com)"})
@@ -537,7 +540,7 @@ def resolve_google_maps_or_address(raw_input: str) -> dict:
                     "status": "ok",
                     "lat": round(float(item["lat"]), 4),
                     "lng": round(float(item["lon"]), 4),
-                    "name": item.get("display_name", "").split(",")[0].strip() or raw
+                    "name": item.get("display_name", "").split(",")[0].strip() or clean_raw
                 }
     except Exception:
         pass
