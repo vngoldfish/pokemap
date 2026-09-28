@@ -397,18 +397,20 @@ def test_adversarial_created_at_skew_boundary_conditions():
     test_sid = "test_adv_skew_store"
 
     cases = [
-        ("exact_now", now_ts, True),
-        ("within_119", now_ts - 119, True),
-        ("boundary_120", now_ts - 120, True),
-        ("stale_121", now_ts - 121, False),
-        ("stale_old", now_ts - 86400, False),
-        ("future_skew_60", now_ts + 60, True),
-        ("future_skew_120", now_ts + 120, True),
-        ("future_skew_125", now_ts + 125, False),
+        ("exact_now", 0, True),
+        ("within_119", -118, True),
+        ("boundary_120", -119, True),
+        ("stale_121", -123, False),
+        ("stale_old", -86400, False),
+        ("future_skew_60", 60, True),
+        ("future_skew_120", 118, True),
+        ("future_skew_125", 125, False),
     ]
 
-    for label, ts, should_be_now in cases:
+    for label, offset, should_be_now in cases:
         sid = f"{test_sid}_{label}"
+        cur_now = int(time.time())
+        ts = cur_now + offset
         is_new, rep = record_new_report(
             store_id=sid,
             status_code="i",
@@ -423,8 +425,8 @@ def test_adversarial_created_at_skew_boundary_conditions():
             c.execute("SELECT created_at FROM store_history WHERE store_id = ?;", (sid,))
             cat = c.fetchone()[0]
             if should_be_now:
-                # Should be approximately now_ts (within 2 seconds)
-                assert abs(cat - now_ts) <= 2, f"Failed case {label}: expected cat ~ {now_ts}, got {cat}"
+                # Should be approximately cur_now (within 2 seconds)
+                assert abs(cat - cur_now) <= 2, f"Failed case {label}: expected cat ~ {cur_now}, got {cat}"
             else:
                 # Should strictly retain timestamp
                 assert cat == ts, f"Failed case {label}: expected cat == {ts}, got {cat}"

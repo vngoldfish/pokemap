@@ -912,11 +912,20 @@ SHARED_MODALS_HTML = """
 
         <!-- PANE 2: CẤU HÌNH THÔNG BÁO TELEGRAM 24/7 -->
         <div id="settings-pane-telegram" class="settings-tab-pane" style="display:none; flex-direction:column; gap:16px;">
+          <!-- 1. HEADER & STATUS CARD -->
           <div style="border:1px solid #bae6fd; background:#f0f9ff; border-radius:12px; padding:14px;">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
-              <div style="display:flex; align-items:center; gap:6px;">
-                <span style="font-size:1.15rem;">✈️</span>
-                <span style="font-weight:800; font-size:0.92rem; color:#0369a1;">Thông báo Telegram 24/7</span>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:1.25rem;">✈️</span>
+                <div>
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-weight:800; font-size:0.95rem; color:#0369a1;">Thông báo Telegram 24/7</span>
+                    <span id="tg-status-badge" style="font-size:0.7rem; font-weight:800; padding:2px 8px; border-radius:12px; background:#e2e8f0; color:#475569;">⚪ Đang tắt</span>
+                  </div>
+                  <div style="font-size:0.72rem; color:#0284c7; margin-top:2px; line-height:1.3;">
+                    Tự động gửi cảnh báo tức thì về Bot / Kênh chat Telegram theo bộ lọc bên dưới.
+                  </div>
+                </div>
               </div>
               <!-- Switch toggle -->
               <label style="position:relative; display:inline-block; width:44px; height:24px; margin:0; flex-shrink:0;">
@@ -925,88 +934,157 @@ SHARED_MODALS_HTML = """
               </label>
             </div>
 
-            <div style="font-size:0.72rem; color:#0369a1; margin-bottom:12px; line-height:1.4;">
-              Tự động gửi tin nhắn báo quán có hàng vào chat hoặc nhóm Telegram ngay khi phát hiện.
-            </div>
-
-            <!-- Token & Chat ID -->
-            <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:12px;">
+            <!-- Credentials Inputs -->
+            <div style="display:flex; flex-direction:column; gap:10px; margin-top:12px; padding-top:12px; border-top:1px dashed #bae6fd;">
               <div>
-                <label style="font-weight:800; font-size:0.75rem; color:#334155; display:block; margin-bottom:4px;">Telegram Bot Token:</label>
-                <input type="text" id="tg-cfg-token" placeholder="Ví dụ: 123456789:ABCdefGhIJKlmNoPQRstuVWXyz..." style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:8px 10px; font-size:0.8rem; outline:none; background:#ffffff;" />
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+                  <label style="font-weight:800; font-size:0.75rem; color:#1e293b;">Telegram Bot Token:</label>
+                  <a href="https://t.me/BotFather" target="_blank" rel="noopener noreferrer" style="font-size:0.68rem; color:#0284c7; text-decoration:underline; font-weight:700;">Lấy Token tại @BotFather ↗</a>
+                </div>
+                <input type="text" id="tg-cfg-token" placeholder="Ví dụ: 123456789:ABCdefGhIJKlmNoPQRstuVWXyz..." style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:8px 10px; font-size:0.8rem; outline:none; background:#ffffff; box-shadow:0 1px 2px rgba(0,0,0,0.04);" />
               </div>
               <div>
-                <label style="font-weight:800; font-size:0.75rem; color:#334155; display:block; margin-bottom:4px;">Telegram Chat ID (Nhóm hoặc Cá nhân):</label>
-                <input type="text" id="tg-cfg-chatid" placeholder="Ví dụ: -1001234567890 hoặc 987654321" style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:8px 10px; font-size:0.8rem; outline:none; background:#ffffff;" />
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+                  <label style="font-weight:800; font-size:0.75rem; color:#1e293b;">Telegram Chat ID (Cá nhân hoặc Nhóm):</label>
+                  <a href="https://t.me/userinfobot" target="_blank" rel="noopener noreferrer" style="font-size:0.68rem; color:#0284c7; text-decoration:underline; font-weight:700;">Lấy Chat ID tại @userinfobot ↗</a>
+                </div>
+                <input type="text" id="tg-cfg-chatid" placeholder="Ví dụ: -1001234567890 (nhóm) hoặc 987654321 (cá nhân)" style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:8px 10px; font-size:0.8rem; outline:none; background:#ffffff; box-shadow:0 1px 2px rgba(0,0,0,0.04);" />
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. BỘ LỌC CẢNH BÁO TELEGRAM -->
+          <div style="display:flex; flex-direction:column; gap:14px;">
+            <!-- Hidden inputs/selects for backward compatibility -->
+            <select id="tg-cfg-region" style="display:none;">
+              <option value="osaka">osaka</option>
+              <option value="tokyo">tokyo</option>
+              <option value="nagoya">nagoya</option>
+              <option value="all">all</option>
+            </select>
+            <select id="tg-cfg-status" style="display:none;">
+              <option value="in">in</option>
+              <option value="onsite">onsite</option>
+              <option value="recent">recent</option>
+              <option value="all">all</option>
+            </select>
+            <select id="tg-cfg-chain" style="display:none;">
+              <option value="all">all</option>
+              <option value="conbini">conbini</option>
+              <option value="seven">seven</option>
+              <option value="lawson">lawson</option>
+              <option value="familymart">familymart</option>
+              <option value="ministop">ministop</option>
+              <option value="specialty">specialty</option>
+              <option value="electronics">electronics</option>
+            </select>
+            <select id="tg-cfg-time" style="display:none;">
+              <option value="realtime">realtime</option>
+              <option value="1">1</option>
+              <option value="3">3</option>
+              <option value="24">24</option>
+              <option value="all">all</option>
+            </select>
+
+            <!-- A. KHU VỰC GỬI TIN -->
+            <div>
+              <div class="filter-group-title">📍 Vùng nhận thông báo (地域・エリア)</div>
+              <div class="filter-options-grid" id="tg-modal-region-group">
+                <button type="button" class="filter-option-btn active" data-val="osaka" onclick="selectTgModalRegion('osaka')">
+                  📍 Osaka &amp; Kansai (大阪府周辺)
+                </button>
+                <button type="button" class="filter-option-btn" data-val="tokyo" onclick="selectTgModalRegion('tokyo')">
+                  🗼 Tokyo &amp; Kanto (東京・神奈川・千葉)
+                </button>
+                <button type="button" class="filter-option-btn" data-val="nagoya" onclick="selectTgModalRegion('nagoya')">
+                  🏯 Nagoya &amp; Tokai (愛知・岐阜・三重)
+                </button>
+                <button type="button" class="filter-option-btn" data-val="all" onclick="selectTgModalRegion('all')">
+                  🌐 Toàn quốc (Tất cả khu vực)
+                </button>
               </div>
             </div>
 
-            <!-- Bộ lọc tin nhắn gửi Telegram -->
-            <div style="border-top:1px dashed #bae6fd; padding-top:10px; margin-bottom:10px;">
-              <div style="font-weight:800; color:#0f172a; font-size:0.78rem; margin-bottom:8px; display:flex; align-items:center; gap:5px;">
-                <span>🎯</span> <span>Bộ lọc cảnh báo gửi Telegram:</span>
-              </div>
-
-              <!-- Grid 2 cột -->
-              <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-                <div>
-                  <label style="font-size:0.7rem; font-weight:700; color:#475569; display:block; margin-bottom:3px;">📍 Khu vực:</label>
-                  <select id="tg-cfg-region" style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:6px 8px; font-size:0.75rem; font-weight:700; color:#1e293b; background:#ffffff;">
-                    <option value="osaka">📍 Osaka &amp; Kansai</option>
-                    <option value="tokyo">📍 Tokyo &amp; Kanto</option>
-                    <option value="nagoya">📍 Nagoya &amp; Tokai</option>
-                    <option value="all">🗾 Toàn quốc</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label style="font-size:0.7rem; font-weight:700; color:#475569; display:block; margin-bottom:3px;">📊 Trạng thái:</label>
-                  <select id="tg-cfg-status" style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:6px 8px; font-size:0.75rem; font-weight:700; color:#1e293b; background:#ffffff;">
-                    <option value="in">🟢 Chỉ khi có hàng</option>
-                    <option value="onsite">📸 Chỉ tin tại quán (GPS)</option>
-                    <option value="recent">★ Có hàng &amp; Từng có</option>
-                    <option value="all">🌐 Nhận tất cả tin</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label style="font-size:0.7rem; font-weight:700; color:#475569; display:block; margin-bottom:3px;">🏢 Chuỗi:</label>
-                  <select id="tg-cfg-chain" style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:6px 8px; font-size:0.75rem; font-weight:700; color:#1e293b; background:#ffffff;">
-                    <option value="all">🏢 Tất cả các chuỗi</option>
-                    <option value="conbini">🏪 Tất cả Conbini</option>
-                    <option value="seven">🏪 7-Eleven</option>
-                    <option value="lawson">🏪 Lawson</option>
-                    <option value="familymart">🏪 FamilyMart</option>
-                    <option value="ministop">🏪 Ministop</option>
-                    <option value="specialty">🃏 Card Shop chuyên</option>
-                    <option value="electronics">🎮 Điện máy, GEO</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label style="font-size:0.7rem; font-weight:700; color:#475569; display:block; margin-bottom:3px;">⏱️ Độ mới:</label>
-                  <select id="tg-cfg-time" style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:6px 8px; font-size:0.75rem; font-weight:700; color:#1e293b; background:#ffffff;">
-                    <option value="1">⚡ Trong vòng 1 giờ</option>
-                    <option value="3">⏱ Trong vòng 3 giờ</option>
-                    <option value="6">⏱ Trong vòng 6 giờ</option>
-                    <option value="24" selected>📅 Trong vòng 24 giờ</option>
-                    <option value="all">⏳ Toàn bộ thời gian</option>
-                  </select>
-                </div>
+            <!-- B. ĐIỀU KIỆN TRẠNG THÁI -->
+            <div>
+              <div class="filter-group-title">📊 Điều kiện trạng thái gửi tin</div>
+              <div class="filter-options-grid" id="tg-modal-status-group">
+                <button type="button" class="filter-option-btn active" data-val="in" onclick="selectTgModalStatus('in')">
+                  🟢 Chỉ khi CÓ HÀNG (Khuyên dùng)
+                </button>
+                <button type="button" class="filter-option-btn" data-val="onsite" onclick="selectTgModalStatus('onsite')">
+                  📸 Có hàng tại quán (Xác nhận GPS)
+                </button>
+                <button type="button" class="filter-option-btn" data-val="recent" onclick="selectTgModalStatus('recent')">
+                  ★ Có hàng &amp; Từng có gần đây
+                </button>
+                <button type="button" class="filter-option-btn" data-val="all" onclick="selectTgModalStatus('all')">
+                  🌐 Tất cả tin báo (Gồm hết hàng)
+                </button>
               </div>
             </div>
 
-            <div id="tg-test-result" style="display:none; padding:8px 10px; border-radius:8px; font-size:0.75rem; font-weight:700; margin-top:8px;"></div>
-
-            <!-- Buttons test & save -->
-            <div style="display:flex; gap:8px; margin-top:10px;">
-              <button type="button" onclick="testTelegramWebhook()" style="flex:1; padding:9px 10px; background:#ffffff; color:#0369a1; border:1px solid #bae6fd; border-radius:8px; font-weight:800; font-size:0.78rem; cursor:pointer;">
-                🔔 Gửi test
-              </button>
-              <button type="button" onclick="saveTelegramConfig()" style="flex:2; padding:9px 10px; background:#0284c7; color:#ffffff; border:none; border-radius:8px; font-weight:800; font-size:0.78rem; cursor:pointer;">
-                💾 Lưu cấu hình Telegram
-              </button>
+            <!-- C. CHUỖI CỬA HÀNG -->
+            <div>
+              <div class="filter-group-title">🏢 Chuỗi cửa hàng muốn nhận cảnh báo</div>
+              <div class="filter-options-grid" id="tg-modal-chain-group">
+                <button type="button" class="filter-option-btn active" data-val="all" onclick="selectTgModalChain('all')">
+                  🏢 Tất cả các chuỗi
+                </button>
+                <button type="button" class="filter-option-btn" data-val="conbini" onclick="selectTgModalChain('conbini')">
+                  🏪 Tất cả Conbini
+                </button>
+                <button type="button" class="filter-option-btn" data-val="seven" onclick="selectTgModalChain('seven')">
+                  🏪 7-Eleven
+                </button>
+                <button type="button" class="filter-option-btn" data-val="lawson" onclick="selectTgModalChain('lawson')">
+                  🏪 Lawson
+                </button>
+                <button type="button" class="filter-option-btn" data-val="familymart" onclick="selectTgModalChain('familymart')">
+                  🏪 FamilyMart
+                </button>
+                <button type="button" class="filter-option-btn" data-val="ministop" onclick="selectTgModalChain('ministop')">
+                  🏪 Ministop
+                </button>
+                <button type="button" class="filter-option-btn" data-val="specialty" onclick="selectTgModalChain('specialty')">
+                  🃏 Card Shop chuyên
+                </button>
+                <button type="button" class="filter-option-btn" data-val="electronics" onclick="selectTgModalChain('electronics')">
+                  🎮 Điện máy, GEO
+                </button>
+              </div>
             </div>
+
+            <!-- D. ĐỘ TƯƠI MỚI / THỜI GIAN BÁO -->
+            <div>
+              <div class="filter-group-title">⏱️ Độ mới của báo cáo (Tránh tin cũ)</div>
+              <div class="filter-options-grid" id="tg-modal-time-group">
+                <button type="button" class="filter-option-btn" data-val="realtime" onclick="selectTgModalTime('realtime')">
+                  ⚡ Tức thì (Vừa báo ≤ 5 phút)
+                </button>
+                <button type="button" class="filter-option-btn" data-val="1" onclick="selectTgModalTime('1')">
+                  ⏱️ Trong vòng 1 giờ
+                </button>
+                <button type="button" class="filter-option-btn" data-val="3" onclick="selectTgModalTime('3')">
+                  ⏱️ Trong vòng 3 giờ
+                </button>
+                <button type="button" class="filter-option-btn active" data-val="24" onclick="selectTgModalTime('24')">
+                  📅 Trong vòng 24 giờ
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div id="tg-test-result" style="display:none; padding:10px 12px; border-radius:8px; font-size:0.75rem; font-weight:700; margin-top:4px;"></div>
+
+          <!-- Buttons test & save -->
+          <div style="display:flex; gap:10px; margin-top:8px; padding-top:12px; border-top:1px solid #e2e8f0;">
+            <button type="button" onclick="testTelegramWebhook()" style="flex:1; padding:10px 12px; background:#f0f9ff; color:#0369a1; border:1px solid #bae6fd; border-radius:10px; font-weight:800; font-size:0.8rem; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;">
+              <span>🔔</span> <span>Gửi tin test</span>
+            </button>
+            <button type="button" onclick="saveTelegramConfig()" style="flex:2; padding:10px 14px; background:#0284c7; color:#ffffff; border:none; border-radius:10px; font-weight:800; font-size:0.82rem; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; box-shadow:0 2px 6px rgba(2, 132, 199, 0.3);">
+              <span>💾</span> <span>Lưu cấu hình Telegram</span>
+            </button>
           </div>
         </div>
 
@@ -2505,6 +2583,69 @@ def render_map_page() -> str:
     function onTelegramToggleChange(checked) {
       const slider = document.getElementById('tg-cfg-slider');
       if (slider) slider.style.background = checked ? '#0284c7' : '#cbd5e1';
+      const badge = document.getElementById('tg-status-badge');
+      if (badge) {
+        badge.innerText = checked ? '🟢 Đang BẬT' : '⚪ Đang TẮT';
+        badge.style.background = checked ? '#dcfce7' : '#e2e8f0';
+        badge.style.color = checked ? '#15803d' : '#475569';
+      }
+    }
+
+    function syncTelegramModalUI() {
+      const regionEl = document.getElementById('tg-cfg-region');
+      const statusEl = document.getElementById('tg-cfg-status');
+      const chainEl = document.getElementById('tg-cfg-chain');
+      const timeEl = document.getElementById('tg-cfg-time');
+
+      const region = regionEl ? regionEl.value : (configData.telegramRegion || 'osaka');
+      const status = statusEl ? statusEl.value : (configData.telegramStatus || 'in');
+      const chain = chainEl ? chainEl.value : (configData.telegramChain || 'all');
+      const time = timeEl ? String(timeEl.value) : String(configData.telegramTime || '24');
+
+      document.querySelectorAll('#tg-modal-region-group .filter-option-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-val') === region);
+      });
+      document.querySelectorAll('#tg-modal-status-group .filter-option-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-val') === status);
+      });
+      document.querySelectorAll('#tg-modal-chain-group .filter-option-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-val') === chain);
+      });
+      document.querySelectorAll('#tg-modal-time-group .filter-option-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-val') === time);
+      });
+    }
+
+    function selectTgModalRegion(val) {
+      const el = document.getElementById('tg-cfg-region');
+      if (el) el.value = val;
+      document.querySelectorAll('#tg-modal-region-group .filter-option-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-val') === val);
+      });
+    }
+
+    function selectTgModalStatus(val) {
+      const el = document.getElementById('tg-cfg-status');
+      if (el) el.value = val;
+      document.querySelectorAll('#tg-modal-status-group .filter-option-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-val') === val);
+      });
+    }
+
+    function selectTgModalChain(val) {
+      const el = document.getElementById('tg-cfg-chain');
+      if (el) el.value = val;
+      document.querySelectorAll('#tg-modal-chain-group .filter-option-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-val') === val);
+      });
+    }
+
+    function selectTgModalTime(val) {
+      const el = document.getElementById('tg-cfg-time');
+      if (el) el.value = val;
+      document.querySelectorAll('#tg-modal-time-group .filter-option-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-val') === val);
+      });
     }
 
     function openTelegramModal() {
@@ -2526,6 +2667,9 @@ def render_map_page() -> str:
       });
       if (tabName === 'map' && typeof syncMapFilterModalUI === 'function') {
         syncMapFilterModalUI();
+      }
+      if (tabName === 'telegram' && typeof syncTelegramModalUI === 'function') {
+        syncTelegramModalUI();
       }
     }
 
@@ -2573,6 +2717,7 @@ def render_map_page() -> str:
       mapModalTempChain = mapChainFilter;
 
       switchSettingsTab(initialTab || 'map');
+      syncTelegramModalUI();
       document.getElementById('settings-modal').classList.add('open');
     }
     function closeSettingsModal() { document.getElementById('settings-modal').classList.remove('open'); }
@@ -2636,46 +2781,92 @@ def render_map_page() -> str:
       configData.telegramTime = time;
       configData.telegramRegion = region;
 
-      await fetch('/api/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          notifications: {
-            telegramBotToken: token, telegramChatId: chatId, telegramEnabled: enabled,
-            telegramStatus: status, telegramChain: chain, telegramTime: time, telegramRegion: region
-          }
-        })
-      });
-      alert('Đã lưu cấu hình Telegram thành công! ✅');
+      const resEl = document.getElementById('tg-test-result');
+      if (resEl) {
+        resEl.style.display = 'block';
+        resEl.style.background = '#f0f9ff';
+        resEl.style.color = '#0369a1';
+        resEl.innerText = '⏳ Đang lưu cấu hình Telegram...';
+      }
+
+      try {
+        const res = await fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            notifications: {
+              telegramBotToken: token, telegramChatId: chatId, telegramEnabled: enabled,
+              telegramStatus: status, telegramChain: chain, telegramTime: time, telegramRegion: region
+            }
+          })
+        });
+        const d = await res.json();
+        if (resEl) {
+          resEl.style.background = '#dcfce7';
+          resEl.style.color = '#15803d';
+          resEl.innerText = '✅ Đã lưu cấu hình và bộ lọc Telegram thành công!';
+          setTimeout(() => { if (resEl) resEl.style.display = 'none'; }, 4000);
+        }
+      } catch(e) {
+        if (resEl) {
+          resEl.style.background = '#fee2e2';
+          resEl.style.color = '#b91c1c';
+          resEl.innerText = '❌ Lỗi khi lưu cấu hình';
+        }
+      }
     }
 
     async function testTelegramWebhook() {
       const resEl = document.getElementById('tg-test-result');
       const token = (document.getElementById('tg-cfg-token') ? document.getElementById('tg-cfg-token').value : '').trim();
       const chatId = (document.getElementById('tg-cfg-chatid') ? document.getElementById('tg-cfg-chatid').value : '').trim();
+      const status = document.getElementById('tg-cfg-status') ? document.getElementById('tg-cfg-status').value : 'in';
+      const chain = document.getElementById('tg-cfg-chain') ? document.getElementById('tg-cfg-chain').value : 'all';
+      const time = document.getElementById('tg-cfg-time') ? document.getElementById('tg-cfg-time').value : '24';
+      const region = document.getElementById('tg-cfg-region') ? document.getElementById('tg-cfg-region').value : 'osaka';
+
       if (!token || !chatId) {
-        alert('Vui lòng nhập Token và Chat ID trước khi gửi test!');
+        if (resEl) {
+          resEl.style.display = 'block';
+          resEl.style.background = '#fef2f2';
+          resEl.style.color = '#b91c1c';
+          resEl.innerText = '⚠️ Vui lòng nhập Bot Token và Chat ID trước khi gửi test!';
+        }
         return;
       }
-      resEl.style.display = 'block';
-      resEl.style.background = '#f1f5f9';
-      resEl.innerText = 'Đang gửi tin test...';
+      if (resEl) {
+        resEl.style.display = 'block';
+        resEl.style.background = '#f0f9ff';
+        resEl.style.color = '#0369a1';
+        resEl.innerText = '⏳ Đang gửi tin nhắn kiểm tra đến Telegram...';
+      }
       try {
         const res = await fetch('/api/notify/webhook', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             is_test: true,
-            store: { id: 'test', name: 'Pokémon Center Test', chain: 'specialty', address: 'Osaka Namba', lat: 34.6667, lng: 135.5000, pref: 'osaka' },
+            notifications: {
+              telegramBotToken: token, telegramChatId: chatId, telegramEnabled: true,
+              telegramStatus: status, telegramChain: chain, telegramTime: time, telegramRegion: region
+            },
+            store: { id: 'test', name: 'Pokémon Center Test (Osaka)', chain: 'specialty', address: 'Osaka Namba, Chuo-ku', lat: 34.6667, lng: 135.5000, pref: 'osaka' },
             info: { status_code: 'i', code: 'i', onsite: true, reported_at: 'Vừa xong', timeAgo: 'Vừa xong', packs: ['Terastal Festival'] }
           })
         });
         const d = await res.json();
-        resEl.style.background = d.status === 'ok' ? '#dcfce7' : '#fee2e2';
-        resEl.innerText = d.status === 'ok' ? '✅ Gửi test thành công!' : `❌ Lỗi: ${JSON.stringify(d)}`;
+        if (resEl) {
+          const isSuccess = (d.status === 'ok' && (!d.results || d.results.telegram === 'ok'));
+          resEl.style.background = isSuccess ? '#dcfce7' : '#fee2e2';
+          resEl.style.color = isSuccess ? '#15803d' : '#b91c1c';
+          resEl.innerText = isSuccess ? '✅ Gửi tin nhắn test thành công! Hãy kiểm tra Telegram.' : `❌ Lỗi: ${d.error || (d.results && d.results.telegram) || JSON.stringify(d)}`;
+        }
       } catch(e) {
-        resEl.style.background = '#fee2e2';
-        resEl.innerText = '❌ Không thể kết nối máy chủ';
+        if (resEl) {
+          resEl.style.background = '#fee2e2';
+          resEl.style.color = '#b91c1c';
+          resEl.innerText = '❌ Không thể kết nối máy chủ';
+        }
       }
     }
 
@@ -4556,6 +4747,69 @@ def render_thongbao_page() -> str:
     function onTelegramToggleChange(checked) {
       const slider = document.getElementById('tg-cfg-slider');
       if (slider) slider.style.background = checked ? '#0284c7' : '#cbd5e1';
+      const badge = document.getElementById('tg-status-badge');
+      if (badge) {
+        badge.innerText = checked ? '🟢 Đang BẬT' : '⚪ Đang TẮT';
+        badge.style.background = checked ? '#dcfce7' : '#e2e8f0';
+        badge.style.color = checked ? '#15803d' : '#475569';
+      }
+    }
+
+    function syncTelegramModalUI() {
+      const regionEl = document.getElementById('tg-cfg-region');
+      const statusEl = document.getElementById('tg-cfg-status');
+      const chainEl = document.getElementById('tg-cfg-chain');
+      const timeEl = document.getElementById('tg-cfg-time');
+
+      const region = regionEl ? regionEl.value : (configData.telegramRegion || 'osaka');
+      const status = statusEl ? statusEl.value : (configData.telegramStatus || 'in');
+      const chain = chainEl ? chainEl.value : (configData.telegramChain || 'all');
+      const time = timeEl ? String(timeEl.value) : String(configData.telegramTime || '24');
+
+      document.querySelectorAll('#tg-modal-region-group .filter-option-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-val') === region);
+      });
+      document.querySelectorAll('#tg-modal-status-group .filter-option-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-val') === status);
+      });
+      document.querySelectorAll('#tg-modal-chain-group .filter-option-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-val') === chain);
+      });
+      document.querySelectorAll('#tg-modal-time-group .filter-option-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-val') === time);
+      });
+    }
+
+    function selectTgModalRegion(val) {
+      const el = document.getElementById('tg-cfg-region');
+      if (el) el.value = val;
+      document.querySelectorAll('#tg-modal-region-group .filter-option-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-val') === val);
+      });
+    }
+
+    function selectTgModalStatus(val) {
+      const el = document.getElementById('tg-cfg-status');
+      if (el) el.value = val;
+      document.querySelectorAll('#tg-modal-status-group .filter-option-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-val') === val);
+      });
+    }
+
+    function selectTgModalChain(val) {
+      const el = document.getElementById('tg-cfg-chain');
+      if (el) el.value = val;
+      document.querySelectorAll('#tg-modal-chain-group .filter-option-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-val') === val);
+      });
+    }
+
+    function selectTgModalTime(val) {
+      const el = document.getElementById('tg-cfg-time');
+      if (el) el.value = val;
+      document.querySelectorAll('#tg-modal-time-group .filter-option-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-val') === val);
+      });
     }
 
     function openTelegramModal() {
@@ -4578,6 +4832,9 @@ def render_thongbao_page() -> str:
       });
       if (tabName === 'map' && typeof syncMapFilterModalUI === 'function') {
         syncMapFilterModalUI();
+      }
+      if (tabName === 'telegram' && typeof syncTelegramModalUI === 'function') {
+        syncTelegramModalUI();
       }
     }
 
@@ -4666,6 +4923,7 @@ def render_thongbao_page() -> str:
       } catch(e) {}
 
       switchSettingsTab(initialTab || 'map');
+      syncTelegramModalUI();
       document.getElementById('settings-modal').classList.add('open');
     }
     function closeSettingsModal() { document.getElementById('settings-modal').classList.remove('open'); }
@@ -4725,17 +4983,39 @@ def render_thongbao_page() -> str:
       configData.telegramTime = time;
       configData.telegramRegion = region;
 
-      await fetch('/api/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          notifications: {
-            telegramBotToken: token, telegramChatId: chatId, telegramEnabled: enabled,
-            telegramStatus: status, telegramChain: chain, telegramTime: time, telegramRegion: region
-          }
-        })
-      });
-      alert('Đã lưu cấu hình Telegram thành công! ✅');
+      const resEl = document.getElementById('tg-test-result');
+      if (resEl) {
+        resEl.style.display = 'block';
+        resEl.style.background = '#f0f9ff';
+        resEl.style.color = '#0369a1';
+        resEl.innerText = '⏳ Đang lưu cấu hình Telegram...';
+      }
+
+      try {
+        const res = await fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            notifications: {
+              telegramBotToken: token, telegramChatId: chatId, telegramEnabled: enabled,
+              telegramStatus: status, telegramChain: chain, telegramTime: time, telegramRegion: region
+            }
+          })
+        });
+        const d = await res.json();
+        if (resEl) {
+          resEl.style.background = '#dcfce7';
+          resEl.style.color = '#15803d';
+          resEl.innerText = '✅ Đã lưu cấu hình và bộ lọc Telegram thành công!';
+          setTimeout(() => { if (resEl) resEl.style.display = 'none'; }, 4000);
+        }
+      } catch(e) {
+        if (resEl) {
+          resEl.style.background = '#fee2e2';
+          resEl.style.color = '#b91c1c';
+          resEl.innerText = '❌ Lỗi khi lưu cấu hình';
+        }
+      }
       renderStoreList();
     }
 
@@ -4743,29 +5023,53 @@ def render_thongbao_page() -> str:
       const resEl = document.getElementById('tg-test-result');
       const token = (document.getElementById('tg-cfg-token') ? document.getElementById('tg-cfg-token').value : '').trim();
       const chatId = (document.getElementById('tg-cfg-chatid') ? document.getElementById('tg-cfg-chatid').value : '').trim();
+      const status = document.getElementById('tg-cfg-status') ? document.getElementById('tg-cfg-status').value : 'in';
+      const chain = document.getElementById('tg-cfg-chain') ? document.getElementById('tg-cfg-chain').value : 'all';
+      const time = document.getElementById('tg-cfg-time') ? document.getElementById('tg-cfg-time').value : '24';
+      const region = document.getElementById('tg-cfg-region') ? document.getElementById('tg-cfg-region').value : 'osaka';
+
       if (!token || !chatId) {
-        alert('Vui lòng nhập Token và Chat ID trước khi gửi test!');
+        if (resEl) {
+          resEl.style.display = 'block';
+          resEl.style.background = '#fef2f2';
+          resEl.style.color = '#b91c1c';
+          resEl.innerText = '⚠️ Vui lòng nhập Bot Token và Chat ID trước khi gửi test!';
+        }
         return;
       }
-      resEl.style.display = 'block';
-      resEl.style.background = '#f1f5f9';
-      resEl.innerText = 'Đang gửi tin test...';
+      if (resEl) {
+        resEl.style.display = 'block';
+        resEl.style.background = '#f0f9ff';
+        resEl.style.color = '#0369a1';
+        resEl.innerText = '⏳ Đang gửi tin nhắn kiểm tra đến Telegram...';
+      }
       try {
         const res = await fetch('/api/notify/webhook', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             is_test: true,
-            store: { id: 'test', name: 'Pokémon Center Test', chain: 'specialty', address: 'Osaka Namba', lat: 34.6667, lng: 135.5000, pref: 'osaka' },
+            notifications: {
+              telegramBotToken: token, telegramChatId: chatId, telegramEnabled: true,
+              telegramStatus: status, telegramChain: chain, telegramTime: time, telegramRegion: region
+            },
+            store: { id: 'test', name: 'Pokémon Center Test (Osaka)', chain: 'specialty', address: 'Osaka Namba, Chuo-ku', lat: 34.6667, lng: 135.5000, pref: 'osaka' },
             info: { status_code: 'i', code: 'i', onsite: true, reported_at: 'Vừa xong', timeAgo: 'Vừa xong', packs: ['Terastal Festival'] }
           })
         });
         const d = await res.json();
-        resEl.style.background = d.status === 'ok' ? '#dcfce7' : '#fee2e2';
-        resEl.innerText = d.status === 'ok' ? '✅ Gửi test thành công!' : `❌ Lỗi: ${JSON.stringify(d)}`;
+        if (resEl) {
+          const isSuccess = (d.status === 'ok' && (!d.results || d.results.telegram === 'ok'));
+          resEl.style.background = isSuccess ? '#dcfce7' : '#fee2e2';
+          resEl.style.color = isSuccess ? '#15803d' : '#b91c1c';
+          resEl.innerText = isSuccess ? '✅ Gửi tin nhắn test thành công! Hãy kiểm tra Telegram.' : `❌ Lỗi: ${d.error || (d.results && d.results.telegram) || JSON.stringify(d)}`;
+        }
       } catch(e) {
-        resEl.style.background = '#fee2e2';
-        resEl.innerText = '❌ Không thể kết nối máy chủ';
+        if (resEl) {
+          resEl.style.background = '#fee2e2';
+          resEl.style.color = '#b91c1c';
+          resEl.innerText = '❌ Không thể kết nối máy chủ';
+        }
       }
     }
     function openBulletinModal() { document.getElementById('bulletin-modal').classList.add('open'); }

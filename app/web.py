@@ -23,6 +23,7 @@ Features:
 import sys
 import os
 import json
+import time
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Query, Request
 from fastapi.middleware.gzip import GZipMiddleware
@@ -319,9 +320,31 @@ def on_csdl_report_added(store: dict, entry: dict):
         rep_ts = int(entry.get("timestamp") or 0)
 
         # 1. Freshness guard: NEVER notify for old historical reports!
-        # Only notify reports submitted within the last 5 minutes (300s) - tức là VỪA CÓ NGƯỜI BÁO CÁO TỨC THÌ
-        if rep_ts <= 0 or (now_ts - rep_ts > 300):
-            print(f"  [CSDL -> Telegram] Bỏ qua báo cáo không mới tức thì: ts={rep_ts}, tuổi={(now_ts - rep_ts)/60:.1f} phút (> 5 phút)")
+        rep_ts = int(entry.get("timestamp") or 0)
+        now_ts = int(time.time())
+
+        # Check configured freshness/time window
+        tg_time = str(notif_cfg.get("telegramTime", "24")).lower()
+        if tg_time in ["realtime", "0"]:
+            max_age = 300  # 5 minutes
+        elif tg_time == "1":
+            max_age = 3600  # 1 hour
+        elif tg_time == "3":
+            max_age = 3 * 3600  # 3 hours
+        elif tg_time == "6":
+            max_age = 6 * 3600  # 6 hours
+        elif tg_time == "24":
+            max_age = 24 * 3600  # 24 hours
+        elif tg_time == "all":
+            max_age = 7 * 86400  # 7 days
+        else:
+            try:
+                max_age = int(tg_time) * 3600
+            except Exception:
+                max_age = 24 * 3600
+
+        if rep_ts <= 0 or (now_ts - rep_ts > max_age):
+            print(f"  [CSDL -> Telegram] Bỏ qua báo cáo không thỏa độ mới ({tg_time}): ts={rep_ts}, tuổi={(now_ts - rep_ts)/60:.1f} phút (> {max_age/60:.0f} phút)")
             return
 
         # 2. Telegram enabled time guard:
@@ -331,22 +354,25 @@ def on_csdl_report_added(store: dict, entry: dict):
             print(f"  [CSDL -> Telegram] Bỏ qua báo cáo phát sinh trước khi bật Telegram: ts={rep_ts} < enabled_at={tg_enabled_at}")
             return
 
-        # Check region filter
-        tg_reg = notif_cfg.get("telegramRegion", "osaka")
+        # 3. Check region filter (supporting multi-prefecture regions)
+        tg_reg = (notif_cfg.get("telegramRegion") or "osaka").lower()
         store_pref = (store.get("pref") or "osaka").lower()
-        if tg_reg != "all" and tg_reg != store_pref:
+        allowed_prefs = REGION_PREFS.get(tg_reg, [tg_reg])
+        if tg_reg != "all" and store_pref not in allowed_prefs:
             return
 
-        # Check status filter
+        # 4. Check status filter
         code = entry.get("status_code", "i")
-        tg_status = notif_cfg.get("telegramStatus", "in")
+        tg_status = (notif_cfg.get("telegramStatus") or "in").lower()
         if tg_status == "in" and code != "i":
             return
         if tg_status == "onsite" and (code != "i" or not entry.get("onsite")):
             return
+        if tg_status == "recent" and code not in ["i", "w", "c"]:
+            return
 
-        # Check chain filter
-        tg_chain = notif_cfg.get("telegramChain", "all")
+        # 5. Check chain filter
+        tg_chain = (notif_cfg.get("telegramChain") or "all").lower()
         st_chain = (store.get("chain") or "").lower()
         if tg_chain != "all":
             if tg_chain == "conbini" and st_chain not in ["seven", "lawson", "familymart", "ministop"]:
@@ -382,7 +408,7 @@ async def send_webhook_notification(request: Request):
         is_test = bool(body.get("is_test", False))
         
         user_settings = load_user_settings()
-        notif_cfg = user_settings.get("notifications", {})
+        notif_cfg = {**user_settings.get("notifications", {}), **(body.get("notifications") or {})}
 
         if is_test:
             test_store = store or {
@@ -402,7 +428,11 @@ async def send_webhook_notification(request: Request):
                 "note": "Kiểm tra kết nối Telegram Bot thành công"
             }
             res = send_telegram_alert(test_store, test_info, notif_cfg, is_test=True)
-            return JSONResponse(content={"status": "ok", "results": {"telegram": res.get("status", "ok")}})
+            st = res.get("status", "ok")
+            if st == "ok":
+                return JSONResponse(content={"status": "ok", "results": {"telegram": "ok"}})
+            else:
+                return JSONResponse(content={"status": "error", "error": f"Telegram API: {st}", "results": {"telegram": st}})
 
         # Ingest into SQLite database
         sid = store.get("id") or info.get("store_id")

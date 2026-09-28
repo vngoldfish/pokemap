@@ -643,3 +643,97 @@ def test_map_filter_persistence():
     assert "localStorage.getItem('poketan_map_chain')" in map_html
 
 
+# ==============================================================================
+# 14. Telegram Filter Tab Structure & UI Logic
+# ==============================================================================
+
+def test_telegram_filter_tab_structure():
+    """Verify Telegram settings tab has rich filter chips and synchronized controls."""
+    map_html = render_map_page()
+    tb_html = render_thongbao_page()
+
+    for name, html in [("map", map_html), ("thongbao", tb_html)]:
+        # Header & Status Badge
+        assert 'id="settings-pane-telegram"' in html, f"Missing #settings-pane-telegram in {name}"
+        assert 'id="tg-status-badge"' in html, f"Missing #tg-status-badge in {name}"
+        assert 'id="tg-cfg-enabled"' in html, f"Missing #tg-cfg-enabled in {name}"
+        assert 'id="tg-cfg-token"' in html, f"Missing #tg-cfg-token in {name}"
+        assert 'id="tg-cfg-chatid"' in html, f"Missing #tg-cfg-chatid in {name}"
+
+        # 4 Filter Groups
+        assert 'id="tg-modal-region-group"' in html, f"Missing #tg-modal-region-group in {name}"
+        assert 'id="tg-modal-status-group"' in html, f"Missing #tg-modal-status-group in {name}"
+        assert 'id="tg-modal-chain-group"' in html, f"Missing #tg-modal-chain-group in {name}"
+        assert 'id="tg-modal-time-group"' in html, f"Missing #tg-modal-time-group in {name}"
+
+        # Underlying hidden inputs for backward compatibility
+        assert 'id="tg-cfg-region"' in html, f"Missing #tg-cfg-region in {name}"
+        assert 'id="tg-cfg-status"' in html, f"Missing #tg-cfg-status in {name}"
+        assert 'id="tg-cfg-chain"' in html, f"Missing #tg-cfg-chain in {name}"
+        assert 'id="tg-cfg-time"' in html, f"Missing #tg-cfg-time in {name}"
+
+        # JS functions
+        assert "function syncTelegramModalUI(" in html, f"Missing syncTelegramModalUI in {name}"
+        assert "function selectTgModalRegion(" in html, f"Missing selectTgModalRegion in {name}"
+        assert "function selectTgModalStatus(" in html, f"Missing selectTgModalStatus in {name}"
+        assert "function selectTgModalChain(" in html, f"Missing selectTgModalChain in {name}"
+        assert "function selectTgModalTime(" in html, f"Missing selectTgModalTime in {name}"
+        assert "function saveTelegramConfig(" in html, f"Missing saveTelegramConfig in {name}"
+        assert "function testTelegramWebhook(" in html, f"Missing testTelegramWebhook in {name}"
+
+
+# ==============================================================================
+# 15. Telegram Backend Dispatch Filter Logic
+# ==============================================================================
+
+def test_telegram_backend_dispatch_filters():
+    """Verify on_csdl_report_added correctly handles multi-prefecture regions and filters."""
+    import time
+    from unittest.mock import patch
+    from app.web import on_csdl_report_added
+
+    now = int(time.time())
+
+    # 1. Tokyo region should accept Kanagawa store
+    sent_alerts = []
+    def fake_send(store, entry, notif_cfg, is_test=False):
+        sent_alerts.append((store, entry))
+        return {"status": "ok"}
+
+    fake_cfg = {
+        "notifications": {
+            "telegramEnabled": True,
+            "telegramRegion": "tokyo",
+            "telegramStatus": "in",
+            "telegramChain": "all",
+            "telegramTime": "24",
+            "telegramEnabledAt": now - 3600
+        }
+    }
+
+    with patch("app.web.load_user_settings", return_value=fake_cfg), \
+         patch("app.web.send_telegram_alert", side_effect=fake_send):
+        
+        # Kanagawa store should be ACCEPTED for Tokyo region
+        kanagawa_store = {"id": "st_kn_1", "name": "7-Eleven Yokohama", "chain": "seven", "pref": "kanagawa"}
+        report_in = {"status_code": "i", "timestamp": now - 60, "onsite": False}
+        on_csdl_report_added(kanagawa_store, report_in)
+        assert len(sent_alerts) == 1, "Kanagawa store should be accepted for tokyo region"
+
+        # Osaka store should be REJECTED for Tokyo region
+        osaka_store = {"id": "st_os_1", "name": "7-Eleven Umeda", "chain": "seven", "pref": "osaka"}
+        on_csdl_report_added(osaka_store, report_in)
+        assert len(sent_alerts) == 1, "Osaka store should be rejected for tokyo region"
+
+        # Status 'o' (sold out) should be REJECTED when status filter is 'in'
+        report_out = {"status_code": "o", "timestamp": now - 60, "onsite": False}
+        on_csdl_report_added(kanagawa_store, report_out)
+        assert len(sent_alerts) == 1, "Sold out report should be rejected when status filter is 'in'"
+
+        # Outdated report (> max_age) should be REJECTED
+        report_stale = {"status_code": "i", "timestamp": now - 90000, "onsite": False}
+        on_csdl_report_added(kanagawa_store, report_stale)
+        assert len(sent_alerts) == 1, "Report older than 24h should be rejected"
+
+
+
