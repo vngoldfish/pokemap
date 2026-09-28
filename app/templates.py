@@ -1873,7 +1873,7 @@ def render_map_page() -> str:
 
     let userLat = null, userLng = null, userMarker = null, userCircle = null, hasCenteredOnUser = false;
     let gpsWatchId = null;
-    let isFollowingUser = true;
+    let isFollowingUser = false;
     try {
       const savedLat = parseFloat(localStorage.getItem('poketan_user_lat'));
       const savedLng = parseFloat(localStorage.getItem('poketan_user_lng'));
@@ -1913,8 +1913,8 @@ def render_map_page() -> str:
       attribution: '&copy; Google Maps'
     }).addTo(map);
 
-    // Map drag listener: pause auto-following so user can explore freely
-    map.on('dragstart', () => {
+    // Map interaction listeners: pause auto-following so user can explore freely
+    map.on('dragstart zoomstart movestart', () => {
       isFollowingUser = false;
       updateGpsBtnState();
     });
@@ -2551,6 +2551,8 @@ def render_map_page() -> str:
       if (btn) btn.classList.toggle('tracking', !!isFollowingUser);
     }
 
+    let hasAutoFlown = false;
+
     function startGpsTracking(autoFly = true) {
       if (!navigator.geolocation) return;
       const btn = document.getElementById('gps-btn');
@@ -2559,7 +2561,7 @@ def render_map_page() -> str:
         updateGpsBtnState();
       }
 
-      function onPositionSuccess(pos) {
+      function updateCoordinatesAndMarker(pos) {
         userLat = pos.coords.latitude;
         userLng = pos.coords.longitude;
         try {
@@ -2571,8 +2573,15 @@ def render_map_page() -> str:
           btn.classList.remove('locating');
           updateGpsBtnState();
         }
+      }
+
+      function onInitialPositionSuccess(pos) {
+        updateCoordinatesAndMarker(pos);
         const urlParams = new URLSearchParams(window.location.search);
-        if (autoFly && !urlParams.get('focus') && urlParams.get('hunt') !== '1') {
+        // Only auto-center ONCE on first load, NEVER snap back when user is exploring or zooming!
+        if (autoFly && !hasAutoFlown && !hasCenteredOnUser && !urlParams.get('focus') && urlParams.get('hunt') !== '1') {
+          hasAutoFlown = true;
+          hasCenteredOnUser = true;
           map.flyTo([userLat, userLng], 15, { duration: 1.0 });
         }
       }
@@ -2595,7 +2604,7 @@ def render_map_page() -> str:
 
       // 1. Initial immediate location fix with graceful fallback
       navigator.geolocation.getCurrentPosition(
-        onPositionSuccess,
+        onInitialPositionSuccess,
         (err) => {
           if (err && err.code === 1) { // PERMISSION_DENIED
             onPositionFailure();
@@ -2603,7 +2612,7 @@ def render_map_page() -> str:
           }
           // Fallback to low-accuracy / network / Wi-Fi positioning (succeeds indoors and on desktops)
           navigator.geolocation.getCurrentPosition(
-            onPositionSuccess,
+            onInitialPositionSuccess,
             () => { onPositionFailure(); },
             { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
           );
@@ -2611,25 +2620,27 @@ def render_map_page() -> str:
         { enableHighAccuracy: true, timeout: 4000, maximumAge: 60000 }
       );
 
-      // 2. Real-time continuous tracking as device moves
+      // 2. Real-time continuous tracking: ONLY updates the blue dot, NEVER forces flyTo or changes map view!
       if (gpsWatchId !== null) {
         navigator.geolocation.clearWatch(gpsWatchId);
       }
       gpsWatchId = navigator.geolocation.watchPosition(
-        onPositionSuccess,
+        (pos) => {
+          updateCoordinatesAndMarker(pos);
+        },
         () => {},
         { enableHighAccuracy: false, maximumAge: 5000, timeout: 15000 }
       );
     }
 
     function locateUser(userInitiated = true) {
-      isFollowingUser = true;
-      updateGpsBtnState();
       if (userLat !== null && userLng !== null) {
-        map.flyTo([userLat, userLng], 15, { duration: 0.8 });
+        map.flyTo([userLat, userLng], 16, { duration: 0.8 });
         updateUserMarker(userLat, userLng);
       }
-      startGpsTracking(userInitiated);
+      isFollowingUser = false;
+      updateGpsBtnState();
+      startGpsTracking(false);
     }
 
     // 9. AREA & REGION SELECTION
@@ -3886,7 +3897,7 @@ def render_map_page() -> str:
         updateUserMarker(userLat, userLng, 25);
       }
       const urlParams = new URLSearchParams(window.location.search);
-      const shouldAutoFly = !urlParams.get('focus') && !urlParams.get('store_id') && urlParams.get('hunt') !== '1';
+      const shouldAutoFly = !hasCenteredOnUser && !urlParams.get('focus') && !urlParams.get('store_id') && urlParams.get('hunt') !== '1';
       startGpsTracking(shouldAutoFly);
     });
   </script>
