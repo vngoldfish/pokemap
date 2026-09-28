@@ -702,6 +702,7 @@ def render_shared_header() -> str:
 def render_shared_footer(active_page: str) -> str:
     map_active = " active" if active_page == "map" else ""
     list_active = " active" if active_page == "thongbao" else ""
+    stats_active = " active" if active_page in ("thongke", "admin", "stats", "quanly") else ""
     return f"""
   <!-- 5. FOOTER BOTTOM NAVIGATION -->
   <footer id="poketan-footer">
@@ -714,6 +715,11 @@ def render_shared_footer(active_page: str) -> str:
       <span class="tab-icon">📋</span>
       <span class="tab-label">Thông báo</span>
       <span id="footer-unread-badge" class="footer-unread-badge" style="display:none;">0</span>
+    </a>
+
+    <a href="/thongke" class="footer-tab-btn{stats_active}" id="f-tab-stats" title="Quản lý &amp; Thống kê (統計・管理)">
+      <span class="tab-icon">📊</span>
+      <span class="tab-label">Quản lý</span>
     </a>
 
     <button type="button" class="footer-tab-btn" id="f-tab-settings" onclick="openSettingsModal()" title="Cài đặt hệ thống &amp; Telegram">

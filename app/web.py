@@ -894,6 +894,94 @@ def get_latest_reports_route(since: int = 0, limit: int = 50):
         return JSONResponse(content=[])
 
 
+@app.get("/api/stats/overview")
+def get_stats_overview_route():
+    try:
+        from .db import db_get_stats_overview
+        return JSONResponse(content=db_get_stats_overview())
+    except Exception as e:
+        print("[Stats] Error getting overview:", e)
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+@app.get("/api/stats/leaderboard")
+def get_stats_leaderboard_route(pref: Optional[str] = None, chain: Optional[str] = None, limit: int = 50):
+    try:
+        from .db import db_get_leaderboard
+        return JSONResponse(content=db_get_leaderboard(pref=pref, chain=chain, limit=limit))
+    except Exception as e:
+        print("[Stats] Error getting leaderboard:", e)
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+@app.get("/api/stats/history_logs")
+def get_stats_history_logs_route(
+    q: str = "",
+    pref: str = "",
+    chain: str = "",
+    status: str = "",
+    page: int = 1,
+    limit: int = 30
+):
+    try:
+        from .db import db_search_history_logs
+        return JSONResponse(content=db_search_history_logs(
+            q=q, pref=pref, chain=chain, status=status, page=page, limit=limit
+        ))
+    except Exception as e:
+        print("[Stats] Error getting history logs:", e)
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+@app.get("/api/stats/export_csv")
+def export_stats_history_csv():
+    try:
+        from .db import get_db_connection
+        import io, csv
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow([
+            "ID", "Store ID", "Tên cửa hàng", "Tỉnh", "Chuỗi", "Địa chỉ",
+            "Mã trạng thái", "Trạng thái", "Gói thẻ", "Ghi chú",
+            "Người gửi", "Tại quán", "Thời gian (JST)", "Nguồn"
+        ])
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT h.id, h.store_id, s.name, s.pref, s.chain, s.address,
+                       h.status_code, h.status_label, h.packs_json, h.note,
+                       h.user, h.onsite, h.formatted_time, h.source
+                FROM store_history h
+                LEFT JOIN stores s ON h.store_id = s.id
+                ORDER BY h.timestamp DESC
+                LIMIT 5000;
+            """)
+            for r in cursor.fetchall():
+                packs_str = ""
+                try:
+                    if r["packs_json"]:
+                        packs_str = ", ".join(json.loads(r["packs_json"]))
+                except Exception:
+                    packs_str = ""
+                writer.writerow([
+                    r["id"], r["store_id"], r["name"] or r["store_id"], r["pref"] or "",
+                    r["chain"] or "", r["address"] or "", r["status_code"] or "",
+                    r["status_label"] or "", packs_str, r["note"] or "",
+                    r["user"] or "", "Có" if r["onsite"] else "Không",
+                    r["formatted_time"] or "", r["source"] or ""
+                ])
+        csv_data = "\ufeff" + output.getvalue()
+        return Response(
+            content=csv_data,
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": "attachment; filename=pokemap_history.csv"}
+        )
+    except Exception as e:
+        print("[Stats] Error exporting CSV:", e)
+        return Response(content=f"Error exporting CSV: {e}", media_type="text/plain", status_code=500)
+
+
+
 
 @app.post("/api/admin/harvest_all")
 def trigger_harvest_all():
@@ -943,10 +1031,12 @@ def get_calendar(include_expired: bool = False):
 
 
 from .templates import render_map_page, render_thongbao_page
+from .templates_stats import render_thongke_page
 
 
 _cached_map_html = None
 _cached_thongbao_html = None
+_cached_thongke_html = None
 
 
 def get_map_html():
@@ -961,6 +1051,13 @@ def get_thongbao_html():
     if _cached_thongbao_html is None:
         _cached_thongbao_html = render_thongbao_page()
     return _cached_thongbao_html
+
+
+def get_thongke_html():
+    global _cached_thongke_html
+    if _cached_thongke_html is None:
+        _cached_thongke_html = render_thongke_page()
+    return _cached_thongke_html
 
 
 PAGE_CACHE_HEADERS = {
@@ -980,6 +1077,14 @@ def map_page():
 @app.get("/stores", response_class=HTMLResponse)
 def thongbao_page():
     return HTMLResponse(content=get_thongbao_html(), headers=PAGE_CACHE_HEADERS)
+
+
+@app.get("/thongke", response_class=HTMLResponse)
+@app.get("/admin", response_class=HTMLResponse)
+@app.get("/quanly", response_class=HTMLResponse)
+@app.get("/stats", response_class=HTMLResponse)
+def thongke_page():
+    return HTMLResponse(content=get_thongke_html(), headers=PAGE_CACHE_HEADERS)
 
 
 def main():

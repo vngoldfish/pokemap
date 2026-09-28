@@ -13,6 +13,7 @@ import time
 import threading
 from contextlib import contextmanager
 from datetime import datetime, timezone, timedelta
+from collections import Counter
 from typing import Dict, Any, List, Optional, Tuple
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "data", "pokemap.db")
@@ -1264,4 +1265,229 @@ def get_recent_reports(since_created_at: int = 0, limit: int = 50) -> List[Dict[
                 "source": r["source"] or "poketan"
             })
         return results
+
+
+def db_get_stats_overview() -> Dict[str, Any]:
+    """Retrieve comprehensive system statistics and KPI metrics."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM stores;")
+        total_stores = cursor.fetchone()[0]
+
+        cursor.execute("SELECT COUNT(*) FROM store_history;")
+        total_reports = cursor.fetchone()[0]
+
+        cursor.execute("SELECT COUNT(DISTINCT store_id) FROM store_history;")
+        active_stores = cursor.fetchone()[0]
+
+        cursor.execute("SELECT current_status, COUNT(*) FROM stores GROUP BY current_status;")
+        by_status = dict(cursor.fetchall())
+
+        cursor.execute("""
+            SELECT s.pref, COUNT(h.id) 
+            FROM store_history h 
+            JOIN stores s ON h.store_id = s.id 
+            GROUP BY s.pref 
+            ORDER BY COUNT(h.id) DESC;
+        """)
+        by_pref = [{"pref": r[0] or "other", "count": r[1]} for r in cursor.fetchall()]
+
+        cursor.execute("""
+            SELECT s.chain, COUNT(h.id) 
+            FROM store_history h 
+            JOIN stores s ON h.store_id = s.id 
+            GROUP BY s.chain 
+            ORDER BY COUNT(h.id) DESC 
+            LIMIT 12;
+        """)
+        by_chain = [{"chain": r[0] or "other", "count": r[1]} for r in cursor.fetchall()]
+
+        cursor.execute("""
+            SELECT ((timestamp + 32400) % 86400) / 3600 as jst_hour,
+                   COUNT(*) as total,
+                   SUM(CASE WHEN status_code = 'i' THEN 1 ELSE 0 END) as in_stock
+            FROM store_history
+            WHERE timestamp > 0
+            GROUP BY jst_hour
+            ORDER BY jst_hour;
+        """)
+        by_hour = [{"hour": r[0], "total": r[1], "in_stock": r[2] or 0} for r in cursor.fetchall()]
+
+        cursor.execute("SELECT packs_json FROM store_history WHERE packs_json IS NOT NULL AND packs_json != '[]' LIMIT 3000;")
+        pack_counter = Counter()
+        for row in cursor.fetchall():
+            try:
+                p_list = json.loads(row[0])
+                for p in p_list:
+                    pack_counter[p] += 1
+            except Exception:
+                pass
+        top_packs = [{"pack": k, "count": v} for k, v in pack_counter.most_common(8)]
+
+        cursor.execute("SELECT MAX(timestamp), MAX(formatted_time) FROM store_history;")
+        latest_row = cursor.fetchone()
+        latest_ts = latest_row[0] if latest_row else 0
+        latest_time_str = latest_row[1] if latest_row else ""
+
+        return {
+            "total_stores": total_stores,
+            "total_reports": total_reports,
+            "active_stores": active_stores,
+            "in_stock_now": by_status.get("i", 0),
+            "out_of_stock_now": by_status.get("o", 0),
+            "not_handled_now": by_status.get("n", 0),
+            "unknown_now": by_status.get("u", 0),
+            "by_pref": by_pref,
+            "by_chain": by_chain,
+            "by_hour": by_hour,
+            "top_packs": top_packs,
+            "latest_timestamp": latest_ts,
+            "latest_formatted_time": latest_time_str
+        }
+
+
+def db_get_leaderboard(pref: Optional[str] = None, chain: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
+    """Retrieve top stores with the most report activity."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        where_clauses = ["1=1"]
+        params = []
+        if pref:
+            where_clauses.append("s.pref = ?")
+            params.append(pref.strip().lower())
+        if chain:
+            where_clauses.append("s.chain = ?")
+            params.append(chain.strip().lower())
+
+        where_sql = " AND ".join(where_clauses)
+        cursor.execute(f"""
+            SELECT s.id, s.name, s.pref, s.chain, s.address, s.lat, s.lng, s.current_status,
+                   COUNT(h.id) as total_reports,
+                   SUM(CASE WHEN h.status_code = 'i' THEN 1 ELSE 0 END) as in_count,
+                   SUM(CASE WHEN h.status_code = 'o' THEN 1 ELSE 0 END) as out_count,
+                   MAX(h.timestamp) as last_ts,
+                   MAX(h.formatted_time) as last_rep_time
+            FROM store_history h
+            JOIN stores s ON h.store_id = s.id
+            WHERE {where_sql}
+            GROUP BY s.id
+            ORDER BY total_reports DESC, last_ts DESC
+            LIMIT ?;
+        """, params + [limit])
+        rows = cursor.fetchall()
+        leaderboard = []
+        for r in rows:
+            tot = r["total_reports"] or 0
+            inc = r["in_count"] or 0
+            leaderboard.append({
+                "id": r["id"],
+                "name": r["name"] or r["id"],
+                "pref": r["pref"] or "",
+                "chain": r["chain"] or "other",
+                "address": r["address"] or "",
+                "lat": r["lat"],
+                "lng": r["lng"],
+                "current_status": r["current_status"] or "u",
+                "total_reports": tot,
+                "in_count": inc,
+                "out_count": r["out_count"] or 0,
+                "in_rate": round((inc / tot * 100), 1) if tot > 0 else 0,
+                "last_timestamp": r["last_ts"] or 0,
+                "last_reported_at": r["last_rep_time"] or ""
+            })
+        return leaderboard
+
+
+def db_search_history_logs(
+    q: str = "",
+    pref: str = "",
+    chain: str = "",
+    status: str = "",
+    page: int = 1,
+    limit: int = 30
+) -> Dict[str, Any]:
+    """Retrieve paginated store history reports with multi-criteria filters."""
+    page = max(1, page)
+    limit = max(1, min(100, limit))
+    offset = (page - 1) * limit
+
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        where_clauses = ["1=1"]
+        params = []
+        if q:
+            clean_q = q.strip()
+            where_clauses.append("(s.name LIKE ? OR s.address LIKE ? OR h.store_id LIKE ? OR h.note LIKE ?)")
+            pattern = f"%{clean_q}%"
+            params.extend([pattern, pattern, pattern, pattern])
+        if pref:
+            where_clauses.append("s.pref = ?")
+            params.append(pref.strip().lower())
+        if chain:
+            where_clauses.append("s.chain = ?")
+            params.append(chain.strip().lower())
+        if status:
+            where_clauses.append("h.status_code = ?")
+            params.append(status.strip().lower())
+
+        where_sql = " AND ".join(where_clauses)
+
+        cursor.execute(f"""
+            SELECT COUNT(*) 
+            FROM store_history h 
+            LEFT JOIN stores s ON h.store_id = s.id 
+            WHERE {where_sql};
+        """, params)
+        total_items = cursor.fetchone()[0]
+
+        cursor.execute(f"""
+            SELECT h.id, h.store_id, s.name, s.pref, s.chain, s.address, s.lat, s.lng,
+                   h.status_code, h.status_label, h.note, h.packs_json,
+                   h.user, h.who, h.onsite, h.confirms, h.timestamp, h.formatted_time, h.source
+            FROM store_history h
+            LEFT JOIN stores s ON h.store_id = s.id
+            WHERE {where_sql}
+            ORDER BY h.timestamp DESC
+            LIMIT ? OFFSET ?;
+        """, params + [limit, offset])
+        rows = cursor.fetchall()
+
+        items = []
+        for r in rows:
+            packs = []
+            try:
+                if r["packs_json"]:
+                    packs = json.loads(r["packs_json"])
+            except Exception:
+                packs = []
+            items.append({
+                "id": r["id"],
+                "store_id": r["store_id"],
+                "name": r["name"] or r["store_id"],
+                "pref": r["pref"] or "",
+                "chain": r["chain"] or "other",
+                "address": r["address"] or "",
+                "lat": r["lat"],
+                "lng": r["lng"],
+                "status_code": r["status_code"] or "u",
+                "status_label": r["status_label"] or "",
+                "note": r["note"] or "",
+                "packs": packs,
+                "user": r["user"] or "匿名トレーナー",
+                "who": r["who"] or "",
+                "onsite": bool(r["onsite"]),
+                "confirms": r["confirms"] or 1,
+                "timestamp": r["timestamp"] or 0,
+                "formatted_time": r["formatted_time"] or "",
+                "source": r["source"] or "poketan"
+            })
+
+        return {
+            "total": total_items,
+            "page": page,
+            "limit": limit,
+            "total_pages": (total_items + limit - 1) // limit if total_items > 0 else 1,
+            "items": items
+        }
+
 
