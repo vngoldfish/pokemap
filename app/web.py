@@ -222,7 +222,7 @@ def send_telegram_alert(store: dict, info: dict, notif_cfg: dict, is_test: bool 
         return {"status": "disabled"}
 
     # Calculate distance to JR Imamiya Station (lat=34.6540, lng=135.4925)
-    imamiya_dist_str = "Chưa rõ vị trí"
+    dist_str = "~?km"
     st_lat = store.get("lat")
     st_lng = store.get("lng")
     if st_lat is not None and st_lng is not None:
@@ -234,15 +234,14 @@ def send_telegram_alert(store: dict, info: dict, notif_cfg: dict, is_test: bool 
             a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon/2)**2
             dist_km = 6371 * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
             if dist_km < 1.0:
-                imamiya_dist_str = f"~{int(round(dist_km * 1000))} m (từ ga JR Imamiya)"
+                dist_str = f"~{int(round(dist_km * 1000))}m"
             else:
-                imamiya_dist_str = f"~{dist_km:.1f} km (từ ga JR Imamiya)"
+                dist_str = f"~{dist_km:.1f}km"
         except Exception:
-            pass
+            dist_str = "~?km"
 
     store_name = store.get('name', 'Cửa hàng')
-    store_chain = store.get('chain_label') or store.get('chain') or 'Tiện lợi'
-    store_addr = store.get('address') or 'Khu vực đang chọn'
+    store_addr = store.get('address') or 'Chưa rõ địa chỉ'
     store_id = store.get("id") or info.get("store_id") or ""
     clean_id = store_id[:-2] if store_id.endswith("_c") else store_id
 
@@ -254,40 +253,35 @@ def send_telegram_alert(store: dict, info: dict, notif_cfg: dict, is_test: bool 
             from datetime import datetime, timezone, timedelta
             JST = timezone(timedelta(hours=9))
             dt = datetime.fromtimestamp(ts, tz=JST)
-            time_display = dt.strftime("%H:%M:%S %d/%m/%Y")
+            time_display = dt.strftime("%H:%M %d/%m")
         except Exception:
             pass
     if not time_display:
         time_display = "Vừa xong"
 
-    # Status label
+    # Status icon
     code = info.get("status_code") or info.get("status") or "i"
     if code == "i":
-        status_label = "🟢📸 Có hàng (Xác nhận tại chỗ)" if info.get("onsite") else "🟢 Có hàng (In stock)"
+        status_icon = "🟢📸" if info.get("onsite") else "🟢"
     elif code == "o":
-        status_label = "🔴 Hết hàng (Sold out)"
+        status_icon = "🔴"
     elif code == "n":
-        status_label = "🟡 Không bán thẻ (No stock)"
+        status_icon = "🟡"
     else:
-        status_label = "⚪ Chưa có tin"
+        status_icon = "⚪"
 
     # Link to PokéMap location
     pokemap_url = f"https://pokemap.bawui.com/?focus={clean_id}"
     if st_lat is not None and st_lng is not None:
         pokemap_url += f"&lat={st_lat}&lng={st_lng}&zoom=17"
 
-    header = "🧪 <b>[THÔNG BÁO THỬ NGHIỆM]</b>\n" if is_test else ""
-    msg_lines = [
-        f"{header}🏪 <b>Tên cửa hàng:</b> {store_name} ({store_chain})",
-        f"⏱ <b>Thời gian có báo cáo:</b> {time_display}",
-        f"⚡ <b>Trạng thái:</b> {status_label}",
-        f"📍 <b>Khoảng cách:</b> {imamiya_dist_str}",
-        f"🗺️ <b>Địa chỉ:</b> <a href=\"{pokemap_url}\">{store_addr} (Mở PokéMap ↗)</a>"
-    ]
+    header = "🧪[TEST] " if is_test else ""
+    # Single-line format: icon trạng thái / khoảng cách / thời gian có báo cáo / tên cửa hàng / địa chỉ
+    alert_text = f"{header}{status_icon} / {dist_str} / {time_display} / <b>{store_name}</b> / <a href=\"{pokemap_url}\">{store_addr}</a>"
 
     tg_payload = {
         "chat_id": tg_chat_id,
-        "text": "\n".join(msg_lines),
+        "text": alert_text,
         "parse_mode": "HTML",
         "disable_web_page_preview": True
     }
