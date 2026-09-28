@@ -621,3 +621,25 @@ def test_map_header_brand_only():
     assert "map-counter-pill" not in header_content, "map-counter-pill should be removed from header"
     assert "mft-title" not in header_content, "mft-title should be removed from header"
 
+
+# ==============================================================================
+# 13. Map Filter Persistence on Page Reload / Reset
+# ==============================================================================
+
+def test_map_filter_persistence():
+    """Verify Map Filter persists region, chain, and pin hours to localStorage & /api/settings."""
+    map_html = render_map_page()
+
+    # 1. saveMapFiltersToStorage must persist selected region and chain
+    assert "localStorage.setItem('poketan_selected_region', mapRegionFilter)" in map_html
+    assert "localStorage.setItem('poketan_map_chain', mapChainFilter" in map_html
+
+    # 2. applyAndCloseMapFilterModal must update currentRegion and in-stock pin hours
+    assert "currentRegion = mapModalTempRegion" in map_html
+    assert "updateStockPinHours(stockHours)" in map_html
+
+    # 3. Initial load must read poketan_selected_region and poketan_map_chain
+    assert "localStorage.getItem('poketan_selected_region')" in map_html
+    assert "localStorage.getItem('poketan_map_chain')" in map_html
+
+

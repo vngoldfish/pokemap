@@ -1687,7 +1687,7 @@ def render_map_page() -> str:
       'all': { id: 'all', name: '全エリア (全国)', center: [34.6937, 135.5023], zoom: 10, defaultCity: '全エリア', prefs: ['osaka', 'tokyo', 'kanagawa', 'aichi', 'gifu', 'mie'] }
     };
 
-    let currentRegion = localStorage.getItem('poketan_selected_region') || 'osaka';
+    let currentRegion = localStorage.getItem('poketan_selected_region') || localStorage.getItem('poketan_map_region') || 'osaka';
     if (!REGIONS[currentRegion]) currentRegion = 'osaka';
     let currentPref = REGIONS[currentRegion].prefs[0] || 'osaka';
 
@@ -1700,15 +1700,27 @@ def render_map_page() -> str:
     }
 
     let mapRegionFilter = currentRegion;
-    let mapStatusFilter = localStorage.getItem('poketan_map_status') || 'all';
     let mapChainFilter = localStorage.getItem('poketan_map_chain') || 'all';
+    let mapStatusFilter = localStorage.getItem('poketan_map_status') || 'all';
     let mapTimeFilter = localStorage.getItem('poketan_map_time') || 'all';
 
     function saveMapFiltersToStorage() {
       try {
-        localStorage.setItem('poketan_map_status', mapStatusFilter);
-        localStorage.setItem('poketan_map_chain', mapChainFilter);
-        localStorage.setItem('poketan_map_time', String(mapTimeFilter));
+        if (mapRegionFilter) {
+          localStorage.setItem('poketan_selected_region', mapRegionFilter);
+          localStorage.setItem('poketan_map_region', mapRegionFilter);
+        }
+        localStorage.setItem('poketan_map_chain', mapChainFilter || 'all');
+        localStorage.setItem('poketan_map_status', mapStatusFilter || 'all');
+        localStorage.setItem('poketan_map_time', String(mapTimeFilter || 'all'));
+        fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            currentRegion: mapRegionFilter,
+            currentChain: mapChainFilter || 'all'
+          })
+        }).catch(() => {});
       } catch(e) {}
     }
 
@@ -1726,9 +1738,14 @@ def render_map_page() -> str:
     let initialCenter = REGIONS[currentRegion].center;
     let initialZoom = REGIONS[currentRegion].zoom;
     if (userLat !== null && userLng !== null) {
-      initialCenter = [userLat, userLng];
-      initialZoom = 15;
-      hasCenteredOnUser = true;
+      // Auto-center on GPS if user is within ~80km of the region center
+      const dLat = Math.abs(userLat - initialCenter[0]);
+      const dLng = Math.abs(userLng - initialCenter[1]);
+      if (dLat < 0.8 && dLng < 0.8) {
+        initialCenter = [userLat, userLng];
+        initialZoom = 15;
+        hasCenteredOnUser = true;
+      }
     }
 
     // 2. LEAFLET MAP
@@ -2305,30 +2322,40 @@ def render_map_page() -> str:
     function syncMapFilterModalUI() {
       document.querySelectorAll('#map-modal-region-group .filter-option-btn').forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-val') === mapModalTempRegion));
       document.querySelectorAll('#map-modal-chain-group .filter-option-btn').forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-val') === mapModalTempChain));
+      const pinSelect = document.getElementById('set-stock-pin-hours');
+      if (pinSelect) {
+        const curHours = String(localStorage.getItem('poketan_stock_pin_hours') || configData.stockPinEffectHours || '24');
+        pinSelect.value = curHours;
+      }
     }
     function selectMapModalRegion(val) { mapModalTempRegion = val; syncMapFilterModalUI(); }
     function selectMapModalChain(val) { mapModalTempChain = val; syncMapFilterModalUI(); }
     function selectMapModalStatus(val) {}
     function selectMapModalTime(val) {}
     function resetMapFilters() {
-      mapModalTempRegion = currentRegion;
+      mapModalTempRegion = 'osaka';
       mapModalTempChain = 'all';
-      mapStatusFilter = 'all';
-      mapTimeFilter = 'all';
+      const pinSelect = document.getElementById('set-stock-pin-hours');
+      if (pinSelect) pinSelect.value = '24';
       syncMapFilterModalUI();
     }
     function applyAndCloseMapFilterModal() {
       const regionChanged = (mapModalTempRegion !== mapRegionFilter);
       mapRegionFilter = mapModalTempRegion;
+      currentRegion = mapModalTempRegion;
       mapChainFilter = mapModalTempChain;
       mapStatusFilter = 'all';
       mapTimeFilter = 'all';
       saveMapFiltersToStorage();
-      closeMapFilterModal();
-      updateMapFilterUI();
       if (regionChanged && REGIONS[mapRegionFilter]) {
+        isFollowingUser = false;
         map.flyTo(REGIONS[mapRegionFilter].center, REGIONS[mapRegionFilter].zoom || 13, { duration: 1.0 });
       }
+      const pinSelect = document.getElementById('set-stock-pin-hours');
+      const stockHours = pinSelect ? pinSelect.value : (configData.stockPinEffectHours || '24');
+      updateStockPinHours(stockHours);
+      closeMapFilterModal();
+      updateMapFilterUI();
       renderMapMarkers();
       if (regionChanged && typeof ensureStoresLoadedForRegion === 'function') {
         ensureStoresLoadedForRegion(mapRegionFilter);
@@ -3239,6 +3266,9 @@ def render_map_page() -> str:
 
         updateMapFilterUI();
         renderMapMarkers();
+        if (typeof syncMapFilterModalUI === 'function') {
+          syncMapFilterModalUI();
+        }
 
         // Initialize DB poll timestamp to current time so only future/real-time reports trigger alerts
         lastDbPollTs = getServerNowSec();
@@ -4559,14 +4589,21 @@ def render_thongbao_page() -> str:
     function syncMapFilterModalUI() {
       document.querySelectorAll('#map-modal-region-group .filter-option-btn').forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-val') === mapModalTempRegion));
       document.querySelectorAll('#map-modal-chain-group .filter-option-btn').forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-val') === mapModalTempChain));
+      const pinSelect = document.getElementById('set-stock-pin-hours');
+      if (pinSelect) {
+        const curHours = String(localStorage.getItem('poketan_stock_pin_hours') || configData.stockPinEffectHours || '24');
+        pinSelect.value = curHours;
+      }
     }
     function selectMapModalRegion(val) { mapModalTempRegion = val; syncMapFilterModalUI(); }
     function selectMapModalChain(val) { mapModalTempChain = val; syncMapFilterModalUI(); }
     function selectMapModalStatus(val) {}
     function selectMapModalTime(val) {}
     function resetMapFilters() {
-      mapModalTempRegion = currentRegion;
+      mapModalTempRegion = 'osaka';
       mapModalTempChain = 'all';
+      const pinSelect = document.getElementById('set-stock-pin-hours');
+      if (pinSelect) pinSelect.value = '24';
       syncMapFilterModalUI();
     }
     function applyAndCloseMapFilterModal() {
@@ -4574,6 +4611,20 @@ def render_thongbao_page() -> str:
         localStorage.setItem('poketan_selected_region', mapModalTempRegion);
         localStorage.setItem('poketan_map_region', mapModalTempRegion);
         localStorage.setItem('poketan_map_chain', mapModalTempChain);
+      } catch(e) {}
+      const pinSelect = document.getElementById('set-stock-pin-hours');
+      const stockHours = pinSelect ? pinSelect.value : (configData.stockPinEffectHours || '24');
+      updateStockPinHours(stockHours);
+      try {
+        fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            currentRegion: mapModalTempRegion,
+            currentChain: mapModalTempChain,
+            stockPinEffectHours: String(stockHours)
+          })
+        }).catch(() => {});
       } catch(e) {}
       closeSettingsModal();
       window.location.href = `/?region=${encodeURIComponent(mapModalTempRegion)}`;
