@@ -840,6 +840,22 @@ def test_resolve_google_maps_or_address():
         assert "Nakahiraki" in res_link["name"]
 
 
+def test_telegram_location_autosave_and_gps_ui():
+    """Verify SHARED_MODALS_HTML and both templates have auto-save triggers, feedback pills, and current GPS button."""
+    assert 'id="tg-cfg-loc-name"' in SHARED_MODALS_HTML
+    assert 'oninput="onTelegramLocFieldInput()"' in SHARED_MODALS_HTML
+    assert 'onchange="saveTelegramLocationAuto()"' in SHARED_MODALS_HTML
+    assert 'id="tg-loc-autosave-msg"' in SHARED_MODALS_HTML
+    assert 'setTelegramLocToCurrentGps()' in SHARED_MODALS_HTML
 
+    map_html = render_map_page()
+    assert 'saveTelegramLocationAuto' in map_html
+    assert 'setTelegramLocToCurrentGps' in map_html
+    assert 'saveTelegramConfigSilently' in map_html
+    assert 'tg-loc-autosave-msg' in map_html
 
-
+    thongbao_html = render_thongbao_page()
+    assert 'saveTelegramLocationAuto' in thongbao_html
+    assert 'setTelegramLocToCurrentGps' in thongbao_html
+    assert 'saveTelegramConfigSilently' in thongbao_html
+    assert 'tg-loc-autosave-msg' in thongbao_html
