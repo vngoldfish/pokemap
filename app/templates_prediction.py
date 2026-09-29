@@ -605,6 +605,11 @@ __SHARED_BASE_CSS__
       box-shadow: 0 2px 10px rgba(16, 185, 129, 0.3);
       color: #34d399;
     }
+    .status-tab-btn.active.tab-truck {
+      border-color: #f59e0b;
+      box-shadow: 0 2px 10px rgba(245, 158, 11, 0.3);
+      color: #fbbf24;
+    }
     .status-tab-btn.active.tab-red {
       border-color: #ef4444;
       box-shadow: 0 2px 10px rgba(239, 68, 68, 0.3);
@@ -618,7 +623,82 @@ __SHARED_BASE_CSS__
     }
     .badge-tab-all { background: #334155; color: #f1f5f9; }
     .badge-tab-green { background: #065f46; color: #6ee7b7; border: 1px solid #059669; }
+    .badge-tab-truck { background: #78350f; color: #fde68a; border: 1px solid #d97706; }
     .badge-tab-red { background: #7f1d1d; color: #fca5a5; border: 1px solid #b91c1c; }
+
+    /* TRUCK EN-ROUTE BADGE & CARD HIGHLIGHT */
+    .card-truck-route {
+      border-color: rgba(245, 158, 11, 0.5) !important;
+      box-shadow: 0 4px 18px rgba(245, 158, 11, 0.15) !important;
+    }
+    .truck-enroute-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 0.68rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, rgba(217, 119, 6, 0.25), rgba(180, 83, 9, 0.35));
+      border: 1px solid #f59e0b;
+      color: #fef3c7;
+      letter-spacing: 0.2px;
+    }
+    .pulse-truck-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #f59e0b;
+      box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7);
+      animation: pulse-amber 1.8s infinite;
+      flex-shrink: 0;
+    }
+    @keyframes pulse-amber {
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7); }
+      70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(245, 158, 11, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+    }
+
+    /* DATA RELIABILITY BADGE & STARS */
+    .reliability-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 4px;
+    }
+    .reliability-stars {
+      color: #fbbf24;
+      font-size: 0.68rem;
+      letter-spacing: 1px;
+    }
+    .reliability-label {
+      font-size: 0.64rem;
+      color: #94a3b8;
+      font-weight: 600;
+    }
+
+    /* ACTIONABLE RECOMMENDATION TIP BOX */
+    .card-action-tip {
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+      padding: 7px 10px;
+      border-radius: 8px;
+      background: rgba(30, 41, 59, 0.75);
+      border: 1px dashed rgba(148, 163, 184, 0.35);
+      margin: 8px 0 4px 0;
+    }
+    .tip-icon {
+      font-size: 0.85rem;
+      line-height: 1.2;
+      flex-shrink: 0;
+    }
+    .tip-text {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #e2e8f0;
+      line-height: 1.35;
+    }
 
     /* CARD HEADER */
     .card-top-row {
@@ -1057,6 +1137,11 @@ __SHARED_BASE_CSS__
         <span>🟢 Chắc chắn có hàng (&lt; 30p)</span>
         <span class="status-tab-badge badge-tab-green" id="tab-count-green">0</span>
       </button>
+      <button type="button" class="status-tab-btn tab-truck" data-status="truck" onclick="selectStatusFilter('truck')">
+        <span class="pulse-truck-dot" style="width:7px; height:7px;"></span>
+        <span>🚚 Xe trên tuyến (&lt; 1.8km)</span>
+        <span class="status-tab-badge badge-tab-truck" id="tab-count-truck">0</span>
+      </button>
       <button type="button" class="status-tab-btn tab-red" data-status="red" onclick="selectStatusFilter('red')">
         <span>🚨 Vừa hết hàng (&lt; 30p)</span>
         <span class="status-tab-badge badge-tab-red" id="tab-count-red">0</span>
@@ -1085,23 +1170,23 @@ __SHARED_BASE_CSS__
       <div class="algo-weights-grid">
         <div class="algo-weight-box">
           <div class="algo-weight-pct">35%</div>
-          <div class="algo-weight-name">Khung giờ vàng</div>
-          <div class="algo-weight-desc">Giờ xe tải trả hàng quen thuộc quanh bán kính</div>
+          <div class="algo-weight-name">Khung giờ &amp; Chuỗi</div>
+          <div class="algo-weight-desc">Bayesian Shrinkage theo tuyến xe đặc thù (7-Eleven, Lawson, FM...)</div>
         </div>
         <div class="algo-weight-box">
           <div class="algo-weight-pct">25%</div>
-          <div class="algo-weight-name">Thứ trong tuần</div>
-          <div class="algo-weight-desc">Lịch phân phối cố định theo tuyến tuần</div>
+          <div class="algo-weight-name">Phân rã thời gian</div>
+          <div class="algo-weight-desc">Ưu tiên cao báo cáo trong 21 ngày gần nhất (Half-life = 21d)</div>
         </div>
         <div class="algo-weight-box">
           <div class="algo-weight-pct">25%</div>
-          <div class="algo-weight-name">Chu kỳ restock</div>
-          <div class="algo-weight-desc">Số ngày kể từ lần có hàng gần nhất của quán</div>
+          <div class="algo-weight-name">Tuyến xe &amp; Chu kỳ</div>
+          <div class="algo-weight-desc">Nhận diện xe hàng tiếp vận lân cận (&le; 1.8km) &amp; điểm rơi chu kỳ</div>
         </div>
         <div class="algo-weight-box">
           <div class="algo-weight-pct">15%</div>
-          <div class="algo-weight-name">Khoảng cách &amp; Kệ hàng</div>
-          <div class="algo-weight-desc">Vị trí địa lý GPS và trạng thái hiện tại</div>
+          <div class="algo-weight-name">Kệ trống &amp; Độ tin cậy</div>
+          <div class="algo-weight-desc">Kệ sạch chờ đón đợt mới, lọc quán không bán thẻ Pokémon</div>
         </div>
       </div>
     </div>
@@ -1338,12 +1423,15 @@ __SHARED_BASE_CSS__
       // Update tab counter badges
       const green30m = (data.radius_stats && data.radius_stats.green_30m_count !== undefined) ? data.radius_stats.green_30m_count : 0;
       const red30m = (data.radius_stats && data.radius_stats.red_30m_count !== undefined) ? data.radius_stats.red_30m_count : 0;
+      const truckCount = (data.radius_stats && data.radius_stats.truck_count !== undefined) ? data.radius_stats.truck_count : 0;
       const totalCand = data.predictions ? data.predictions.length : 0;
       const tabAllEl = document.getElementById('tab-count-all');
       const tabGreenEl = document.getElementById('tab-count-green');
+      const tabTruckEl = document.getElementById('tab-count-truck');
       const tabRedEl = document.getElementById('tab-count-red');
       if (tabAllEl) tabAllEl.textContent = totalCand;
       if (tabGreenEl) tabGreenEl.textContent = green30m;
+      if (tabTruckEl) tabTruckEl.textContent = truckCount;
       if (tabRedEl) tabRedEl.textContent = red30m;
 
       // 2. Render Radius KPIs Widget
@@ -1393,9 +1481,14 @@ __SHARED_BASE_CSS__
       listEl.innerHTML = items.map(p => {
         const isFlashGreen = p.flash_mode === 'green';
         const isFlashRed = p.flash_mode === 'red';
+        const isTruckRoute = !!p.truck_en_route;
         const isPrime = p.score >= 85;
 
         let cardClass = 'pred-card';
+        if (isTruckRoute && !isFlashGreen && !isFlashRed) {
+          cardClass += ' card-truck-route';
+        }
+
         let scoreBadgeClass = 'score-badge';
         let scoreIcon = '🎯';
         let scoreText = `${p.score}% XÁC SUẤT`;
@@ -1441,6 +1534,30 @@ __SHARED_BASE_CSS__
           `;
         }
 
+        const truckBadgeHtml = isTruckRoute ? `
+          <span class="truck-enroute-badge" title="Tuyến xe hàng lân cận vừa trả hàng quán cùng chuỗi">
+            <span class="pulse-truck-dot"></span>
+            <span>🚚 Xe trên tuyến (&lt; 1.8km)</span>
+          </span>
+        ` : '';
+
+        const starsCount = p.reliability_stars || 1;
+        const starsStr = '⭐'.repeat(starsCount);
+        const relText = p.reliability_text || 'Độ tin cậy';
+        const reliabilityHtml = `
+          <div class="reliability-row" title="${relText}">
+            <span class="reliability-stars">${starsStr}</span>
+            <span class="reliability-label">${relText}</span>
+          </div>
+        `;
+
+        const actionTipHtml = p.action_tip ? `
+          <div class="card-action-tip">
+            <span class="tip-icon">💡</span>
+            <span class="tip-text">${p.action_tip}</span>
+          </div>
+        ` : '';
+
         const distHtml = p.distance_str ? `
           <span class="dist-badge" title="Khoảng cách từ vị trí của bạn">
             📍 ${p.distance_str} ${p.walk_time_min ? `(~${p.walk_time_min}p đi bộ)` : ''}
@@ -1466,10 +1583,13 @@ __SHARED_BASE_CSS__
         return `
           <div class="${cardClass}">
             <div class="card-top-row">
-              <span class="${scoreBadgeClass}">
-                <span>${scoreIcon}</span>
-                <span>${scoreText}</span>
-              </span>
+              <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                <span class="${scoreBadgeClass}">
+                  <span>${scoreIcon}</span>
+                  <span>${scoreText}</span>
+                </span>
+                ${truckBadgeHtml}
+              </div>
               ${windowBadgeHtml}
             </div>
 
@@ -1482,11 +1602,14 @@ __SHARED_BASE_CSS__
                 <span class="pref-badge">${p.pref}</span>
                 ${distHtml}
               </div>
+              ${reliabilityHtml}
             </div>
 
             <div class="card-address">
               📍 ${p.address || 'Đang cập nhật địa chỉ'}
             </div>
+
+            ${actionTipHtml}
 
             <div class="ai-reasons-box"${reasonBoxStyle}>
               ${reasonsHtml}

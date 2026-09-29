@@ -1503,6 +1503,75 @@ def _calc_haversine_dist(lat1: float, lon1: float, lat2: float, lon2: float) -> 
     return 6371.0 * 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
 
 
+CHAIN_LOGISTICS_PROFILES = {
+    "seven": {
+        "name": "7-Eleven",
+        "peak_hours": [11, 12, 13, 21, 22],
+        "peak_window": "11:00 - 13:30 & 21:00 - 22:30 JST",
+        "dow_peak": [4, 5],
+        "base_cycle_days": 2.5,
+        "desc": "Chuyến trưa (11:00-13:30) & đêm (21:00-22:30)"
+    },
+    "lawson": {
+        "name": "Lawson",
+        "peak_hours": [7, 8, 9, 17, 18],
+        "peak_window": "07:30 - 09:30 & 17:00 - 18:30 JST",
+        "dow_peak": [4, 5],
+        "base_cycle_days": 3.0,
+        "desc": "Chuyến sáng (07:30-09:30) & chiều (17:00-18:30)"
+    },
+    "familymart": {
+        "name": "FamilyMart",
+        "peak_hours": [9, 10, 15, 16],
+        "peak_window": "09:00 - 10:30 & 15:30 - 17:00 JST",
+        "dow_peak": [3, 4],
+        "base_cycle_days": 3.0,
+        "desc": "Chuyến sáng (09:00-10:30) & xế chiều (15:30-17:00)"
+    },
+    "ministop": {
+        "name": "Ministop",
+        "peak_hours": [10, 11, 14, 15],
+        "peak_window": "10:00 - 12:00 & 14:00 - 15:30 JST",
+        "dow_peak": [4],
+        "base_cycle_days": 3.5,
+        "desc": "Chuyến trưa (10:00-12:00)"
+    },
+    "specialty": {
+        "name": "Shop thẻ bài / PokéCenter",
+        "peak_hours": [11, 12, 15, 16, 17],
+        "peak_window": "11:00 - 12:00 & 15:00 - 17:00 JST",
+        "dow_peak": [4, 5, 6],
+        "base_cycle_days": 2.0,
+        "desc": "Mở cửa (11:00-12:00) & xả hàng chiều (15:00-17:00)"
+    },
+    "electronics": {
+        "name": "GEO / Đồ điện máy / Đồ chơi",
+        "peak_hours": [10, 11, 14],
+        "peak_window": "10:00 - 11:30 JST",
+        "dow_peak": [4, 5],
+        "base_cycle_days": 4.0,
+        "desc": "Mở cửa sáng (10:00-11:30)"
+    },
+    "default": {
+        "name": "Cửa hàng bán lẻ",
+        "peak_hours": [10, 11, 14, 15, 16],
+        "peak_window": "10:00 - 12:00 & 14:00 - 16:30 JST",
+        "dow_peak": [4, 5],
+        "base_cycle_days": 3.0,
+        "desc": "Khung giờ restock thông thường"
+    }
+}
+
+
+def get_chain_logistics_profile(chain_code: str) -> Dict[str, Any]:
+    c = (chain_code or "").strip().lower()
+    if c in CHAIN_LOGISTICS_PROFILES:
+        return CHAIN_LOGISTICS_PROFILES[c]
+    if c in ("geo", "joshin", "yamada", "biccamera", "yodobashi", "edion", "ks", "toysrus", "aeon", "piagu", "apita", "tsutaya"):
+        return CHAIN_LOGISTICS_PROFILES["electronics"]
+    return CHAIN_LOGISTICS_PROFILES["default"]
+
+
 def db_get_restock_predictions(
     pref: Optional[str] = None,
     chain: Optional[str] = None,
@@ -1592,6 +1661,27 @@ def db_get_restock_predictions(
         """, recent_params)
         recent_30m_rows = cursor.fetchall()
         recent_30m_map = {r["id"]: r for r in recent_30m_rows}
+
+        # 1c. Fetch active in-stock stores reported within last 60 minutes (3600 seconds)
+        # for Truck Route Ripple detection (logistics trucks delivering to nearby stores of same chain)
+        truck_where = [
+            "s.last_timestamp > 0",
+            "(? - s.last_timestamp) <= 3600",
+            "s.current_status = 'i'",
+            "s.lat IS NOT NULL",
+            "s.lng IS NOT NULL"
+        ]
+        truck_params = [now_ts]
+        if clean_pref:
+            truck_where.append("s.pref = ?")
+            truck_params.append(clean_pref)
+
+        cursor.execute(f"""
+            SELECT s.id, s.name, s.pref, s.chain, s.lat, s.lng, s.last_timestamp
+            FROM stores s
+            WHERE {" AND ".join(truck_where)};
+        """, truck_params)
+        active_truck_sources = cursor.fetchall()
 
     # 2. Aggregate store data and calculate 24h restock distribution
     stores_data = defaultdict(lambda: {
@@ -1750,22 +1840,64 @@ def db_get_restock_predictions(
         in_ts = d["timestamps"]
         last_ts = in_ts[-1] if in_ts else d["last_timestamp"]
         days_since = (now_ts - last_ts) / 86400.0 if last_ts > 0 else 999.0
-        hours = [(t + 32400) % 86400 // 3600 for t in in_ts]
-        dows = [datetime.fromtimestamp(t, tz=JST).weekday() for t in in_ts]
+
+        # Profile for this store's chain
+        chain_prof = get_chain_logistics_profile(d["chain"])
+        prior_peak = chain_prof["peak_hours"]
+
+        # Recency exponential decay weighting (half-life tau = 21 days)
+        w_hours = defaultdict(float)
+        w_dows = defaultdict(float)
+        sum_w = 0.0
+        hours = []
+        dows = []
+        for t in in_ts:
+            delta_d = max(0.0, (now_ts - t) / 86400.0)
+            wi = math.exp(-delta_d / 21.0)
+            h_jst = (t + 32400) % 86400 // 3600
+            dw_jst = datetime.fromtimestamp(t, tz=JST).weekday()
+            w_hours[h_jst] += wi
+            w_dows[dw_jst] += wi
+            sum_w += wi
+            hours.append(h_jst)
+            dows.append(dw_jst)
+
+        count_hours = Counter(hours) if hours else {}
+        count_dows = Counter(dows) if dows else {}
+
+        # Bayesian Shrinkage on hour distribution
+        p_prior = {}
+        for h in range(24):
+            p_prior[h] = 1.0 if h in prior_peak else 0.15
+        sum_prior = sum(p_prior.values())
+        for h in range(24):
+            p_prior[h] /= sum_prior
+
+        # Store empirical probabilities
+        p_store = {}
+        if sum_w > 0:
+            for h in range(24):
+                p_store[h] = w_hours.get(h, 0.0) / sum_w
+        else:
+            p_store = p_prior.copy()
+
+        # Posterior probability: lambda = sum_w / (sum_w + 2.5)
+        shrinkage_lambda = sum_w / (sum_w + 2.5) if sum_w > 0 else 0.0
+        p_posterior = {}
+        for h in range(24):
+            p_posterior[h] = shrinkage_lambda * p_store[h] + (1.0 - shrinkage_lambda) * p_prior[h]
 
         # Calculate turnaround cycle (interval between shipments)
         if len(in_ts) >= 2:
             diffs = [(in_ts[i] - in_ts[i - 1]) / 86400.0 for i in range(1, len(in_ts))]
-            avg_cycle = sum(diffs) / len(diffs)
+            valid_diffs = [diff for diff in diffs if 0.5 <= diff <= 30.0]
+            avg_cycle = sum(valid_diffs) / len(valid_diffs) if valid_diffs else chain_prof["base_cycle_days"]
         else:
-            avg_cycle = 4.0
+            avg_cycle = chain_prof["base_cycle_days"]
 
-        hour_counts = Counter(hours) if hours else {current_hour: 1}
-        best_h = max(hour_counts.keys(), key=lambda h: hour_counts[h])
-        best_h_count = hour_counts[best_h]
+        avg_cycle = max(1.5, min(14.0, avg_cycle))
 
         # Check if store has a report within last 30 minutes (1800 seconds)
-        # Real-time flash mode applies when querying current time or explicitly filtering by status
         is_querying_now = (clean_status in ("green", "red", "hot", "warning", "depleted")) or (
             (target_hour is None or target_hour == current_hour) and
             (allowed_hours is None or current_hour in allowed_hours)
@@ -1774,6 +1906,43 @@ def db_get_restock_predictions(
         flash_mode = "none"  # "green", "red", "none"
         recent_min_ago = None
         reasons = []
+
+        # Check Truck Route Ripple Effect (active delivery truck within 1.8km of same chain)
+        truck_en_route = False
+        truck_source_name = ""
+        truck_source_dist_m = 0
+        truck_source_min_ago = 0
+        s_truck = 0
+
+        if d["lat"] is not None and d["lng"] is not None:
+            c_lat = float(d["lat"])
+            c_lng = float(d["lng"])
+            c_chain = d["chain"]
+            best_truck_dist_km = 999.0
+            best_truck_source = None
+
+            for t in active_truck_sources:
+                if t["id"] == sid:
+                    continue
+                if t["chain"] != c_chain:
+                    continue
+                t_lat = float(t["lat"])
+                t_lng = float(t["lng"])
+                if abs(t_lat - c_lat) > 0.02 or abs(t_lng - c_lng) > 0.02:
+                    continue
+                d_truck_km = _calc_haversine_dist(c_lat, c_lng, t_lat, t_lng)
+                if d_truck_km <= 1.8 and d_truck_km < best_truck_dist_km:
+                    best_truck_dist_km = d_truck_km
+                    best_truck_source = t
+
+            if best_truck_source:
+                truck_en_route = True
+                truck_source_dist_m = int(round(best_truck_dist_km * 1000))
+                sec_since_truck = max(0, now_ts - best_truck_source["last_timestamp"])
+                truck_source_min_ago = max(1, sec_since_truck // 60)
+                truck_source_name = best_truck_source["name"] or best_truck_source["id"]
+                s_truck = int(round(20 - (best_truck_dist_km / 1.8) * 8))
+                s_truck = max(12, min(20, s_truck))
 
         if recent:
             sec_ago = max(0, now_ts - recent["last_timestamp"])
@@ -1803,89 +1972,162 @@ def db_get_restock_predictions(
                 total_score = 50
                 flash_mode = "none"
                 confidence_level = "medium"
-                display_h = best_h
+                display_h = max(range(24), key=lambda h: (p_posterior[h], count_hours.get(h, 0)))
                 predicted_window = f"{display_h:02d}:00 - {(display_h + 1) % 24:02d}:30 JST"
         else:
-            # Hour scoring & filtering
+            # Hour selection & filtering
             if target_hour is not None:
-                m0 = hour_counts.get(target_hour, 0)
-                m1 = hour_counts.get((target_hour - 1) % 24, 0) + hour_counts.get((target_hour + 1) % 24, 0)
-                if m0 == 0 and m1 == 0:
+                m0 = count_hours.get(target_hour, 0)
+                m1 = count_hours.get((target_hour - 1) % 24, 0) + count_hours.get((target_hour + 1) % 24, 0)
+                is_chain_peak = target_hour in prior_peak
+                if m0 == 0 and m1 == 0 and not (is_chain_peak and len(in_ts) <= 2):
                     continue
-                s_hour = min(35, m0 * 18 + m1 * 8)
                 display_h = target_hour
             elif allowed_hours is not None:
-                window_matches = sum(hour_counts.get(h, 0) for h in allowed_hours)
-                if window_matches == 0:
+                window_matches = sum(count_hours.get(h, 0) for h in allowed_hours)
+                window_prior_matches = any(h in prior_peak for h in allowed_hours)
+                if window_matches == 0 and not (window_prior_matches and len(in_ts) <= 2):
                     continue
-                s_hour = min(35, window_matches * 12)
-                display_h = best_h if best_h in allowed_hours else max(allowed_hours, key=lambda h: hour_counts.get(h, 0))
+                display_h = max(allowed_hours, key=lambda h: (p_posterior[h], count_hours.get(h, 0)))
             else:
-                s_hour = min(35, best_h_count * 12)
-                display_h = best_h
-                if abs(display_h - current_hour) <= 1:
-                    s_hour = min(35, s_hour + 5)
+                display_h = max(range(24), key=lambda h: (p_posterior[h], count_hours.get(h, 0)))
 
-            # Day of week affinity scoring
-            dow_count = sum(1 for dw in dows if dw == current_dow)
-            if dow_count >= 2:
+            # 1. Hour scoring (10 to 35 points)
+            h_prob = p_posterior.get(display_h, 0.0)
+            h_emp = w_hours.get(display_h, 0.0)
+            s_hour = int(round(min(26, h_prob * 110)))
+            if h_emp >= 0.8:
+                s_hour += min(7, int(round(h_emp * 3)))
+            if abs(display_h - current_hour) <= 1:
+                s_hour += 4
+            s_hour = max(10, min(35, s_hour))
+
+            # 2. Day of week affinity scoring (6 to 25 points)
+            dow_w = w_dows.get(current_dow, 0.0)
+            dow_cnt = count_dows.get(current_dow, 0)
+            if dow_w >= 1.5 or dow_cnt >= 2:
                 s_dow = 25
-            elif dow_count == 1:
-                s_dow = 16
+            elif dow_w >= 0.7 or dow_cnt == 1:
+                s_dow = 18
+            elif current_dow in chain_prof.get("dow_peak", []):
+                s_dow = 14
             else:
                 s_dow = 6
 
-            # Cycle / interval turnaround scoring
-            if 0.8 <= days_since <= max(7.0, avg_cycle * 1.5):
-                s_cycle = 25  # Prime arrival cycle window
+            # 3. Restock cycle turnaround scoring (7 to 24 points)
+            if 0.8 <= days_since <= max(6.0, avg_cycle * 1.4):
+                s_cycle = 24  # Prime cycle turnaround window!
             elif days_since < 0.8:
-                s_cycle = 14  # Fresh shipment today
-            elif days_since <= avg_cycle * 2.5:
+                s_cycle = 15  # Fresh shipment today
+            elif days_since <= avg_cycle * 2.2:
                 s_cycle = 15  # Slightly overdue
             else:
-                s_cycle = 8
+                s_cycle = 7
 
-            # Current status scoring
+            # 4. Current status & shelf readiness scoring (-15 to 20 points)
             st = d["current_status"]
             if st == "i":
-                s_status = 20  # In-stock report active!
+                s_shelf = 20
             elif st == "o":
-                s_status = 15  # Shelves clear, ready for shipment
+                s_shelf = 16  # Shelves clear, ready for next drop
+            elif st == "n":
+                s_shelf = -15  # Flagged not carrying Pokemon cards
             else:
-                s_status = 5
+                s_shelf = 6
 
-            # Restock frequency / consistency bonus
-            s_cluster = 6 if len(in_ts) >= 4 else 0
+            # Dormancy penalty: no restock in >45 days and not currently 'i'
+            if days_since > 45.0 and st != "i":
+                s_shelf -= 15
+
+            # 5. Restock consistency cluster bonus (0 to 6 points)
+            s_cluster = 6 if len(in_ts) >= 4 and sum_w >= 1.5 else 0
 
             # Calculate final confidence score
-            total_score = min(99, max(20, s_hour + s_dow + s_cycle + s_status + s_cluster))
+            raw_score = s_hour + s_dow + s_cycle + s_shelf + s_cluster + s_truck
+            total_score = min(99, max(15, raw_score))
+            if truck_en_route:
+                total_score = max(total_score, 78)
+
             confidence_level = "prime" if total_score >= 85 else ("high" if total_score >= 70 else "medium")
             predicted_window = f"{display_h:02d}:00 - {(display_h + 1) % 24:02d}:30 JST"
 
-            if dow_count > 0:
-                reasons.append(f"🎯 Đã {dow_count} lần có hàng vào {dow_names[current_dow]}")
-            h_freq = hour_counts.get(display_h, 1)
-            reasons.append(f"⏰ Giờ quen thuộc: {display_h:02d}:00 - {(display_h + 1) % 24:02d}:30 ({h_freq} lần)")
-            if 0.8 <= days_since <= max(7.0, avg_cycle * 1.5):
+            # Build prediction reasons
+            if truck_en_route:
+                reasons.append(
+                    f"🚚 Tuyến xe cùng chuỗi: '{truck_source_name}' (cách {truck_source_dist_m}m) vừa có hàng {truck_source_min_ago} phút trước! Xe hàng nhiều khả năng đang trên tuyến đến đây."
+                )
+
+            if dow_cnt > 0:
+                reasons.append(f"🎯 Đã {dow_cnt} lần có hàng vào {dow_names[current_dow]} (tỷ trọng gần đây cao)")
+            elif current_dow in chain_prof.get("dow_peak", []):
+                reasons.append(f"📅 Trùng ngày giao hàng trọng điểm của {chain_prof['name']} ({dow_names[current_dow]})")
+
+            h_freq = count_hours.get(display_h, 0)
+            if h_freq > 0:
+                reasons.append(f"⏰ Giờ quen thuộc: {display_h:02d}:00 - {(display_h + 1) % 24:02d}:30 ({h_freq} lần)")
+            else:
+                reasons.append(f"⏰ Khung giờ giao hàng đặc trưng chuỗi: {chain_prof['peak_window']}")
+
+            if 0.8 <= days_since <= max(6.0, avg_cycle * 1.4):
                 reasons.append(f"🔄 Điểm rơi chu kỳ: TB {avg_cycle:.1f} ngày/đợt (cách {days_since:.1f} ngày)")
             elif days_since < 0.8:
                 reasons.append("⚡ Vừa có hàng trong ngày hôm nay!")
+
             if st == "i":
                 reasons.append("🟢 Đang có báo cáo CÓ HÀNG gần đây!")
             elif st == "o":
-                reasons.append("📦 Vừa hết hàng - Chuẩn bị nhận đợt mới")
+                reasons.append("📦 Vừa hết hàng - Kệ trống sẵn sàng đón đợt mới")
+            elif st == "n":
+                reasons.append("⚠️ Báo cáo gần nhất: Chưa bán thẻ Pokémon")
+
+        # Determine data reliability rating and action tips
+        if flash_mode == "green":
+            reliability_level = "realtime"
+            reliability_stars = 3
+            reliability_text = "Thời gian thực (100% chính xác)"
+            action_tip = "🔥 Chắc chắn còn hàng! Hãy đến cửa hàng ngay lập tức trước khi hết."
+        elif flash_mode == "red":
+            reliability_level = "realtime"
+            reliability_stars = 3
+            reliability_text = "Thời gian thực (Cảnh báo hết hàng)"
+            action_tip = "⛔ Kệ đã sạch hàng - KHÔNG NÊN ĐẾN tránh lãng phí thời gian!"
+        else:
+            if len(in_ts) >= 5 and sum_w >= 2.0:
+                reliability_level = "verified"
+                reliability_stars = 3
+                reliability_text = "Đã xác minh qua nhiều đợt restock"
+            elif len(in_ts) >= 2 or (len(in_ts) >= 1 and truck_en_route):
+                reliability_level = "high"
+                reliability_stars = 2
+                reliability_text = "Độ tin cậy khá (Lịch sử + Chuỗi)"
+            else:
+                reliability_level = "estimated"
+                reliability_stars = 1
+                reliability_text = "Ước tính theo chuỗi & tuyến xe"
+
+            is_prime_now = (abs(display_h - current_hour) <= 1)
+            if truck_en_route:
+                action_tip = f"🚚 Xe giao hàng đang ở gần ({truck_source_dist_m}m)! Nên ghé kiểm tra kệ trong 20-45 phút tới."
+            elif is_prime_now:
+                action_tip = f"⚡ Đang trong khung giờ vàng ({predicted_window})! Tỷ lệ lên kệ cao nhất trong ngày."
+            elif d["current_status"] == "o" and days_since <= 2.5:
+                action_tip = "📦 Kệ đang trống sau đợt bán trước, rất thích hợp đón đợt bổ sung tiếp theo."
+            else:
+                action_tip = f"🕒 Canh giờ ghé vào khoảng {display_h:02d}:00 - {(display_h + 1) % 24:02d}:30 để có cơ hội cao nhất."
 
         # Status filtering:
         if clean_status in ("green", "hot", "in_stock") and flash_mode != "green":
             continue
         if clean_status in ("red", "warning", "depleted") and flash_mode != "red":
             continue
+        if clean_status in ("truck", "route", "en_route") and not truck_en_route:
+            continue
         if clean_status in ("predictions", "pred_only") and flash_mode != "none":
             continue
 
         # Score threshold filtering:
-        # Keep green flash (100%) and red flash (0% warning), but filter regular predictions below min_score
-        if flash_mode == "none" and total_score < min_score:
+        # Keep green flash (100%), red flash (0% warning), and truck ripple stores, but filter regular predictions below min_score
+        if flash_mode == "none" and not truck_en_route and total_score < min_score:
             continue
 
         # Proximity & Walking Distance calculation
@@ -1927,7 +2169,16 @@ def db_get_restock_predictions(
             "recent_min_ago": recent_min_ago,
             "is_hot_30m": flash_mode == "green",
             "is_cold_30m": flash_mode == "red",
+            "truck_en_route": truck_en_route,
+            "truck_source_name": truck_source_name,
+            "truck_source_dist_m": truck_source_dist_m,
+            "truck_source_min_ago": truck_source_min_ago,
             "confidence_level": confidence_level,
+            "reliability_level": reliability_level,
+            "reliability_stars": reliability_stars,
+            "reliability_text": reliability_text,
+            "action_tip": action_tip,
+            "chain_pattern_match": display_h in prior_peak,
             "predicted_hour": display_h,
             "predicted_window": predicted_window,
             "is_prime_now": is_prime_now,
@@ -1950,7 +2201,6 @@ def db_get_restock_predictions(
             -x["score"]
         ))
     elif sort_by == "score":
-        # Green flashing (100%) at the very top, then regular high probability, then red warnings at the end
         candidates.sort(key=lambda x: (
             0 if x["flash_mode"] == "green" else (1 if x["flash_mode"] == "none" else 2),
             -x["score"],
@@ -1969,13 +2219,15 @@ def db_get_restock_predictions(
             x["predicted_hour"]
         ))
 
+    truck_cand_count = sum(1 for c in candidates if c.get("truck_en_route"))
+    green_30m_count = sum(1 for c in candidates if c["flash_mode"] == "green")
+    red_30m_count = sum(1 for c in candidates if c["flash_mode"] == "red")
+
     if radius_stats["is_active"]:
         radius_stats["prime_stores_today"] = sum(1 for c in candidates if c["score"] >= 70)
-        radius_stats["green_30m_count"] = sum(1 for c in candidates if c["flash_mode"] == "green")
-        radius_stats["red_30m_count"] = sum(1 for c in candidates if c["flash_mode"] == "red")
-    else:
-        radius_stats["green_30m_count"] = sum(1 for c in candidates if c["flash_mode"] == "green")
-        radius_stats["red_30m_count"] = sum(1 for c in candidates if c["flash_mode"] == "red")
+    radius_stats["green_30m_count"] = green_30m_count
+    radius_stats["red_30m_count"] = red_30m_count
+    radius_stats["truck_count"] = truck_cand_count
 
     result_payload = {
         "server_time_jst": now_dt.strftime("%H:%M %d/%m/%Y"),

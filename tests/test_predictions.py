@@ -234,3 +234,138 @@ def test_predictions_html_contains_flash_animations(client):
     assert "tab-count-green" in html
     assert "tab-count-red" in html
 
+
+def test_predictions_recency_decay_weighting():
+    """Verify exponential decay function correctly discounts older events."""
+    import math
+    tau = 21.0
+    w_2d = math.exp(-2.0 / tau)
+    w_14d = math.exp(-14.0 / tau)
+    w_45d = math.exp(-45.0 / tau)
+    assert w_2d > 0.90
+    assert w_14d > 0.50
+    assert w_45d < 0.15
+    assert w_2d > w_14d > w_45d
+
+
+def test_predictions_truck_ripple_effect_boost(client):
+    """Verify truck route ripple detects nearby same-chain in-stock store within 1.8km."""
+    import time
+    from app.db import get_db_connection, _predictions_cache
+
+    _predictions_cache.clear()
+    now_ts = int(time.time())
+
+    with get_db_connection() as conn:
+        c = conn.cursor()
+        # Store A: 7-Eleven restocked 15m ago
+        c.execute("""
+            INSERT OR REPLACE INTO stores (id, name, pref, chain, address, lat, lng, current_status, last_timestamp)
+            VALUES ('test_truck_A', '7-Eleven Truck Pioneer', 'tokyo', 'seven', 'Tokyo Test Pioneer', 35.6800, 139.7600, 'i', ?)
+        """, (now_ts - 900,))
+        # Store B: 7-Eleven 570m away, out of stock
+        c.execute("""
+            INSERT OR REPLACE INTO stores (id, name, pref, chain, address, lat, lng, current_status, last_timestamp)
+            VALUES ('test_truck_B', '7-Eleven Route Target', 'tokyo', 'seven', 'Tokyo Test Target', 35.6840, 139.7640, 'o', ?)
+        """, (now_ts - 86400,))
+        c.execute("""
+            INSERT OR REPLACE INTO store_history (store_id, timestamp, status_code, created_at)
+            VALUES ('test_truck_B', ?, 'i', datetime('now'))
+        """, (now_ts - 86400,))
+        conn.commit()
+
+    try:
+        _predictions_cache.clear()
+        res = client.get("/api/stats/predictions?pref=tokyo&chain=seven&limit=100")
+        assert res.status_code == 200
+        data = res.json()
+        target = next((p for p in data["predictions"] if p["store_id"] == "test_truck_B"), None)
+        assert target is not None, "Target store B should be present in predictions"
+        assert target["truck_en_route"] is True
+        assert target["truck_source_name"] == "7-Eleven Truck Pioneer"
+        assert target["truck_source_dist_m"] < 1000
+        assert target["score"] >= 78
+        assert any("Tuyến xe cùng chuỗi" in r for r in target["reasons"])
+        assert "Xe giao hàng đang ở gần" in target["action_tip"] or "Xe hàng đang ở gần" in target["action_tip"]
+    finally:
+        with get_db_connection() as conn:
+            c = conn.cursor()
+            c.execute("DELETE FROM store_history WHERE store_id IN ('test_truck_A', 'test_truck_B')")
+            c.execute("DELETE FROM stores WHERE id IN ('test_truck_A', 'test_truck_B')")
+            conn.commit()
+        _predictions_cache.clear()
+
+
+def test_predictions_data_reliability_and_tips(client):
+    """Verify every prediction includes reliability level, stars, and actionable advice tip."""
+    res = client.get("/api/stats/predictions?limit=30")
+    assert res.status_code == 200
+    data = res.json()
+    preds = data["predictions"]
+    assert len(preds) > 0
+    valid_levels = {"realtime", "verified", "high", "estimated"}
+
+    for p in preds:
+        assert p["reliability_level"] in valid_levels
+        assert 1 <= p["reliability_stars"] <= 3
+        assert isinstance(p["reliability_text"], str) and len(p["reliability_text"]) > 0
+        assert isinstance(p["action_tip"], str) and len(p["action_tip"]) > 0
+        assert "chain_pattern_match" in p
+
+
+def test_predictions_truck_filter_tab(client):
+    """Verify status=truck endpoint filter properly isolates truck route ripple stores."""
+    import time
+    from app.db import get_db_connection, _predictions_cache
+
+    _predictions_cache.clear()
+    now_ts = int(time.time())
+
+    with get_db_connection() as conn:
+        c = conn.cursor()
+        c.execute("""
+            INSERT OR REPLACE INTO stores (id, name, pref, chain, address, lat, lng, current_status, last_timestamp)
+            VALUES ('test_truck_f1', 'Lawson Delivery Source', 'osaka', 'lawson', 'Osaka Truck F1', 34.6600, 135.5000, 'i', ?)
+        """, (now_ts - 600,))
+        c.execute("""
+            INSERT OR REPLACE INTO stores (id, name, pref, chain, address, lat, lng, current_status, last_timestamp)
+            VALUES ('test_truck_f2', 'Lawson Delivery Target', 'osaka', 'lawson', 'Osaka Truck F2', 34.6650, 135.5040, 'o', ?)
+        """, (now_ts - 72000,))
+        c.execute("""
+            INSERT OR REPLACE INTO store_history (store_id, timestamp, status_code, created_at)
+            VALUES ('test_truck_f2', ?, 'i', datetime('now'))
+        """, (now_ts - 72000,))
+        conn.commit()
+
+    try:
+        _predictions_cache.clear()
+        res = client.get("/api/stats/predictions?pref=osaka&status=truck")
+        assert res.status_code == 200
+        data = res.json()
+        preds = data["predictions"]
+        for p in preds:
+            assert p["truck_en_route"] is True
+    finally:
+        with get_db_connection() as conn:
+            c = conn.cursor()
+            c.execute("DELETE FROM store_history WHERE store_id IN ('test_truck_f1', 'test_truck_f2')")
+            c.execute("DELETE FROM stores WHERE id IN ('test_truck_f1', 'test_truck_f2')")
+            conn.commit()
+        _predictions_cache.clear()
+
+
+def test_predictions_html_contains_truck_and_reliability_elements(client):
+    """Verify /dudoan HTML includes truck tab, badges, and actionable tip containers."""
+    res = client.get("/dudoan")
+    assert res.status_code == 200
+    html = res.text
+    assert "tab-truck" in html
+    assert "tab-count-truck" in html
+    assert "truck-enroute-badge" in html
+    assert "pulse-truck-dot" in html
+    assert "card-action-tip" in html
+    assert "reliability-stars" in html
+    assert "Khung giờ &amp; Chuỗi" in html
+    assert "Phân rã thời gian" in html
+
+
