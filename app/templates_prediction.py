@@ -1,13 +1,13 @@
 """
 HTML Template and Page Renderer for PokéMap AI Restock Prediction Dashboard
 Routes: GET /dudoan, GET /goiy, GET /radar, GET /predict
-Real-time Restock Timing Predictions by Hour & Day of Week.
+Real-time Restock Timing Predictions by Hour, Day of Week & Distance Radius (KM).
 """
 
 def render_dudoan_page() -> str:
     from .templates import get_shared_head, SHARED_BASE_CSS, render_shared_footer, SHARED_MODALS_HTML
 
-    shared_head = get_shared_head("🎯 Dự Đoán Restock Theo Giờ - AI Pokédar Tracker", include_leaflet=False)
+    shared_head = get_shared_head("🎯 Dự Đoán Restock Theo Giờ & Bán Kính - AI Pokédar Tracker", include_leaflet=False)
     shared_footer = render_shared_footer("dudoan")
 
     html = """__SHARED_HEAD__
@@ -173,6 +173,115 @@ __SHARED_BASE_CSS__
       display: inline-flex;
       align-items: center;
       gap: 5px;
+    }
+
+    /* RADIUS CONTROL & LOCAL STATS SECTION */
+    .radius-bar-card {
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+    .radius-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .radius-title {
+      font-size: 0.78rem;
+      font-weight: 800;
+      color: #e2e8f0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .radius-chips-row {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      margin-bottom: 4px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .radius-chip {
+      padding: 6px 12px;
+      border-radius: 8px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #cbd5e1;
+      font-size: 0.72rem;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+    }
+    .radius-chip:hover {
+      background: #334155;
+      color: #ffffff;
+    }
+    .radius-chip.active {
+      background: #059669;
+      border-color: #10b981;
+      color: #ffffff;
+      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+    }
+
+    /* RADIUS KPI GRID */
+    .radius-kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-top: 10px;
+    }
+    @media (min-width: 640px) {
+      .radius-kpi-grid {
+        grid-template-columns: repeat(4, 1fr);
+      }
+    }
+    .radius-kpi-box {
+      background: #141e33;
+      border: 1px solid #1e293b;
+      border-radius: 10px;
+      padding: 10px;
+      position: relative;
+      overflow: hidden;
+    }
+    .radius-kpi-box::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 3px;
+      bottom: 0;
+      background: #38bdf8;
+    }
+    .kpi-accent-green::before { background: #10b981; }
+    .kpi-accent-amber::before { background: #f59e0b; }
+    .kpi-accent-red::before { background: #ef4444; }
+    .kpi-accent-purple::before { background: #8b5cf6; }
+
+    .radius-kpi-val {
+      font-size: 1.25rem;
+      font-weight: 900;
+      color: #f8fafc;
+      line-height: 1.1;
+    }
+    .radius-kpi-label {
+      font-size: 0.68rem;
+      font-weight: 800;
+      color: #94a3b8;
+      margin-top: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .radius-kpi-sub {
+      font-size: 0.62rem;
+      color: #cbd5e1;
+      margin-top: 2px;
     }
 
     /* TIMELINE & HOUR FILTER BAR */
@@ -503,9 +612,6 @@ __SHARED_BASE_CSS__
       gap: 4px;
       line-height: 1.3;
     }
-    .ai-reason-item strong {
-      color: #f1f5f9;
-    }
 
     /* CARD ACTIONS */
     .card-actions-row {
@@ -643,12 +749,12 @@ __SHARED_BASE_CSS__
       <div>
         <div class="radar-title">🎯 Dự Đoán Restock Theo Giờ</div>
         <div class="radar-subtitle">
-          <span>Hệ thống phân tích tần suất &amp; chu kỳ restock theo giờ</span>
+          <span>Hệ thống phân tích tỉ lệ &amp; chu kỳ restock theo bán kính</span>
         </div>
       </div>
     </div>
     <div class="radar-actions">
-      <button type="button" class="radar-btn radar-btn-outline radar-btn-gps" id="btn-gps-toggle" onclick="toggleGPSLocation()" title="Lấy định vị GPS của bạn để sắp xếp gần nhất">
+      <button type="button" class="radar-btn radar-btn-outline radar-btn-gps" id="btn-gps-toggle" onclick="toggleGPSLocation()" title="Lấy định vị GPS của bạn để đo lường bán kính chính xác">
         <span id="gps-icon">📍</span>
         <span id="gps-label">Định vị GPS</span>
       </button>
@@ -677,11 +783,73 @@ __SHARED_BASE_CSS__
       </div>
     </div>
 
+    <!-- Radius Selector & Local Rate Measurement Card -->
+    <div class="radius-bar-card">
+      <div class="radius-header-row">
+        <div class="radius-title">
+          <span>📍 BÁN KÍNH TỪ VỊ TRÍ CỦA BẠN &amp; ĐO LƯỜNG TỈ LỆ CÓ HÀNG</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:6px;">
+          <select id="anchor-select" class="radar-select" onchange="onAnchorSelectChange()" style="font-size:0.7rem; padding:4px 8px;">
+            <option value="gps">📍 Vị trí GPS của tôi (Tự động)</option>
+            <option value="namba" selected>📍 Ga Namba (Osaka)</option>
+            <option value="umeda">📍 Ga Umeda / Osaka</option>
+            <option value="imamiya">📍 Ga Imamiya (Osaka)</option>
+            <option value="ota">📍 Ota Road (Nipponbashi)</option>
+            <option value="tennoji">📍 Ga Tennoji (Osaka)</option>
+            <option value="shinjuku">📍 Ga Shinjuku (Tokyo)</option>
+            <option value="akiba">📍 Ga Akihabara (Tokyo)</option>
+            <option value="shibuya">📍 Ga Shibuya (Tokyo)</option>
+            <option value="nagoya">📍 Ga Nagoya (Aichi)</option>
+            <option value="yokohama">📍 Ga Yokohama (Kanagawa)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Quick Radius Chips -->
+      <div class="radius-chips-row">
+        <button class="radius-chip" data-radius="1" onclick="selectRadiusKm(1)">📍 1 km</button>
+        <button class="radius-chip" data-radius="2" onclick="selectRadiusKm(2)">📍 2 km</button>
+        <button class="radius-chip active" data-radius="3" onclick="selectRadiusKm(3)">📍 3 km (Quanh bạn)</button>
+        <button class="radius-chip" data-radius="5" onclick="selectRadiusKm(5)">📍 5 km</button>
+        <button class="radius-chip" data-radius="10" onclick="selectRadiusKm(10)">📍 10 km</button>
+        <button class="radius-chip" data-radius="20" onclick="selectRadiusKm(20)">📍 20 km</button>
+        <button class="radius-chip" data-radius="" onclick="selectRadiusKm('')">🗾 Toàn vùng</button>
+      </div>
+
+      <!-- Local Radius KPIs -->
+      <div id="radius-kpi-container" class="radius-kpi-grid" style="display:none;">
+        <div class="radius-kpi-box kpi-accent-green">
+          <div class="radius-kpi-val" id="kpi-rate-now" style="color:#34d399;">0%</div>
+          <div class="radius-kpi-label">Có hàng lúc này</div>
+          <div class="radius-kpi-sub" id="kpi-sub-now">0 / 0 quán</div>
+        </div>
+        <div class="radius-kpi-box kpi-accent-amber">
+          <div class="radius-kpi-val" id="kpi-rate-ever" style="color:#fbbf24;">0%</div>
+          <div class="radius-kpi-label">Từng về hàng</div>
+          <div class="radius-kpi-sub" id="kpi-sub-ever">0 / 0 quán trong bán kính</div>
+        </div>
+        <div class="radius-kpi-box kpi-accent-purple">
+          <div class="radius-kpi-val" id="kpi-peak-hour" style="color:#c084fc; font-size:1.05rem;">--:-- JST</div>
+          <div class="radius-kpi-label">Giờ vàng bán kính này</div>
+          <div class="radius-kpi-sub" id="kpi-sub-peak">Khung giờ xe tải trả hàng</div>
+        </div>
+        <div class="radius-kpi-box kpi-accent-red">
+          <div class="radius-kpi-val" id="kpi-prime-today" style="color:#f87171;">0 quán</div>
+          <div class="radius-kpi-label">Có thể có hàng hôm nay</div>
+          <div class="radius-kpi-sub" id="kpi-sub-prime">Xác suất cao (≥70%)</div>
+        </div>
+      </div>
+      <div id="radius-kpi-empty" style="font-size:0.7rem; color:#94a3b8; margin-top:8px; display:block;">
+        💡 Chọn bán kính km từ vị trí của bạn để hệ thống đo lường chính xác tỉ lệ có hàng và chu kỳ xe tải riêng trong khu vực bạn!
+      </div>
+    </div>
+
     <!-- Timeline & Hour Bar -->
     <div class="timeline-card">
       <div class="timeline-title-row">
         <div class="timeline-title">
-          <span>⏰ KHUNG GIỜ SĂN THẺ HÔM NAY</span>
+          <span id="timeline-card-heading">⏰ KHUNG GIỜ SĂN THẺ THEO LỊCH SỬ</span>
         </div>
         <span style="font-size:0.68rem; color:#94a3b8;" id="timeline-current-dow">Hôm nay</span>
       </div>
@@ -733,19 +901,9 @@ __SHARED_BASE_CSS__
 
       <div>
         <select id="filter-sort" class="radar-select" onchange="onFilterChange()">
+          <option value="distance" selected>📍 Gần tôi nhất (Khoảng cách GPS)</option>
           <option value="score">🔥 Xác suất cao nhất (Score)</option>
-          <option value="distance">📍 Gần tôi nhất (Khoảng cách GPS)</option>
           <option value="time">⏰ Giờ restock sớm nhất</option>
-        </select>
-      </div>
-
-      <div>
-        <select id="filter-radius" class="radar-select" onchange="onFilterChange()">
-          <option value="">📏 Mọi khoảng cách</option>
-          <option value="2">📍 Dưới 2 km</option>
-          <option value="5">📍 Dưới 5 km</option>
-          <option value="10">📍 Dưới 10 km</option>
-          <option value="20">📍 Dưới 20 km</option>
         </select>
       </div>
 
@@ -765,16 +923,16 @@ __SHARED_BASE_CSS__
     <!-- Algorithm Explainer Section -->
     <div class="algo-explainer-card">
       <div class="algo-explainer-title">
-        <span>🤖 Thuật toán PokéDar AI hoạt động như thế nào?</span>
+        <span>🤖 Thuật toán PokéDar AI đo lường tỉ lệ &amp; dự đoán như thế nào?</span>
       </div>
       <p style="font-size:0.72rem; color:#94a3b8; line-height:1.45;">
-        Mô hình AI quét toàn bộ 27.000+ báo cáo từ các cửa hàng, bóc tách giờ giao xe tải thực tế và chu kỳ quay vòng hàng tại từng địa điểm cụ thể để xếp hạng xác suất:
+        Hệ thống không chỉ dự đoán chung chung toàn tỉnh, mà bóc tách theo từng <strong>bán kính khoảng cách cụ thể từ vị trí của bạn</strong>. Tỉ lệ có hàng và biểu đồ giờ được tính riêng cho các cửa hàng quanh khu vực bạn sinh sống để đạt độ chính xác thực tế cao nhất:
       </p>
       <div class="algo-weights-grid">
         <div class="algo-weight-box">
           <div class="algo-weight-pct">35%</div>
           <div class="algo-weight-name">Khung giờ vàng</div>
-          <div class="algo-weight-desc">Giờ xe tải đại lý giao hàng quen thuộc</div>
+          <div class="algo-weight-desc">Giờ xe tải trả hàng quen thuộc quanh bán kính</div>
         </div>
         <div class="algo-weight-box">
           <div class="algo-weight-pct">25%</div>
@@ -784,12 +942,12 @@ __SHARED_BASE_CSS__
         <div class="algo-weight-box">
           <div class="algo-weight-pct">25%</div>
           <div class="algo-weight-name">Chu kỳ restock</div>
-          <div class="algo-weight-desc">Số ngày kể từ lần có hàng gần nhất</div>
+          <div class="algo-weight-desc">Số ngày kể từ lần có hàng gần nhất của quán</div>
         </div>
         <div class="algo-weight-box">
           <div class="algo-weight-pct">15%</div>
-          <div class="algo-weight-name">Trạng thái tức thời</div>
-          <div class="algo-weight-desc">Tình trạng kệ hàng và báo cáo hiện tại</div>
+          <div class="algo-weight-name">Khoảng cách &amp; Kệ hàng</div>
+          <div class="algo-weight-desc">Vị trí địa lý GPS và trạng thái hiện tại</div>
         </div>
       </div>
     </div>
@@ -813,11 +971,26 @@ __SHARED_BASE_CSS__
   __SHARED_FOOTER__
 
   <script>
+    // Known anchor coordinates
+    const ANCHOR_COORDS = {
+      namba: { lat: 34.6667, lng: 135.5000, name: 'Ga Namba (Osaka)', pref: 'osaka' },
+      umeda: { lat: 34.7024, lng: 135.4959, name: 'Ga Umeda (Osaka)', pref: 'osaka' },
+      imamiya: { lat: 34.6540, lng: 135.4925, name: 'Ga Imamiya (Osaka)', pref: 'osaka' },
+      ota: { lat: 34.6628, lng: 135.5058, name: 'Nipponbashi Ota Road', pref: 'osaka' },
+      tennoji: { lat: 34.6472, lng: 135.5140, name: 'Ga Tennoji (Osaka)', pref: 'osaka' },
+      shinjuku: { lat: 35.6896, lng: 139.7006, name: 'Ga Shinjuku (Tokyo)', pref: 'tokyo' },
+      akiba: { lat: 35.6983, lng: 139.7731, name: 'Ga Akihabara (Tokyo)', pref: 'tokyo' },
+      shibuya: { lat: 35.6580, lng: 139.7016, name: 'Ga Shibuya (Tokyo)', pref: 'tokyo' },
+      nagoya: { lat: 35.1709, lng: 136.8815, name: 'Ga Nagoya (Aichi)', pref: 'aichi' },
+      yokohama: { lat: 35.4658, lng: 139.6227, name: 'Ga Yokohama (Kanagawa)', pref: 'kanagawa' }
+    };
+
     // State
     let currentWindow = 'now';
     let currentTargetHour = null;
-    let userLat = null;
-    let userLng = null;
+    let selectedRadiusKm = 3.0; // Default: 3km radius
+    let userLat = 34.6667; // Default Namba
+    let userLng = 135.5000;
     let isGpsActive = false;
     let hourlyDistData = [];
 
@@ -829,6 +1002,8 @@ __SHARED_BASE_CSS__
         userLat = parseFloat(savedLat);
         userLng = parseFloat(savedLng);
         isGpsActive = true;
+        const anchorSel = document.getElementById('anchor-select');
+        if (anchorSel) anchorSel.value = 'gps';
         updateGpsButtonUI();
       }
     } catch(e) {}
@@ -847,16 +1022,16 @@ __SHARED_BASE_CSS__
 
     function toggleGPSLocation() {
       if (isGpsActive) {
-        // Toggle off
-        userLat = null;
-        userLng = null;
+        // Switch to anchor Namba
         isGpsActive = false;
         try {
           localStorage.removeItem('user_last_lat');
           localStorage.removeItem('user_last_lng');
         } catch(e) {}
         updateGpsButtonUI();
-        loadPredictions();
+        const anchorSel = document.getElementById('anchor-select');
+        if (anchorSel) anchorSel.value = 'namba';
+        onAnchorSelectChange();
         return;
       }
 
@@ -878,15 +1053,46 @@ __SHARED_BASE_CSS__
             localStorage.setItem('user_last_lng', String(userLng));
           } catch(e) {}
           updateGpsButtonUI();
+          const anchorSel = document.getElementById('anchor-select');
+          if (anchorSel) anchorSel.value = 'gps';
           loadPredictions();
         },
         (err) => {
-          alert('Không thể lấy vị trí GPS. Hãy kiểm tra quyền định vị trên thiết bị.');
+          alert('Không thể lấy vị trí GPS. Đang sử dụng điểm neo gần nhất.');
           lbl.textContent = 'Định vị GPS';
           isGpsActive = false;
         },
         { enableHighAccuracy: true, timeout: 8000 }
       );
+    }
+
+    function onAnchorSelectChange() {
+      const val = document.getElementById('anchor-select').value;
+      if (val === 'gps') {
+        toggleGPSLocation();
+        return;
+      }
+      const coords = ANCHOR_COORDS[val];
+      if (coords) {
+        userLat = coords.lat;
+        userLng = coords.lng;
+        isGpsActive = false;
+        updateGpsButtonUI();
+        if (coords.pref) {
+          const prefEl = document.getElementById('filter-pref');
+          if (prefEl) prefEl.value = coords.pref;
+        }
+        loadPredictions();
+      }
+    }
+
+    function selectRadiusKm(r) {
+      selectedRadiusKm = r === '' ? null : parseFloat(r);
+      document.querySelectorAll('.radius-chip').forEach(btn => {
+        const btnR = btn.getAttribute('data-radius');
+        btn.classList.toggle('active', (r === '' && btnR === '') || (btnR !== '' && parseFloat(btnR) === selectedRadiusKm));
+      });
+      loadPredictions();
     }
 
     function selectTimeWindow(win) {
@@ -921,13 +1127,12 @@ __SHARED_BASE_CSS__
       const pref = document.getElementById('filter-pref').value;
       const chain = document.getElementById('filter-chain').value;
       const sort = document.getElementById('filter-sort').value;
-      const radius = document.getElementById('filter-radius').value;
 
       const listEl = document.getElementById('prediction-list');
       listEl.innerHTML = `
         <div class="state-box" style="grid-column: 1 / -1;">
           <div class="spinner"></div>
-          <div>Đang nạp gợi ý từ mô hình dự đoán PokéDar...</div>
+          <div>Đang đo lường tỉ lệ có hàng và nạp gợi ý từ mô hình dự đoán PokéDar...</div>
         </div>
       `;
 
@@ -940,8 +1145,8 @@ __SHARED_BASE_CSS__
 
       if (userLat !== null && userLng !== null) {
         url += `&user_lat=${userLat}&user_lng=${userLng}`;
-        if (radius) {
-          url += `&max_dist_km=${radius}`;
+        if (selectedRadiusKm !== null) {
+          url += `&max_dist_km=${selectedRadiusKm}`;
         }
       }
 
@@ -967,7 +1172,10 @@ __SHARED_BASE_CSS__
       document.getElementById('timeline-current-dow').textContent = `${data.current_dow_name || 'Hôm nay'} (${data.current_dow_jp || ''})`;
       document.getElementById('res-count-num').textContent = data.predictions ? data.predictions.length : 0;
 
-      // Update banner text
+      // 2. Render Radius KPIs Widget
+      renderRadiusStats(data.radius_stats);
+
+      // 3. Update banner text
       const curH = data.current_hour !== undefined ? data.current_hour : 9;
       const curHStr = curH < 10 ? '0' + curH : String(curH);
       const bannerTitle = document.getElementById('banner-status-title');
@@ -990,10 +1198,10 @@ __SHARED_BASE_CSS__
         bannerDesc.textContent = `Đang phân tích chu kỳ giao hàng sớm cho buổi sáng hôm nay.`;
       }
 
-      // 2. Render 24-hour scroller
-      renderHourScroller(data.hourly_distribution, curH);
+      // 4. Render 24-hour scroller
+      renderHourScroller(data.hourly_distribution, curH, data.radius_stats);
 
-      // 3. Render prediction cards
+      // 5. Render prediction cards
       const listEl = document.getElementById('prediction-list');
       const items = data.predictions || [];
 
@@ -1001,8 +1209,8 @@ __SHARED_BASE_CSS__
         listEl.innerHTML = `
           <div class="state-box" style="grid-column: 1 / -1;">
             <div style="font-size:2rem; margin-bottom:10px;">🔍</div>
-            <div style="font-size:0.95rem; font-weight:800; color:#f8fafc;">Không tìm thấy cửa hàng phù hợp bộ lọc</div>
-            <div style="font-size:0.75rem; color:#94a3b8; margin-top:4px;">Hãy thử chọn khung giờ khác hoặc mở rộng bán kính khoảng cách.</div>
+            <div style="font-size:0.95rem; font-weight:800; color:#f8fafc;">Không tìm thấy cửa hàng phù hợp trong bán kính này</div>
+            <div style="font-size:0.75rem; color:#94a3b8; margin-top:4px;">Hãy thử mở rộng bán kính lên 5km hoặc 10km, hoặc chọn khung giờ khác.</div>
           </div>
         `;
         return;
@@ -1018,7 +1226,7 @@ __SHARED_BASE_CSS__
         const nowNotice = p.is_prime_now ? '<span style="color:#34d399; font-weight:900;">• Sắp / Đang đến giờ!</span>' : '';
 
         const distHtml = p.distance_str ? `
-          <span class="dist-badge" title="Khoảng cách từ GPS của bạn">
+          <span class="dist-badge" title="Khoảng cách từ vị trí của bạn">
             📍 ${p.distance_str} ${p.walk_time_min ? `(~${p.walk_time_min}p đi bộ)` : ''}
           </span>
         ` : '';
@@ -1087,7 +1295,38 @@ __SHARED_BASE_CSS__
       }).join('');
     }
 
-    function renderHourScroller(distArray, currentHour) {
+    function renderRadiusStats(radStats) {
+      const container = document.getElementById('radius-kpi-container');
+      const emptyMsg = document.getElementById('radius-kpi-empty');
+      const headingEl = document.getElementById('timeline-card-heading');
+
+      if (!radStats || !radStats.is_active) {
+        container.style.display = 'none';
+        emptyMsg.style.display = 'block';
+        headingEl.textContent = '⏰ KHUNG GIỜ SĂN THẺ TOÀN VÙNG (TỔNG HỢP)';
+        return;
+      }
+
+      container.style.display = 'grid';
+      emptyMsg.style.display = 'none';
+      headingEl.textContent = `⏰ KHUNG GIỜ RESTOCK TRONG BÁN KÍNH ${radStats.radius_km} KM QUANH BẠN`;
+
+      // Fill values
+      document.getElementById('kpi-rate-now').textContent = `${radStats.in_stock_rate}%`;
+      document.getElementById('kpi-sub-now').textContent = `${radStats.in_stock_now} / ${radStats.total_stores} quán có hàng`;
+
+      document.getElementById('kpi-rate-ever').textContent = `${radStats.ever_restocked_rate}%`;
+      document.getElementById('kpi-sub-ever').textContent = `${radStats.ever_restocked} / ${radStats.total_stores} quán từng về hàng`;
+
+      const peakWindowText = radStats.peak_window || '--:-- JST';
+      document.getElementById('kpi-peak-hour').textContent = peakWindowText;
+      document.getElementById('kpi-sub-peak').textContent = `Đỉnh điểm ${radStats.peak_hour_count} đợt xe trả hàng`;
+
+      document.getElementById('kpi-prime-today').textContent = `${radStats.prime_stores_today} quán`;
+      document.getElementById('kpi-sub-prime').textContent = `Xác suất cao (≥70%)`;
+    }
+
+    function renderHourScroller(distArray, currentHour, radStats) {
       const scroller = document.getElementById('hour-scroller-bar');
       if (!distArray || distArray.length < 24) return;
 
@@ -1103,7 +1342,7 @@ __SHARED_BASE_CSS__
         const activeClass = isActive ? ' active' : '';
 
         return `
-          <div class="hour-pill${nowClass}${activeClass}" data-hour="${h}" onclick="selectSpecificHour(${h})" title="${h}:00 JST - ${count} đợt restock lịch sử">
+          <div class="hour-pill${nowClass}${activeClass}" data-hour="${h}" onclick="selectSpecificHour(${h})" title="${h}:00 JST - ${count} đợt restock ghi nhận">
             <span class="hour-label">${h < 10 ? '0' + h : h}:00</span>
             <div class="hour-bar-wrap">
               <div class="hour-bar-fill" style="width:${pct}%;"></div>

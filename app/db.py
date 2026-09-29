@@ -1606,7 +1606,84 @@ def db_get_restock_predictions(
             except Exception:
                 pass
 
-    # 3. Analyze each candidate store
+    # 3. Radius-specific calculations if user location and max_dist_km are specified
+    radius_stats = {
+        "is_active": False,
+        "radius_km": round(max_dist_km, 1) if max_dist_km else None,
+        "total_stores": 0,
+        "in_stock_now": 0,
+        "in_stock_rate": 0.0,
+        "ever_restocked": 0,
+        "ever_restocked_rate": 0.0,
+        "peak_hour": None,
+        "peak_hour_count": 0,
+        "peak_window": "",
+        "prime_stores_today": 0
+    }
+
+    if user_lat is not None and user_lng is not None and max_dist_km is not None and max_dist_km > 0:
+        dlat = (max_dist_km + 0.5) / 111.0
+        dlng = (max_dist_km + 0.5) / (111.0 * max(0.01, math.cos(math.radians(user_lat))))
+
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT id, lat, lng, current_status
+                FROM stores
+                WHERE lat BETWEEN ? AND ? AND lng BETWEEN ? AND ?;
+            """, (user_lat - dlat, user_lat + dlat, user_lng - dlng, user_lng + dlng))
+            box_stores = cursor.fetchall()
+
+            stores_in_radius = []
+            for s in box_stores:
+                dist = _calc_haversine_dist(user_lat, user_lng, s["lat"], s["lng"])
+                if dist <= max_dist_km:
+                    stores_in_radius.append(s)
+
+            radius_store_ids = set(s["id"] for s in stores_in_radius)
+            total_in_radius = len(stores_in_radius)
+            in_stock_now_in_radius = sum(1 for s in stores_in_radius if s["current_status"] == 'i')
+
+            radius_hourly_dist = [0] * 24
+            ever_restocked_ids = set()
+            if radius_store_ids:
+                id_list = list(radius_store_ids)
+                batch_size = 900
+                for i in range(0, len(id_list), batch_size):
+                    batch = id_list[i:i + batch_size]
+                    q_marks = ",".join("?" for _ in batch)
+                    cursor.execute(f"""
+                        SELECT store_id, timestamp
+                        FROM store_history
+                        WHERE timestamp > 0 AND status_code = 'i' AND store_id IN ({q_marks});
+                    """, batch)
+                    for r_sid, r_ts in cursor.fetchall():
+                        h_jst = (r_ts + 32400) % 86400 // 3600
+                        radius_hourly_dist[h_jst] += 1
+                        ever_restocked_ids.add(r_sid)
+
+            peak_h = max(range(24), key=lambda h: radius_hourly_dist[h]) if radius_store_ids else 10
+            peak_h_cnt = radius_hourly_dist[peak_h]
+            in_stock_rate = round(in_stock_now_in_radius / total_in_radius * 100, 1) if total_in_radius > 0 else 0.0
+            ever_rate = round(len(ever_restocked_ids) / total_in_radius * 100, 1) if total_in_radius > 0 else 0.0
+
+            radius_stats = {
+                "is_active": True,
+                "radius_km": round(max_dist_km, 1),
+                "total_stores": total_in_radius,
+                "in_stock_now": in_stock_now_in_radius,
+                "in_stock_rate": in_stock_rate,
+                "ever_restocked": len(ever_restocked_ids),
+                "ever_restocked_rate": ever_rate,
+                "peak_hour": peak_h,
+                "peak_hour_count": peak_h_cnt,
+                "peak_window": f"{peak_h:02d}:00 - {(peak_h + 1) % 24:02d}:30 JST",
+                "prime_stores_today": 0
+            }
+            # Use radius-specific hourly distribution for local timeline
+            hourly_distribution = radius_hourly_dist
+
+    # 4. Analyze each candidate store
     candidates = []
 
     # Prepare window bounds if window filter selected
@@ -1778,12 +1855,16 @@ def db_get_restock_predictions(
     else:
         candidates.sort(key=lambda x: (-x["score"], x["predicted_hour"]))
 
+    if radius_stats["is_active"]:
+        radius_stats["prime_stores_today"] = sum(1 for c in candidates if c["score"] >= 70)
+
     result_payload = {
         "server_time_jst": now_dt.strftime("%H:%M %d/%m/%Y"),
         "current_hour": current_hour,
         "current_dow": current_dow,
         "current_dow_name": dow_names[current_dow],
         "current_dow_jp": dow_jp_names[current_dow],
+        "radius_stats": radius_stats,
         "hourly_distribution": hourly_distribution,
         "total_candidates": len(candidates),
         "predictions": candidates[:limit]

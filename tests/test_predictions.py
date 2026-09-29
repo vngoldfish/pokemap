@@ -132,6 +132,32 @@ def test_predictions_api_gps_distance(client):
             assert preds[i]["distance_km"] <= preds[i + 1]["distance_km"]
 
 
+def test_predictions_api_radius_stats(client):
+    """Verify local radius statistics and in-stock rate calculations."""
+    # Namba Station, Osaka: 3km radius
+    lat = 34.6667
+    lng = 135.5000
+    r_km = 3.0
+    res = client.get(f"/api/stats/predictions?user_lat={lat}&user_lng={lng}&max_dist_km={r_km}&limit=20")
+    assert res.status_code == 200
+    data = res.json()
+    assert "radius_stats" in data
+    rs = data["radius_stats"]
+    assert rs["is_active"] is True
+    assert rs["radius_km"] == 3.0
+    assert rs["total_stores"] > 100
+    assert rs["ever_restocked"] > 20
+    assert rs["ever_restocked_rate"] > 5.0
+    assert rs["peak_hour"] is not None
+    assert 0 <= rs["peak_hour"] <= 23
+
+    # All stores returned should be <= 3km
+    preds = data["predictions"]
+    for p in preds:
+        if p["distance_km"] is not None:
+            assert p["distance_km"] <= 3.05
+
+
 def test_predictions_js_syntax_with_node():
     """Verify embedded JavaScript in prediction template has 0 syntax errors."""
     import re
@@ -146,3 +172,4 @@ def test_predictions_js_syntax_with_node():
             capture_output=True
         )
         assert proc.returncode == 0, f"Node syntax error in script #{idx+1}: {proc.stderr.decode('utf-8')}"
+
