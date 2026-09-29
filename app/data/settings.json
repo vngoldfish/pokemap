@@ -22,7 +22,7 @@
     "telegramBotToken": "8888535478:AAFtlcFhwjhlAvLZ4lPf7tGQtnZ8XIoKvSE",
     "telegramChatId": "5572197416",
     "telegramEnabled": true,
-    "telegramStatus": "all",
+    "telegramStatus": "in",
     "telegramChain": "all",
     "telegramTime": "24",
     "telegramRegion": "osaka",
