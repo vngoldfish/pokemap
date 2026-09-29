@@ -486,6 +486,140 @@ __SHARED_BASE_CSS__
       background: linear-gradient(90deg, #ef4444, #f59e0b);
     }
 
+    /* FLASHING 30-MIN IN-STOCK & OUT-OF-STOCK CARDS */
+    @keyframes pulse-green-glow {
+      0% {
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.75);
+        border-color: #10b981;
+      }
+      50% {
+        box-shadow: 0 0 20px 5px rgba(16, 185, 129, 0.9);
+        border-color: #34d399;
+      }
+      100% {
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.75);
+        border-color: #10b981;
+      }
+    }
+    @keyframes pulse-red-glow {
+      0% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.75);
+        border-color: #ef4444;
+      }
+      50% {
+        box-shadow: 0 0 20px 5px rgba(239, 68, 68, 0.9);
+        border-color: #f87171;
+      }
+      100% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.75);
+        border-color: #ef4444;
+      }
+    }
+    @keyframes badge-blink {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.7; transform: scale(1.05); }
+    }
+
+    .pred-card.card-flash-green {
+      border: 2px solid #10b981 !important;
+      background: linear-gradient(135deg, rgba(6, 78, 59, 0.65), rgba(15, 23, 42, 0.96)) !important;
+      animation: pulse-green-glow 1.4s infinite ease-in-out;
+    }
+    .pred-card.card-flash-green::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #10b981, #34d399, #10b981);
+    }
+
+    .pred-card.card-flash-red {
+      border: 2px solid #ef4444 !important;
+      background: linear-gradient(135deg, rgba(127, 29, 29, 0.65), rgba(15, 23, 42, 0.96)) !important;
+      animation: pulse-red-glow 1.4s infinite ease-in-out;
+    }
+    .pred-card.card-flash-red::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #ef4444, #f87171, #ef4444);
+    }
+
+    .score-badge-flash-green {
+      background: linear-gradient(135deg, #059669, #10b981) !important;
+      color: #ffffff !important;
+      animation: badge-blink 1.2s infinite ease-in-out;
+      font-size: 0.74rem !important;
+      box-shadow: 0 0 10px rgba(16, 185, 129, 0.6);
+    }
+    .score-badge-flash-red {
+      background: linear-gradient(135deg, #b91c1c, #ef4444) !important;
+      color: #ffffff !important;
+      animation: badge-blink 1.2s infinite ease-in-out;
+      font-size: 0.74rem !important;
+      box-shadow: 0 0 10px rgba(239, 68, 68, 0.6);
+    }
+
+    /* STATUS TABS FOR REAL-TIME & PREDICTIONS */
+    .status-filter-tabs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 12px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .status-tab-btn {
+      padding: 7px 12px;
+      border-radius: 9px;
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      color: #cbd5e1;
+      font-size: 0.75rem;
+      font-weight: 800;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+    }
+    .status-tab-btn:hover {
+      background: #1e293b;
+      color: #ffffff;
+      border-color: #334155;
+    }
+    .status-tab-btn.active {
+      background: #1e293b;
+      border-color: #38bdf8;
+      color: #ffffff;
+      box-shadow: 0 2px 10px rgba(56, 189, 248, 0.25);
+    }
+    .status-tab-btn.active.tab-green {
+      border-color: #10b981;
+      box-shadow: 0 2px 10px rgba(16, 185, 129, 0.3);
+      color: #34d399;
+    }
+    .status-tab-btn.active.tab-red {
+      border-color: #ef4444;
+      box-shadow: 0 2px 10px rgba(239, 68, 68, 0.3);
+      color: #f87171;
+    }
+    .status-tab-badge {
+      padding: 1px 6px;
+      border-radius: 999px;
+      font-size: 0.65rem;
+      font-weight: 900;
+    }
+    .badge-tab-all { background: #334155; color: #f1f5f9; }
+    .badge-tab-green { background: #065f46; color: #6ee7b7; border: 1px solid #059669; }
+    .badge-tab-red { background: #7f1d1d; color: #fca5a5; border: 1px solid #b91c1c; }
+
     /* CARD HEADER */
     .card-top-row {
       display: flex;
@@ -912,6 +1046,26 @@ __SHARED_BASE_CSS__
       </div>
     </div>
 
+    <!-- Real-time 30-min Status Filter Tabs -->
+    <div class="status-filter-tabs">
+      <button type="button" class="status-tab-btn active" data-status="all" onclick="selectStatusFilter('all')">
+        <span>⚡ Tất cả</span>
+        <span class="status-tab-badge badge-tab-all" id="tab-count-all">0</span>
+      </button>
+      <button type="button" class="status-tab-btn tab-green" data-status="green" onclick="selectStatusFilter('green')">
+        <span class="pulse-radar-dot" style="width:7px; height:7px;"></span>
+        <span>🟢 Chắc chắn có hàng (&lt; 30p)</span>
+        <span class="status-tab-badge badge-tab-green" id="tab-count-green">0</span>
+      </button>
+      <button type="button" class="status-tab-btn tab-red" data-status="red" onclick="selectStatusFilter('red')">
+        <span>🚨 Vừa hết hàng (&lt; 30p)</span>
+        <span class="status-tab-badge badge-tab-red" id="tab-count-red">0</span>
+      </button>
+      <button type="button" class="status-tab-btn" data-status="predictions" onclick="selectStatusFilter('predictions')">
+        <span>🎯 Dự đoán xác suất cao</span>
+      </button>
+    </div>
+
     <!-- Prediction Results List -->
     <div id="prediction-list">
       <div class="state-box">
@@ -988,11 +1142,20 @@ __SHARED_BASE_CSS__
     // State
     let currentWindow = 'now';
     let currentTargetHour = null;
+    let currentStatusFilter = 'all';
     let selectedRadiusKm = 3.0; // Default: 3km radius
     let userLat = 34.6667; // Default Namba
     let userLng = 135.5000;
     let isGpsActive = false;
     let hourlyDistData = [];
+
+    function selectStatusFilter(status) {
+      currentStatusFilter = status;
+      document.querySelectorAll('.status-tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-status') === status);
+      });
+      loadPredictions();
+    }
 
     // Attempt to read cached GPS coordinates from local storage
     try {
@@ -1136,7 +1299,7 @@ __SHARED_BASE_CSS__
         </div>
       `;
 
-      let url = `/api/stats/predictions?pref=${encodeURIComponent(pref)}&chain=${encodeURIComponent(chain)}&sort=${encodeURIComponent(sort)}`;
+      let url = `/api/stats/predictions?pref=${encodeURIComponent(pref)}&chain=${encodeURIComponent(chain)}&sort=${encodeURIComponent(sort)}&status=${encodeURIComponent(currentStatusFilter)}`;
       if (currentTargetHour !== null) {
         url += `&hour=${currentTargetHour}`;
       } else if (currentWindow) {
@@ -1171,6 +1334,17 @@ __SHARED_BASE_CSS__
       document.getElementById('live-jst-time').textContent = `${data.server_time_jst || ''} JST`;
       document.getElementById('timeline-current-dow').textContent = `${data.current_dow_name || 'Hôm nay'} (${data.current_dow_jp || ''})`;
       document.getElementById('res-count-num').textContent = data.predictions ? data.predictions.length : 0;
+
+      // Update tab counter badges
+      const green30m = (data.radius_stats && data.radius_stats.green_30m_count !== undefined) ? data.radius_stats.green_30m_count : 0;
+      const red30m = (data.radius_stats && data.radius_stats.red_30m_count !== undefined) ? data.radius_stats.red_30m_count : 0;
+      const totalCand = data.predictions ? data.predictions.length : 0;
+      const tabAllEl = document.getElementById('tab-count-all');
+      const tabGreenEl = document.getElementById('tab-count-green');
+      const tabRedEl = document.getElementById('tab-count-red');
+      if (tabAllEl) tabAllEl.textContent = totalCand;
+      if (tabGreenEl) tabGreenEl.textContent = green30m;
+      if (tabRedEl) tabRedEl.textContent = red30m;
 
       // 2. Render Radius KPIs Widget
       renderRadiusStats(data.radius_stats);
@@ -1217,19 +1391,65 @@ __SHARED_BASE_CSS__
       }
 
       listEl.innerHTML = items.map(p => {
+        const isFlashGreen = p.flash_mode === 'green';
+        const isFlashRed = p.flash_mode === 'red';
         const isPrime = p.score >= 85;
-        const primeClass = isPrime ? ' card-prime' : '';
-        const scoreBadgeClass = isPrime ? 'score-badge-prime' : (p.score >= 70 ? 'score-badge-high' : 'score-badge-medium');
-        const scoreIcon = isPrime ? '🔥' : (p.score >= 70 ? '⚡' : '🎯');
 
-        const isNowClass = p.is_prime_now ? ' active-now' : '';
-        const nowNotice = p.is_prime_now ? '<span style="color:#34d399; font-weight:900;">• Sắp / Đang đến giờ!</span>' : '';
+        let cardClass = 'pred-card';
+        let scoreBadgeClass = 'score-badge';
+        let scoreIcon = '🎯';
+        let scoreText = `${p.score}% XÁC SUẤT`;
+        let windowBadgeHtml = '';
+
+        if (isFlashGreen) {
+          cardClass += ' card-flash-green';
+          scoreBadgeClass += ' score-badge-flash-green';
+          scoreIcon = '⚡🟢';
+          scoreText = '100% CÓ HÀNG';
+          const minText = p.recent_min_ago !== undefined ? `${p.recent_min_ago}p trước` : 'vừa xong';
+          windowBadgeHtml = `
+            <span class="window-badge active-now" style="background:#064e3b; border-color:#10b981; color:#6ee7b7; box-shadow:0 0 10px rgba(16,185,129,0.4);">
+              <span class="pulse-radar-dot" style="width:7px; height:7px;"></span>
+              <span>100% CÓ HÀNG (${minText})</span>
+            </span>
+          `;
+        } else if (isFlashRed) {
+          cardClass += ' card-flash-red';
+          scoreBadgeClass += ' score-badge-flash-red';
+          scoreIcon = '🚨🔴';
+          scoreText = '0% - ĐÃ HẾT HÀNG';
+          const minText = p.recent_min_ago !== undefined ? `${p.recent_min_ago}p trước` : 'vừa xong';
+          windowBadgeHtml = `
+            <span class="window-badge" style="background:#7f1d1d; border-color:#ef4444; color:#fca5a5; box-shadow:0 0 10px rgba(239,68,68,0.4);">
+              <span>🚨</span>
+              <span>VỪA BÁO HẾT (${minText} - ĐỪNG ĐI!)</span>
+            </span>
+          `;
+        } else {
+          if (isPrime) cardClass += ' card-prime';
+          scoreBadgeClass += isPrime ? ' score-badge-prime' : (p.score >= 70 ? ' score-badge-high' : ' score-badge-medium');
+          scoreIcon = isPrime ? '🔥' : (p.score >= 70 ? '⚡' : '🎯');
+
+          const isNowClass = p.is_prime_now ? ' active-now' : '';
+          const nowNotice = p.is_prime_now ? '<span style="color:#34d399; font-weight:900;">• Sắp / Đang đến giờ!</span>' : '';
+          windowBadgeHtml = `
+            <span class="window-badge${isNowClass}">
+              <span>⏰</span>
+              <span>${p.predicted_window}</span>
+              ${nowNotice}
+            </span>
+          `;
+        }
 
         const distHtml = p.distance_str ? `
           <span class="dist-badge" title="Khoảng cách từ vị trí của bạn">
             📍 ${p.distance_str} ${p.walk_time_min ? `(~${p.walk_time_min}p đi bộ)` : ''}
           </span>
         ` : '';
+
+        const reasonBoxStyle = isFlashGreen 
+          ? ' style="border-left-color:#10b981; background:rgba(6, 78, 59, 0.35);"' 
+          : (isFlashRed ? ' style="border-left-color:#ef4444; background:rgba(127, 29, 29, 0.35);"' : '');
 
         const reasonsHtml = (p.reasons || []).map(r => `
           <div class="ai-reason-item">
@@ -1244,17 +1464,13 @@ __SHARED_BASE_CSS__
           : `https://www.google.com/maps/search/?api=1&query=${encodedQuery}`;
 
         return `
-          <div class="pred-card${primeClass}">
+          <div class="${cardClass}">
             <div class="card-top-row">
-              <span class="score-badge ${scoreBadgeClass}">
+              <span class="${scoreBadgeClass}">
                 <span>${scoreIcon}</span>
-                <span>${p.score}% XÁC SUẤT</span>
+                <span>${scoreText}</span>
               </span>
-              <span class="window-badge${isNowClass}">
-                <span>⏰</span>
-                <span>${p.predicted_window}</span>
-                ${nowNotice}
-              </span>
+              ${windowBadgeHtml}
             </div>
 
             <div>
@@ -1272,7 +1488,7 @@ __SHARED_BASE_CSS__
               📍 ${p.address || 'Đang cập nhật địa chỉ'}
             </div>
 
-            <div class="ai-reasons-box">
+            <div class="ai-reasons-box"${reasonBoxStyle}>
               ${reasonsHtml}
             </div>
 
@@ -1287,7 +1503,7 @@ __SHARED_BASE_CSS__
               </a>
               <button type="button" class="card-action-btn btn-hist-link" onclick="openPredStoreModal('${p.store_id}')">
                 <span>📜</span>
-                <span>Lịch sử (${p.total_in_reports} đợt)</span>
+                <span>Lịch sử (${p.total_in_reports || 0} đợt)</span>
               </button>
             </div>
           </div>
@@ -1313,7 +1529,8 @@ __SHARED_BASE_CSS__
 
       // Fill values
       document.getElementById('kpi-rate-now').textContent = `${radStats.in_stock_rate}%`;
-      document.getElementById('kpi-sub-now').textContent = `${radStats.in_stock_now} / ${radStats.total_stores} quán có hàng`;
+      const greenText = (radStats.green_30m_count && radStats.green_30m_count > 0) ? ` • ⚡🟢 ${radStats.green_30m_count} quán < 30p` : '';
+      document.getElementById('kpi-sub-now').textContent = `${radStats.in_stock_now} / ${radStats.total_stores} quán có hàng${greenText}`;
 
       document.getElementById('kpi-rate-ever').textContent = `${radStats.ever_restocked_rate}%`;
       document.getElementById('kpi-sub-ever').textContent = `${radStats.ever_restocked} / ${radStats.total_stores} quán từng về hàng`;
@@ -1323,7 +1540,8 @@ __SHARED_BASE_CSS__
       document.getElementById('kpi-sub-peak').textContent = `Đỉnh điểm ${radStats.peak_hour_count} đợt xe trả hàng`;
 
       document.getElementById('kpi-prime-today').textContent = `${radStats.prime_stores_today} quán`;
-      document.getElementById('kpi-sub-prime').textContent = `Xác suất cao (≥70%)`;
+      const redText = (radStats.red_30m_count && radStats.red_30m_count > 0) ? ` • 🚨 ${radStats.red_30m_count} vừa hết` : '';
+      document.getElementById('kpi-sub-prime').textContent = `Xác suất cao (≥70%)${redText}`;
     }
 
     function renderHourScroller(distArray, currentHour, radStats) {

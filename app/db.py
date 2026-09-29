@@ -1513,7 +1513,8 @@ def db_get_restock_predictions(
     max_dist_km: Optional[float] = None,
     min_score: int = 40,
     limit: int = 60,
-    sort_by: str = "score"
+    sort_by: str = "score",
+    status_filter: Optional[str] = "all"
 ) -> Dict[str, Any]:
     """
     Predict stores most likely to have stock or restock today in upcoming/selected hours.
@@ -1527,6 +1528,7 @@ def db_get_restock_predictions(
     clean_pref = (pref or "").strip().lower()
     clean_chain = (chain or "").strip().lower()
     clean_window = (time_window or "").strip().lower()
+    clean_status = (status_filter or "all").strip().lower()
     if clean_pref in ("all", "", "tatca"):
         clean_pref = None
     if clean_chain in ("all", "", "tatca"):
@@ -1534,7 +1536,7 @@ def db_get_restock_predictions(
     if target_hour is not None and (target_hour < 0 or target_hour > 23):
         target_hour = None
 
-    cache_key = f"{clean_pref}_{clean_chain}_{target_hour}_{clean_window}_{user_lat}_{user_lng}_{max_dist_km}_{min_score}_{limit}_{sort_by}"
+    cache_key = f"{clean_pref}_{clean_chain}_{target_hour}_{clean_window}_{user_lat}_{user_lng}_{max_dist_km}_{min_score}_{limit}_{sort_by}_{clean_status}"
     now_ts = int(time.time())
 
     if cache_key in _predictions_cache:
@@ -1572,6 +1574,25 @@ def db_get_restock_predictions(
         """, params)
         rows = cursor.fetchall()
 
+        # 1b. Fetch stores reported within last 30 minutes (1800 seconds)
+        recent_where = ["s.last_timestamp > 0", "(? - s.last_timestamp) <= 1800"]
+        recent_params = [now_ts]
+        if clean_pref:
+            recent_where.append("s.pref = ?")
+            recent_params.append(clean_pref)
+        if clean_chain:
+            recent_where.append("s.chain = ?")
+            recent_params.append(clean_chain)
+
+        cursor.execute(f"""
+            SELECT s.id, s.name, s.pref, s.chain, s.address, s.lat, s.lng,
+                   s.current_status, s.last_timestamp, s.last_reported_at, s.packs_json
+            FROM stores s
+            WHERE {" AND ".join(recent_where)};
+        """, recent_params)
+        recent_30m_rows = cursor.fetchall()
+        recent_30m_map = {r["id"]: r for r in recent_30m_rows}
+
     # 2. Aggregate store data and calculate 24h restock distribution
     stores_data = defaultdict(lambda: {
         "timestamps": [],
@@ -1582,7 +1603,8 @@ def db_get_restock_predictions(
         "address": "",
         "lat": None,
         "lng": None,
-        "current_status": "u"
+        "current_status": "u",
+        "last_timestamp": 0
     })
     hourly_distribution = [0] * 24
 
@@ -1605,6 +1627,26 @@ def db_get_restock_predictions(
                     d["packs"].extend(p_list)
             except Exception:
                 pass
+
+    # Merge recent 30m stores that might not have historical 'i'
+    for sid, r in recent_30m_map.items():
+        if sid not in stores_data:
+            d = stores_data[sid]
+            d["name"] = r["name"] or sid
+            d["pref"] = r["pref"] or ""
+            d["chain"] = r["chain"] or "other"
+            d["address"] = r["address"] or ""
+            d["lat"] = r["lat"]
+            d["lng"] = r["lng"]
+            d["current_status"] = r["current_status"] or "u"
+            d["last_timestamp"] = r["last_timestamp"] or 0
+            if r["packs_json"]:
+                try:
+                    p_list = json.loads(r["packs_json"])
+                    if isinstance(p_list, list):
+                        d["packs"].extend(p_list)
+                except Exception:
+                    pass
 
     # 3. Radius-specific calculations if user location and max_dist_km are specified
     radius_stats = {
@@ -1706,11 +1748,8 @@ def db_get_restock_predictions(
 
     for sid, d in stores_data.items():
         in_ts = d["timestamps"]
-        if not in_ts:
-            continue
-
-        last_ts = in_ts[-1]
-        days_since = (now_ts - last_ts) / 86400.0
+        last_ts = in_ts[-1] if in_ts else d["last_timestamp"]
+        days_since = (now_ts - last_ts) / 86400.0 if last_ts > 0 else 999.0
         hours = [(t + 32400) % 86400 // 3600 for t in in_ts]
         dows = [datetime.fromtimestamp(t, tz=JST).weekday() for t in in_ts]
 
@@ -1721,64 +1760,132 @@ def db_get_restock_predictions(
         else:
             avg_cycle = 4.0
 
-        hour_counts = Counter(hours)
+        hour_counts = Counter(hours) if hours else {current_hour: 1}
         best_h = max(hour_counts.keys(), key=lambda h: hour_counts[h])
         best_h_count = hour_counts[best_h]
 
-        # Hour scoring & filtering
-        if target_hour is not None:
-            m0 = hour_counts.get(target_hour, 0)
-            m1 = hour_counts.get((target_hour - 1) % 24, 0) + hour_counts.get((target_hour + 1) % 24, 0)
-            if m0 == 0 and m1 == 0:
-                continue
-            s_hour = min(35, m0 * 18 + m1 * 8)
-            display_h = target_hour
-        elif allowed_hours is not None:
-            window_matches = sum(hour_counts.get(h, 0) for h in allowed_hours)
-            if window_matches == 0:
-                continue
-            s_hour = min(35, window_matches * 12)
-            display_h = best_h if best_h in allowed_hours else max(allowed_hours, key=lambda h: hour_counts.get(h, 0))
+        # Check if store has a report within last 30 minutes (1800 seconds)
+        # Real-time flash mode applies when querying current time or explicitly filtering by status
+        is_querying_now = (clean_status in ("green", "red", "hot", "warning", "depleted")) or (
+            (target_hour is None or target_hour == current_hour) and
+            (allowed_hours is None or current_hour in allowed_hours)
+        )
+        recent = recent_30m_map.get(sid) if is_querying_now else None
+        flash_mode = "none"  # "green", "red", "none"
+        recent_min_ago = None
+        reasons = []
+
+        if recent:
+            sec_ago = max(0, now_ts - recent["last_timestamp"])
+            recent_min_ago = sec_ago // 60
+            time_ago_str = f"{recent_min_ago} phút trước" if recent_min_ago > 0 else "vừa xong"
+            st = recent["current_status"]
+
+            if st == "i":
+                # Chắc chắn 100% có hàng! Chớp chớp xanh!
+                total_score = 100
+                flash_mode = "green"
+                confidence_level = "flash_green"
+                display_h = current_hour
+                predicted_window = f"NGAY BÂY GIỜ ({time_ago_str})"
+                reasons.append(f"⚡ 100% CÓ HÀNG: Vừa có báo cáo CÓ HÀNG {time_ago_str}!")
+                reasons.append("🔥 Chắc chắn còn hàng! Hãy đến cửa hàng ngay lập tức.")
+            elif st in ("o", "n"):
+                # Vừa báo hết hàng trong 30p! Chớp chớp đỏ cảnh báo!
+                total_score = 0
+                flash_mode = "red"
+                confidence_level = "flash_red"
+                display_h = current_hour
+                predicted_window = f"ĐÃ HẾT HÀNG ({time_ago_str})"
+                reasons.append(f"🚨 CẢNH BÁO: Vừa có báo cáo HẾT HÀNG {time_ago_str}!")
+                reasons.append("⛔ Kệ đã sạch hàng - KHÔNG NÊN ĐẾN tránh lãng phí thời gian!")
+            else:
+                total_score = 50
+                flash_mode = "none"
+                confidence_level = "medium"
+                display_h = best_h
+                predicted_window = f"{display_h:02d}:00 - {(display_h + 1) % 24:02d}:30 JST"
         else:
-            s_hour = min(35, best_h_count * 12)
-            display_h = best_h
-            if abs(display_h - current_hour) <= 1:
-                s_hour = min(35, s_hour + 5)
+            # Hour scoring & filtering
+            if target_hour is not None:
+                m0 = hour_counts.get(target_hour, 0)
+                m1 = hour_counts.get((target_hour - 1) % 24, 0) + hour_counts.get((target_hour + 1) % 24, 0)
+                if m0 == 0 and m1 == 0:
+                    continue
+                s_hour = min(35, m0 * 18 + m1 * 8)
+                display_h = target_hour
+            elif allowed_hours is not None:
+                window_matches = sum(hour_counts.get(h, 0) for h in allowed_hours)
+                if window_matches == 0:
+                    continue
+                s_hour = min(35, window_matches * 12)
+                display_h = best_h if best_h in allowed_hours else max(allowed_hours, key=lambda h: hour_counts.get(h, 0))
+            else:
+                s_hour = min(35, best_h_count * 12)
+                display_h = best_h
+                if abs(display_h - current_hour) <= 1:
+                    s_hour = min(35, s_hour + 5)
 
-        # Day of week affinity scoring
-        dow_count = sum(1 for dw in dows if dw == current_dow)
-        if dow_count >= 2:
-            s_dow = 25
-        elif dow_count == 1:
-            s_dow = 16
-        else:
-            s_dow = 6
+            # Day of week affinity scoring
+            dow_count = sum(1 for dw in dows if dw == current_dow)
+            if dow_count >= 2:
+                s_dow = 25
+            elif dow_count == 1:
+                s_dow = 16
+            else:
+                s_dow = 6
 
-        # Cycle / interval turnaround scoring
-        if 0.8 <= days_since <= max(7.0, avg_cycle * 1.5):
-            s_cycle = 25  # Prime arrival cycle window
-        elif days_since < 0.8:
-            s_cycle = 14  # Fresh shipment today
-        elif days_since <= avg_cycle * 2.5:
-            s_cycle = 15  # Slightly overdue
-        else:
-            s_cycle = 8
+            # Cycle / interval turnaround scoring
+            if 0.8 <= days_since <= max(7.0, avg_cycle * 1.5):
+                s_cycle = 25  # Prime arrival cycle window
+            elif days_since < 0.8:
+                s_cycle = 14  # Fresh shipment today
+            elif days_since <= avg_cycle * 2.5:
+                s_cycle = 15  # Slightly overdue
+            else:
+                s_cycle = 8
 
-        # Current status scoring
-        st = d["current_status"]
-        if st == "i":
-            s_status = 20  # In-stock report active!
-        elif st == "o":
-            s_status = 15  # Shelves clear, ready for shipment
-        else:
-            s_status = 5
+            # Current status scoring
+            st = d["current_status"]
+            if st == "i":
+                s_status = 20  # In-stock report active!
+            elif st == "o":
+                s_status = 15  # Shelves clear, ready for shipment
+            else:
+                s_status = 5
 
-        # Restock frequency / consistency bonus
-        s_cluster = 6 if len(in_ts) >= 4 else 0
+            # Restock frequency / consistency bonus
+            s_cluster = 6 if len(in_ts) >= 4 else 0
 
-        # Calculate final confidence score
-        total_score = min(99, max(20, s_hour + s_dow + s_cycle + s_status + s_cluster))
-        if total_score < min_score:
+            # Calculate final confidence score
+            total_score = min(99, max(20, s_hour + s_dow + s_cycle + s_status + s_cluster))
+            confidence_level = "prime" if total_score >= 85 else ("high" if total_score >= 70 else "medium")
+            predicted_window = f"{display_h:02d}:00 - {(display_h + 1) % 24:02d}:30 JST"
+
+            if dow_count > 0:
+                reasons.append(f"🎯 Đã {dow_count} lần có hàng vào {dow_names[current_dow]}")
+            h_freq = hour_counts.get(display_h, 1)
+            reasons.append(f"⏰ Giờ quen thuộc: {display_h:02d}:00 - {(display_h + 1) % 24:02d}:30 ({h_freq} lần)")
+            if 0.8 <= days_since <= max(7.0, avg_cycle * 1.5):
+                reasons.append(f"🔄 Điểm rơi chu kỳ: TB {avg_cycle:.1f} ngày/đợt (cách {days_since:.1f} ngày)")
+            elif days_since < 0.8:
+                reasons.append("⚡ Vừa có hàng trong ngày hôm nay!")
+            if st == "i":
+                reasons.append("🟢 Đang có báo cáo CÓ HÀNG gần đây!")
+            elif st == "o":
+                reasons.append("📦 Vừa hết hàng - Chuẩn bị nhận đợt mới")
+
+        # Status filtering:
+        if clean_status in ("green", "hot", "in_stock") and flash_mode != "green":
+            continue
+        if clean_status in ("red", "warning", "depleted") and flash_mode != "red":
+            continue
+        if clean_status in ("predictions", "pred_only") and flash_mode != "none":
+            continue
+
+        # Score threshold filtering:
+        # Keep green flash (100%) and red flash (0% warning), but filter regular predictions below min_score
+        if flash_mode == "none" and total_score < min_score:
             continue
 
         # Proximity & Walking Distance calculation
@@ -1800,26 +1907,10 @@ def db_get_restock_predictions(
         # Extract top cards/packs
         pack_counter = Counter(d["packs"])
         top_packs = [p for p, _ in pack_counter.most_common(2)]
-
-        # Human-readable AI reasons
-        reasons = []
-        if dow_count > 0:
-            reasons.append(f"🎯 Đã {dow_count} lần có hàng vào {dow_names[current_dow]}")
-        h_freq = hour_counts.get(display_h, 1)
-        reasons.append(f"⏰ Giờ quen thuộc: {display_h:02d}:00 - {(display_h + 1) % 24:02d}:30 ({h_freq} lần)")
-        if 0.8 <= days_since <= max(7.0, avg_cycle * 1.5):
-            reasons.append(f"🔄 Điểm rơi chu kỳ: TB {avg_cycle:.1f} ngày/đợt (cách {days_since:.1f} ngày)")
-        elif days_since < 0.8:
-            reasons.append("⚡ Vừa có hàng trong ngày hôm nay!")
-        if st == "i":
-            reasons.append("🟢 Đang có báo cáo CÓ HÀNG gần đây!")
-        elif st == "o":
-            reasons.append("📦 Vừa hết hàng - Chuẩn bị nhận đợt mới")
-        if top_packs:
+        if top_packs and flash_mode != "red":
             reasons.append(f"🃏 Thẻ hay về: {', '.join(top_packs)}")
 
-        is_prime_now = abs(display_h - current_hour) <= 1
-        confidence_level = "prime" if total_score >= 85 else ("high" if total_score >= 70 else "medium")
+        is_prime_now = (flash_mode == "green") or (abs(display_h - current_hour) <= 1)
 
         candidates.append({
             "store_id": sid,
@@ -1832,9 +1923,13 @@ def db_get_restock_predictions(
             "lng": d["lng"],
             "current_status": st,
             "score": total_score,
+            "flash_mode": flash_mode,
+            "recent_min_ago": recent_min_ago,
+            "is_hot_30m": flash_mode == "green",
+            "is_cold_30m": flash_mode == "red",
             "confidence_level": confidence_level,
             "predicted_hour": display_h,
-            "predicted_window": f"{display_h:02d}:00 - {(display_h + 1) % 24:02d}:30 JST",
+            "predicted_window": predicted_window,
             "is_prime_now": is_prime_now,
             "days_since_last_in": round(days_since, 1),
             "avg_interval_days": round(avg_cycle, 1),
@@ -1849,14 +1944,38 @@ def db_get_restock_predictions(
 
     # Sort results
     if sort_by == "distance" and user_lat is not None:
-        candidates.sort(key=lambda x: (x["distance_km"] if x["distance_km"] is not None else 99999, -x["score"]))
+        candidates.sort(key=lambda x: (
+            x["distance_km"] if x["distance_km"] is not None else 99999,
+            0 if x["flash_mode"] == "green" else (1 if x["flash_mode"] == "none" else 2),
+            -x["score"]
+        ))
+    elif sort_by == "score":
+        # Green flashing (100%) at the very top, then regular high probability, then red warnings at the end
+        candidates.sort(key=lambda x: (
+            0 if x["flash_mode"] == "green" else (1 if x["flash_mode"] == "none" else 2),
+            -x["score"],
+            x["predicted_hour"]
+        ))
     elif sort_by == "time":
-        candidates.sort(key=lambda x: (x["predicted_hour"], -x["score"]))
+        candidates.sort(key=lambda x: (
+            0 if x["flash_mode"] == "green" else 1,
+            x["predicted_hour"],
+            -x["score"]
+        ))
     else:
-        candidates.sort(key=lambda x: (-x["score"], x["predicted_hour"]))
+        candidates.sort(key=lambda x: (
+            0 if x["flash_mode"] == "green" else (1 if x["flash_mode"] == "none" else 2),
+            -x["score"],
+            x["predicted_hour"]
+        ))
 
     if radius_stats["is_active"]:
         radius_stats["prime_stores_today"] = sum(1 for c in candidates if c["score"] >= 70)
+        radius_stats["green_30m_count"] = sum(1 for c in candidates if c["flash_mode"] == "green")
+        radius_stats["red_30m_count"] = sum(1 for c in candidates if c["flash_mode"] == "red")
+    else:
+        radius_stats["green_30m_count"] = sum(1 for c in candidates if c["flash_mode"] == "green")
+        radius_stats["red_30m_count"] = sum(1 for c in candidates if c["flash_mode"] == "red")
 
     result_payload = {
         "server_time_jst": now_dt.strftime("%H:%M %d/%m/%Y"),

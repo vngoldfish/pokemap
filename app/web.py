@@ -944,7 +944,8 @@ def get_stats_predictions_route(
     max_dist_km: Optional[float] = None,
     min_score: int = 40,
     limit: int = 60,
-    sort: str = "score"
+    sort: str = "score",
+    status: Optional[str] = "all"
 ):
     try:
         from .db import db_get_restock_predictions
@@ -958,7 +959,8 @@ def get_stats_predictions_route(
             max_dist_km=max_dist_km,
             min_score=min_score,
             limit=limit,
-            sort_by=sort
+            sort_by=sort,
+            status_filter=status
         ))
     except Exception as e:
         print("[Stats] Error getting restock predictions:", e)

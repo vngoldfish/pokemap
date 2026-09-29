@@ -173,3 +173,64 @@ def test_predictions_js_syntax_with_node():
         )
         assert proc.returncode == 0, f"Node syntax error in script #{idx+1}: {proc.stderr.decode('utf-8')}"
 
+
+def test_predictions_api_30m_flash_green_and_red(client):
+    """Verify 30-minute real-time flash rules for in-stock (green 100%) and out-of-stock (red 0% warning)."""
+    # 1. Check status_filter=all
+    res_all = client.get("/api/stats/predictions?status=all&limit=60")
+    assert res_all.status_code == 200
+    data_all = res_all.json()
+    assert "radius_stats" in data_all
+    assert "green_30m_count" in data_all["radius_stats"]
+    assert "red_30m_count" in data_all["radius_stats"]
+
+    # 2. Check status_filter=green (100% in stock within 30m)
+    res_green = client.get("/api/stats/predictions?status=green")
+    assert res_green.status_code == 200
+    preds_green = res_green.json()["predictions"]
+    for p in preds_green:
+        assert p["flash_mode"] == "green"
+        assert p["score"] == 100
+        assert p["confidence_level"] == "flash_green"
+        assert p["is_hot_30m"] is True
+        assert p["is_cold_30m"] is False
+        assert p["recent_min_ago"] <= 30
+        assert any("100% CÓ HÀNG" in r for r in p["reasons"])
+
+    # 3. Check status_filter=red (out-of-stock warning within 30m)
+    res_red = client.get("/api/stats/predictions?status=red")
+    assert res_red.status_code == 200
+    preds_red = res_red.json()["predictions"]
+    for p in preds_red:
+        assert p["flash_mode"] == "red"
+        assert p["score"] == 0
+        assert p["confidence_level"] == "flash_red"
+        assert p["is_cold_30m"] is True
+        assert p["is_hot_30m"] is False
+        assert p["recent_min_ago"] <= 30
+        assert any("HẾT HÀNG" in r for r in p["reasons"])
+
+    # 4. Check status_filter=predictions (pure algorithmic restock predictions)
+    res_pred = client.get("/api/stats/predictions?status=predictions&limit=20")
+    assert res_pred.status_code == 200
+    preds_pure = res_pred.json()["predictions"]
+    for p in preds_pure:
+        assert p["flash_mode"] == "none"
+        assert p["score"] >= 40
+
+
+def test_predictions_html_contains_flash_animations(client):
+    """Verify /dudoan HTML includes CSS animations and status filter tabs."""
+    res = client.get("/dudoan")
+    assert res.status_code == 200
+    html = res.text
+    assert "card-flash-green" in html
+    assert "card-flash-red" in html
+    assert "pulse-green-glow" in html
+    assert "pulse-red-glow" in html
+    assert "score-badge-flash-green" in html
+    assert "score-badge-flash-red" in html
+    assert "status-filter-tabs" in html
+    assert "tab-count-green" in html
+    assert "tab-count-red" in html
+
