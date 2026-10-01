@@ -1851,11 +1851,11 @@ __SHARED_BASE_CSS__
         const anchorSel = document.getElementById('anchor-select');
         const anchorName = isGpsActive ? 'bạn' : (anchorSel && anchorSel.options[anchorSel.selectedIndex] ? anchorSel.options[anchorSel.selectedIndex].text.replace(/\\s*\\([^)]*\\)/, '') : 'mốc');
         const travelText = p.travel_time_str || (p.walk_time_min ? `~${p.walk_time_min}p đi bộ` : '');
-        const roadTitle = p.road_str ? ` (${p.road_str})` : '';
+        const displayDist = p.road_str ? `${p.road_str} (${p.distance_str} thẳng)` : p.distance_str;
 
         const distHtml = p.distance_str ? `
-          <span class="dist-badge" title="Khoảng cách tính từ ${anchorName}: đường chim bay ${p.distance_str}${roadTitle}">
-            📍 ${p.distance_str} (từ ${anchorName}) ${travelText ? `• ${travelText}` : ''}
+          <span class="dist-badge" title="Khoảng cách tính từ ${anchorName}: quãng đường đi ${p.road_str || p.distance_str}, đường chim bay ${p.distance_str}">
+            📍 ${displayDist} • ${anchorName} ${travelText ? `• ${travelText}` : ''}
           </span>
         ` : '';
 
@@ -2075,7 +2075,7 @@ __SHARED_BASE_CSS__
           (err) => {
             loadPredictions();
           },
-          { enableHighAccuracy: true, timeout: 5000 }
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
       } else {
         loadPredictions();

@@ -248,10 +248,11 @@ def send_telegram_alert(store: dict, info: dict, notif_cfg: dict, is_test: bool 
             dist_km = 6371 * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
             loc_label = (notif_cfg.get("telegramLocationName") or "").strip()
             loc_suffix = f" ({loc_label})" if loc_label else " (mốc Ga Imamiya)"
+            road_km = dist_km * 1.22
             if dist_km < 1.0:
-                dist_str = f"~{int(round(dist_km * 1000))}m{loc_suffix}"
+                dist_str = f"~{int(round(road_km * 1000))}m đường đi • {int(round(dist_km * 1000))}m{loc_suffix}"
             else:
-                dist_str = f"~{dist_km:.1f}km{loc_suffix}"
+                dist_str = f"~{road_km:.1f}km đường đi • {dist_km:.1f}km{loc_suffix}"
         except Exception:
             dist_str = "~?km"
 

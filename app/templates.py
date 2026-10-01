@@ -2386,7 +2386,10 @@ def render_map_page() -> str:
       let distHtml = '';
       if (userLat !== null && userLng !== null) {
         const d = calcDistanceKm(userLat, userLng, store.lat, store.lng);
-        distHtml = `<div style="font-size:0.75rem; color:#2563eb; font-weight:700; margin-top:2px;">📍 Cách vị trí bạn: ${formatDist(d)}</div>`;
+        const roadD = d * 1.22;
+        const dStr = formatDist(d);
+        const roadStr = formatDist(roadD);
+        distHtml = `<div style="font-size:0.75rem; color:#2563eb; font-weight:700; margin-top:2px;">📍 Cách bạn: ~${roadStr} đường đi (${dStr} thẳng)</div>`;
       }
       let statusBg = '#f1f5f9', statusColor = '#64748b', statusText = '⚪ Chưa có báo cáo (未確認)';
       if (info.code === 'i') {
@@ -5174,7 +5177,8 @@ def render_thongbao_page() -> str:
         const chain = (configData.chainNames && configData.chainNames[store.chain]) || store.chain || 'Cửa hàng';
         const distLabel = isRealUserGps ? 'Cách bạn' : `Cách TT ${regName}`;
         const distGpsNotice = !isRealUserGps ? ' (chưa có GPS)' : '';
-        const distStr = dist !== null ? ` • 📍 ${distLabel} ${formatDist(dist)}${distGpsNotice}` : '';
+        const roadDist = dist !== null ? dist * 1.22 : null;
+        const distStr = dist !== null ? ` • 📍 ${distLabel} ~${formatDist(roadDist)} đi (${formatDist(dist)} thẳng)${distGpsNotice}` : '';
         
         let timeReportHtml = '';
         if (info.timestamp > 0) {
@@ -6497,7 +6501,7 @@ def render_thongbao_page() -> str:
           renderStoreList(document.getElementById('list-search-input').value);
         },
         (err) => {},
-        { enableHighAccuracy: true, timeout: 6000 }
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
     }
 
