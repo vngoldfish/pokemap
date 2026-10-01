@@ -3000,8 +3000,9 @@ def render_map_page() -> str:
             body: JSON.stringify({
               notifications: {
                 telegramLocationName: 'Vị trí GPS của tôi',
-                telegramLat: lat,
-                telegramLng: lng
+                telegramLat: Number(lat.toFixed(5)),
+                telegramLng: Number(lng.toFixed(5)),
+                telegramAutoSyncGps: true
               }
             })
           });
@@ -5689,8 +5690,9 @@ def render_thongbao_page() -> str:
             body: JSON.stringify({
               notifications: {
                 telegramLocationName: 'Vị trí GPS của tôi',
-                telegramLat: lat,
-                telegramLng: lng
+                telegramLat: Number(lat.toFixed(5)),
+                telegramLng: Number(lng.toFixed(5)),
+                telegramAutoSyncGps: true
               }
             })
           });

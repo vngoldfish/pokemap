@@ -26,19 +26,31 @@ JST = timezone(timedelta(hours=9))
 # Module-level concurrency write lock for SQLite transactions
 _db_write_lock = threading.Lock()
 
-# In-memory query TTL cache for stores and report counts
+# In-memory query TTL cache for stores, report counts, predictions, analytics, and stats
 _stores_cache: Dict[str, Tuple[float, Dict[str, Any]]] = {}
 _report_counts_cache: Dict[str, Tuple[float, Dict[str, Any]]] = {}
 _predictions_cache: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+_analytics_cache: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+_stats_overview_cache: Tuple[float, Dict[str, Any]] = (0.0, {})
 _CACHE_TTL = 15.0  # seconds
 _PRED_CACHE_TTL = 30.0  # seconds
+_ANALYTICS_CACHE_TTL = 30.0  # seconds
+_STATS_CACHE_TTL = 15.0  # seconds
+
+def invalidate_stats_overview_cache():
+    """Invalidate in-memory cache for stats overview."""
+    global _stats_overview_cache
+    _stats_overview_cache = (0.0, {})
+
 
 def invalidate_stores_cache():
-    """Invalidate in-memory cache for stores, report counts, and predictions."""
-    global _stores_cache, _report_counts_cache, _predictions_cache
+    """Invalidate in-memory cache for stores, report counts, predictions, analytics, and stats."""
+    global _stores_cache, _report_counts_cache, _predictions_cache, _analytics_cache
     _stores_cache.clear()
     _report_counts_cache.clear()
     _predictions_cache.clear()
+    _analytics_cache.clear()
+    invalidate_stats_overview_cache()
 
 
 _store_catalog_cache = None
@@ -130,6 +142,8 @@ def init_db():
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_stores_chain ON stores(chain);")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_stores_status ON stores(current_status);")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_stores_ts ON stores(last_timestamp DESC);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_stores_chain_pref ON stores(chain, pref);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_stores_lat_lng ON stores(lat, lng);")
 
             # 3. Store History Table
             cursor.execute("""
@@ -155,6 +169,7 @@ def init_db():
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_hist_ts ON store_history(timestamp DESC);")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_hist_status ON store_history(status_code);")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_hist_created_at ON store_history(created_at DESC);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_hist_status_ts ON store_history(status_code, timestamp DESC);")
 
             # Auto-migration: ensure confirms column exists in store_history
             cursor.execute("PRAGMA table_info(store_history);")
@@ -225,6 +240,106 @@ def init_db():
                 """)
             except Exception:
                 pass
+
+            # Auto-normalization migration for combini and retail chains
+            try:
+                # Daily Yamazaki / New Yamazaki / Yamazaki Shop
+                cursor.execute("""
+                    UPDATE stores
+                    SET chain = 'dailyyamazaki'
+                    WHERE chain = 'other' AND (
+                        name LIKE '%デイリーヤマザキ%' OR 
+                        name LIKE '%ニューヤマザキ%' OR 
+                        name LIKE '%ヤマザキショップ%' OR
+                        name LIKE '%Daily Yamazaki%'
+                    );
+                """)
+                # NewDays
+                cursor.execute("""
+                    UPDATE stores
+                    SET chain = 'newdays'
+                    WHERE chain = 'other' AND (
+                        name LIKE '%NewDays%' OR 
+                        name LIKE '%ニューデイズ%'
+                    );
+                """)
+                # Bellmart
+                cursor.execute("""
+                    UPDATE stores
+                    SET chain = 'bellmart'
+                    WHERE chain = 'other' AND (
+                        name LIKE '%ベルマート%' OR 
+                        name LIKE '%Bellmart%'
+                    );
+                """)
+                # Poplar
+                cursor.execute("""
+                    UPDATE stores
+                    SET chain = 'poplar'
+                    WHERE chain = 'other' AND (
+                        name LIKE '%ポプラ%' OR 
+                        name LIKE '%Poplar%'
+                    );
+                """)
+                # Seicomart
+                cursor.execute("""
+                    UPDATE stores
+                    SET chain = 'seicomart'
+                    WHERE chain = 'other' AND (
+                        name LIKE '%セイコーマート%' OR 
+                        name LIKE '%Seicomart%'
+                    );
+                """)
+                # Manual FamilyMart
+                cursor.execute("""
+                    UPDATE stores
+                    SET chain = 'familymart'
+                    WHERE id LIKE 'manual_fm_%' AND chain != 'familymart';
+                """)
+                # Manual Yodobashi
+                cursor.execute("""
+                    UPDATE stores
+                    SET chain = 'yodobashi'
+                    WHERE id LIKE 'manual_yodobashi_%' AND chain != 'yodobashi';
+                """)
+                # TSUTAYA
+                cursor.execute("""
+                    UPDATE stores
+                    SET chain = 'tsutaya'
+                    WHERE chain = 'other' AND (
+                        name LIKE '%TSUTAYA%' OR 
+                        name LIKE '%ツタヤ%'
+                    );
+                """)
+                # Apita
+                cursor.execute("""
+                    UPDATE stores
+                    SET chain = 'apita'
+                    WHERE chain = 'other' AND (
+                        name LIKE '%アピタ%' OR 
+                        name LIKE '%APITA%'
+                    );
+                """)
+                # Piago
+                cursor.execute("""
+                    UPDATE stores
+                    SET chain = 'piagu'
+                    WHERE chain = 'other' AND (
+                        name LIKE '%ピアゴ%' OR 
+                        name LIKE '%Piago%'
+                    );
+                """)
+                # Toys "R" Us
+                cursor.execute("""
+                    UPDATE stores
+                    SET chain = 'toysrus'
+                    WHERE chain = 'other' AND (
+                        name LIKE '%トイザらス%' OR 
+                        id LIKE '%トイザらス%'
+                    );
+                """)
+            except Exception as e:
+                print("  [DB] Store normalization note:", e)
 
             # Ensure region definitions include tokyo and chiba
             try:
@@ -870,11 +985,14 @@ def record_new_report(
         except Exception:
             pass
 
-        for cb in list(_on_report_added_callbacks):
+        def _safe_dispatch(callback, s_dict, rep_entry):
             try:
-                cb(store_dict, entry)
+                callback(s_dict, rep_entry)
             except Exception as cb_err:
                 print(f"  [CSDL Event Error] Failed executing callback: {cb_err}")
+
+        for cb in list(_on_report_added_callbacks):
+            threading.Thread(target=_safe_dispatch, args=(cb, store_dict, entry), daemon=True).start()
 
     return True, entry
 
@@ -1214,6 +1332,229 @@ def get_store_restock_analytics(store_id: str) -> Dict[str, Any]:
         }
 
 
+def get_chain_restock_analytics(
+    chain_code: Optional[str] = None,
+    pref: Optional[str] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """
+    Combini & Chain-Level Restock Pattern Analytics:
+    - 24-hour JST distribution (00:00 - 23:00 JST)
+    - 4-Window Day Distribution:
+      * Sáng sớm (Early Morning): 05:00 - 10:59 JST (core peak: 05:00 - 08:59 JST)
+      * Trưa (Noon): 11:00 - 16:59 JST (core peak: 11:00 - 13:59 JST)
+      * Chiều tối (Afternoon / Evening): 17:00 - 20:59 JST
+      * Đêm (Night): 21:00 - 04:59 JST
+    - Day-of-Week Distribution (0=Monday / Thứ 2 .. 6=Sunday / Chủ Nhật)
+    - Total in-stock count, total out-of-stock count, in-stock success percentage
+    - Top peak hours and peak day-of-week
+    - Logistics profile metadata
+    """
+    global _analytics_cache
+    if chain_code is None and "chain" in kwargs:
+        chain_code = kwargs["chain"]
+
+    clean_chain = (chain_code or "").strip().lower()
+    clean_pref = (pref or "").strip().lower()
+
+    if clean_chain in ("all", "none", ""):
+        clean_chain = ""
+    if clean_pref in ("all", "none", ""):
+        clean_pref = ""
+
+    cache_key = f"{clean_chain}_{clean_pref}"
+    now_mono = time.time()
+    if cache_key in _analytics_cache:
+        cached_ts, cached_val = _analytics_cache[cache_key]
+        if (now_mono - cached_ts) < _ANALYTICS_CACHE_TTL:
+            return cached_val
+
+    from .config import CHAIN_NAMES
+
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+
+        # 1. Status breakdown query
+        status_where = ["1=1"]
+        status_params = []
+        if clean_chain:
+            status_where.append("s.chain = ?")
+            status_params.append(clean_chain)
+        if clean_pref:
+            status_where.append("s.pref = ?")
+            status_params.append(clean_pref)
+
+        status_where_sql = " AND ".join(status_where)
+        cursor.execute(f"""
+            SELECT h.status_code, COUNT(*) as cnt
+            FROM store_history h
+            JOIN stores s ON h.store_id = s.id
+            WHERE {status_where_sql}
+            GROUP BY h.status_code;
+        """, status_params)
+        status_counts = dict(cursor.fetchall())
+
+        total_instock = status_counts.get("i", 0)
+        total_out_of_stock = status_counts.get("o", 0)
+        total_reports = sum(status_counts.values())
+        instock_rate = round(total_instock / total_reports * 100, 1) if total_reports > 0 else 0.0
+
+        # 2. In-stock hourly and DOW aggregation
+        instock_where = ["h.status_code = 'i'", "h.timestamp > 0"]
+        instock_params = []
+        if clean_chain:
+            instock_where.append("s.chain = ?")
+            instock_params.append(clean_chain)
+        if clean_pref:
+            instock_where.append("s.pref = ?")
+            instock_params.append(clean_pref)
+
+        instock_where_sql = " AND ".join(instock_where)
+        cursor.execute(f"""
+            SELECT 
+                ((h.timestamp + 32400) % 86400) / 3600 AS jst_hour,
+                (CAST(strftime('%w', datetime(h.timestamp, 'unixepoch', '+9 hours')) AS INTEGER) + 6) % 7 AS jst_dow,
+                COUNT(*) as cnt
+            FROM store_history h
+            JOIN stores s ON h.store_id = s.id
+            WHERE {instock_where_sql}
+            GROUP BY jst_hour, jst_dow;
+        """, instock_params)
+        rows = cursor.fetchall()
+
+    by_hour = [0] * 24
+    by_dow = [0] * 7
+
+    for row in rows:
+        h = int(row["jst_hour"] if isinstance(row, sqlite3.Row) else row[0])
+        d = int(row["jst_dow"] if isinstance(row, sqlite3.Row) else row[1])
+        cnt = int(row["cnt"] if isinstance(row, sqlite3.Row) else row[2])
+        if 0 <= h < 24:
+            by_hour[h] += cnt
+        if 0 <= d < 7:
+            by_dow[d] += cnt
+
+    # Strictly align total_instock with sum(by_hour) to guarantee
+    # sum(by_hour) == sum(windows.values()) == total_instock regardless of concurrent writes
+    instock_from_hours = sum(by_hour)
+    total_instock = instock_from_hours
+    total_reports = total_instock + total_out_of_stock
+    instock_rate = round(total_instock / total_reports * 100, 1) if total_reports > 0 else 0.0
+
+    # 4-Window Day Distribution
+    # Early Morning: 05:00 - 10:59 JST (hours 5..10)
+    # Noon: 11:00 - 16:59 JST (hours 11..16)
+    # Afternoon / Evening: 17:00 - 20:59 JST (hours 17..20)
+    # Night: 21:00 - 04:59 JST (hours 21..23, 0..4)
+    # These partition the entire 24 hours so sum(windows.values()) == total_instock
+    windows = {
+        "early_morning": sum(by_hour[h] for h in range(5, 11)),
+        "noon": sum(by_hour[h] for h in range(11, 17)),
+        "afternoon_evening": sum(by_hour[h] for h in range(17, 21)),
+        "night": sum(by_hour[h] for h in [21, 22, 23, 0, 1, 2, 3, 4])
+    }
+
+    windows_detail = [
+        {
+            "id": "early_morning",
+            "name": "Sáng sớm (Early Morning)",
+            "window": "05:00 - 10:59 JST",
+            "core_peak": "05:00 - 08:59 JST",
+            "count": windows["early_morning"],
+            "rate": round(windows["early_morning"] / total_instock * 100, 1) if total_instock > 0 else 0.0
+        },
+        {
+            "id": "noon",
+            "name": "Trưa (Noon)",
+            "window": "11:00 - 16:59 JST",
+            "core_peak": "11:00 - 13:59 JST",
+            "count": windows["noon"],
+            "rate": round(windows["noon"] / total_instock * 100, 1) if total_instock > 0 else 0.0
+        },
+        {
+            "id": "afternoon_evening",
+            "name": "Chiều tối (Afternoon / Evening)",
+            "window": "17:00 - 20:59 JST",
+            "core_peak": "17:00 - 20:59 JST",
+            "count": windows["afternoon_evening"],
+            "rate": round(windows["afternoon_evening"] / total_instock * 100, 1) if total_instock > 0 else 0.0
+        },
+        {
+            "id": "night",
+            "name": "Đêm (Night)",
+            "window": "21:00 - 04:59 JST",
+            "core_peak": "21:00 - 00:59 JST",
+            "count": windows["night"],
+            "rate": round(windows["night"] / total_instock * 100, 1) if total_instock > 0 else 0.0
+        }
+    ]
+
+    dow_labels = [
+        {"dow": 0, "name": "Thứ 2", "name_en": "Monday", "name_ja": "月曜日"},
+        {"dow": 1, "name": "Thứ 3", "name_en": "Tuesday", "name_ja": "火曜日"},
+        {"dow": 2, "name": "Thứ 4", "name_en": "Wednesday", "name_ja": "水曜日"},
+        {"dow": 3, "name": "Thứ 5", "name_en": "Thursday", "name_ja": "木曜日"},
+        {"dow": 4, "name": "Thứ 6", "name_en": "Friday", "name_ja": "金曜日"},
+        {"dow": 5, "name": "Thứ 7", "name_en": "Saturday", "name_ja": "土曜日"},
+        {"dow": 6, "name": "Chủ Nhật", "name_en": "Sunday", "name_ja": "日曜日"}
+    ]
+
+    dow_distribution = [
+        {
+            "dow": d,
+            "name": dow_labels[d]["name"],
+            "name_en": dow_labels[d]["name_en"],
+            "name_ja": dow_labels[d]["name_ja"],
+            "count": by_dow[d],
+            "percentage": round(by_dow[d] / total_instock * 100, 1) if total_instock > 0 else 0.0
+        }
+        for d in range(7)
+    ]
+
+    hourly_distribution = [
+        {
+            "hour": h,
+            "label": f"{h:02d}:00",
+            "count": by_hour[h],
+            "percentage": round(by_hour[h] / total_instock * 100, 1) if total_instock > 0 else 0.0
+        }
+        for h in range(24)
+    ]
+
+    # Peak hours and peak DOW
+    peak_hours_sorted = sorted(range(24), key=lambda h: (by_hour[h], -h), reverse=True)
+    peak_hours = [h for h in peak_hours_sorted if by_hour[h] > 0][:5]
+
+    peak_dow = max(range(7), key=lambda d: by_dow[d]) if total_instock > 0 else 0
+    peak_dow_label = dow_labels[peak_dow]["name"]
+
+    logistics_prof = get_chain_logistics_profile(clean_chain) if clean_chain else None
+
+    result = {
+        "status": "ok",
+        "chain": clean_chain or "all",
+        "chain_name": CHAIN_NAMES.get(clean_chain, "Tất cả chuỗi" if not clean_chain else clean_chain),
+        "pref": clean_pref or "all",
+        "total_instock": total_instock,
+        "total_out_of_stock": total_out_of_stock,
+        "total_reports": total_reports,
+        "instock_rate": instock_rate,
+        "by_hour": by_hour,
+        "by_dow": by_dow,
+        "windows": windows,
+        "windows_detail": windows_detail,
+        "peak_hours": peak_hours,
+        "peak_dow": peak_dow,
+        "peak_dow_label": peak_dow_label,
+        "hourly_distribution": hourly_distribution,
+        "dow_distribution": dow_distribution,
+        "logistics_profile": logistics_prof
+    }
+
+    _analytics_cache[cache_key] = (now_mono, result)
+    return result
+
+
 def get_recent_reports(since_created_at: int = 0, limit: int = 50) -> List[Dict[str, Any]]:
     """Retrieve the most recent reports stored in SQLite store_history created after since_created_at."""
     with get_db_connection() as conn:
@@ -1273,6 +1614,11 @@ def get_recent_reports(since_created_at: int = 0, limit: int = 50) -> List[Dict[
 
 def db_get_stats_overview() -> Dict[str, Any]:
     """Retrieve comprehensive system statistics and KPI metrics."""
+    global _stats_overview_cache
+    now = time.time()
+    if _stats_overview_cache[0] > 0 and (now - _stats_overview_cache[0]) < _STATS_CACHE_TTL:
+        return _stats_overview_cache[1]
+
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM stores;")
@@ -1288,20 +1634,20 @@ def db_get_stats_overview() -> Dict[str, Any]:
         by_status = dict(cursor.fetchall())
 
         cursor.execute("""
-            SELECT s.pref, COUNT(h.id) 
-            FROM store_history h 
-            JOIN stores s ON h.store_id = s.id 
-            GROUP BY s.pref 
-            ORDER BY COUNT(h.id) DESC;
+            SELECT s.pref, SUM(h.c) as total
+            FROM (SELECT store_id, COUNT(*) as c FROM store_history GROUP BY store_id) h
+            JOIN stores s ON h.store_id = s.id
+            GROUP BY s.pref
+            ORDER BY total DESC;
         """)
         by_pref = [{"pref": r[0] or "other", "count": r[1]} for r in cursor.fetchall()]
 
         cursor.execute("""
-            SELECT s.chain, COUNT(h.id) 
-            FROM store_history h 
-            JOIN stores s ON h.store_id = s.id 
-            GROUP BY s.chain 
-            ORDER BY COUNT(h.id) DESC 
+            SELECT s.chain, SUM(h.c) as total
+            FROM (SELECT store_id, COUNT(*) as c FROM store_history GROUP BY store_id) h
+            JOIN stores s ON h.store_id = s.id
+            GROUP BY s.chain
+            ORDER BY total DESC
             LIMIT 12;
         """)
         by_chain = [{"chain": r[0] or "other", "count": r[1]} for r in cursor.fetchall()]
@@ -1333,7 +1679,7 @@ def db_get_stats_overview() -> Dict[str, Any]:
         latest_ts = latest_row[0] if latest_row else 0
         latest_time_str = latest_row[1] if latest_row else ""
 
-        return {
+        result = {
             "total_stores": total_stores,
             "total_reports": total_reports,
             "active_stores": active_stores,
@@ -1348,6 +1694,8 @@ def db_get_stats_overview() -> Dict[str, Any]:
             "latest_timestamp": latest_ts,
             "latest_formatted_time": latest_time_str
         }
+        _stats_overview_cache = (now, result)
+        return result
 
 
 def db_get_leaderboard(pref: Optional[str] = None, chain: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
@@ -1506,35 +1854,75 @@ def _calc_haversine_dist(lat1: float, lon1: float, lat2: float, lon2: float) -> 
 CHAIN_LOGISTICS_PROFILES = {
     "seven": {
         "name": "7-Eleven",
-        "peak_hours": [11, 12, 13, 21, 22],
-        "peak_window": "11:00 - 13:30 & 21:00 - 22:30 JST",
-        "dow_peak": [4, 5],
+        "peak_hours": [12, 13, 17, 18, 22],
+        "peak_window": "12:00 - 13:30 & 17:00 - 22:30 JST",
+        "dow_peak": [2, 5, 6],
         "base_cycle_days": 2.5,
-        "desc": "Chuyến trưa (11:00-13:30) & đêm (21:00-22:30)"
+        "desc": "Chuyến trưa (12:00-13:30) & chiều tối-đêm (17:00-22:30)"
     },
     "lawson": {
         "name": "Lawson",
-        "peak_hours": [7, 8, 9, 17, 18],
-        "peak_window": "07:30 - 09:30 & 17:00 - 18:30 JST",
-        "dow_peak": [4, 5],
+        "peak_hours": [7, 8, 9, 17, 20],
+        "peak_window": "07:00 - 09:30 & 17:00 - 20:30 JST",
+        "dow_peak": [0, 2, 6],
         "base_cycle_days": 3.0,
-        "desc": "Chuyến sáng (07:30-09:30) & chiều (17:00-18:30)"
+        "desc": "Chuyến sáng sớm (07:00-09:30) & chiều tối (17:00-20:30)"
     },
     "familymart": {
         "name": "FamilyMart",
-        "peak_hours": [9, 10, 15, 16],
-        "peak_window": "09:00 - 10:30 & 15:30 - 17:00 JST",
-        "dow_peak": [3, 4],
-        "base_cycle_days": 3.0,
-        "desc": "Chuyến sáng (09:00-10:30) & xế chiều (15:30-17:00)"
+        "peak_hours": [9, 10, 11, 15, 16],
+        "peak_window": "09:00 - 11:30 & 15:00 - 16:30 JST",
+        "dow_peak": [2, 5, 6],
+        "base_cycle_days": 2.8,
+        "desc": "Chuyến sáng-trưa (09:00-11:30) & xế chiều (15:00-16:30)"
     },
     "ministop": {
         "name": "Ministop",
-        "peak_hours": [10, 11, 14, 15],
-        "peak_window": "10:00 - 12:00 & 14:00 - 15:30 JST",
-        "dow_peak": [4],
+        "peak_hours": [11, 12, 13, 14, 15],
+        "peak_window": "11:00 - 15:30 JST",
+        "dow_peak": [2, 5, 6],
         "base_cycle_days": 3.5,
-        "desc": "Chuyến trưa (10:00-12:00)"
+        "desc": "Chuyến trưa - đầu chiều (11:00-15:30)"
+    },
+    "dailyyamazaki": {
+        "name": "Daily Yamazaki",
+        "peak_hours": [7, 8, 11, 12, 18],
+        "peak_window": "07:00 - 08:30 & 11:30 - 13:00 JST",
+        "dow_peak": [4, 5],
+        "base_cycle_days": 3.5,
+        "desc": "Chuyến sáng sớm làm bánh & trưa (07:00-08:30 & 11:30-13:00)"
+    },
+    "newdays": {
+        "name": "NewDays",
+        "peak_hours": [7, 8, 17, 18, 19],
+        "peak_window": "07:00 - 09:00 & 17:30 - 19:30 JST",
+        "dow_peak": [4, 5],
+        "base_cycle_days": 3.0,
+        "desc": "Khung giờ cao điểm ga tàu sáng & chiều tối"
+    },
+    "bellmart": {
+        "name": "Bellmart",
+        "peak_hours": [8, 9, 16, 17, 18],
+        "peak_window": "08:00 - 09:30 & 16:30 - 18:30 JST",
+        "dow_peak": [4, 5],
+        "base_cycle_days": 3.5,
+        "desc": "Kiosk ga JR sáng & giờ tan tầm"
+    },
+    "poplar": {
+        "name": "Poplar",
+        "peak_hours": [11, 12, 18, 19],
+        "peak_window": "11:00 - 13:00 & 18:00 - 20:00 JST",
+        "dow_peak": [4, 5],
+        "base_cycle_days": 3.5,
+        "desc": "Chuyến trưa & tối (11:00-13:00 & 18:00-20:00)"
+    },
+    "seicomart": {
+        "name": "Seicomart",
+        "peak_hours": [6, 7, 11, 12, 17],
+        "peak_window": "06:30 - 08:00 & 11:00 - 13:00 JST",
+        "dow_peak": [4, 5],
+        "base_cycle_days": 3.0,
+        "desc": "Chuyến sáng Hot Chef & trưa (06:30-08:00 & 11:00-13:00)"
     },
     "specialty": {
         "name": "Shop thẻ bài / PokéCenter",
@@ -1572,6 +1960,14 @@ def get_chain_logistics_profile(chain_code: str) -> Dict[str, Any]:
     return CHAIN_LOGISTICS_PROFILES["default"]
 
 
+def db_get_chain_profiles() -> Dict[str, Dict[str, Any]]:
+    """
+    Returns calibrated logistics profiles for combini and retail chains.
+    Includes hourly prior peak weights, DOW peaks, and median turnaround cycles.
+    """
+    return {k: dict(v) for k, v in CHAIN_LOGISTICS_PROFILES.items()}
+
+
 def db_get_restock_predictions(
     pref: Optional[str] = None,
     chain: Optional[str] = None,
@@ -1604,6 +2000,8 @@ def db_get_restock_predictions(
         clean_chain = None
     if target_hour is not None and (target_hour < 0 or target_hour > 23):
         target_hour = None
+    if limit is not None and limit < 0:
+        limit = 0
 
     cache_key = f"{clean_pref}_{clean_chain}_{target_hour}_{clean_window}_{user_lat}_{user_lng}_{max_dist_km}_{min_score}_{limit}_{sort_by}_{clean_status}"
     now_ts = int(time.time())
@@ -1632,6 +2030,15 @@ def db_get_restock_predictions(
             where_clauses.append("s.chain = ?")
             params.append(clean_chain)
 
+        # Early candidate bounding box pruning in SQLite for high-performance localized queries
+        if user_lat is not None and user_lng is not None and max_dist_km is not None and max_dist_km > 0:
+            dlat = (max_dist_km + 0.5) / 111.0
+            dlng = (max_dist_km + 0.5) / (111.0 * max(0.01, math.cos(math.radians(user_lat))))
+            where_clauses.append("s.lat BETWEEN ? AND ?")
+            params.extend([user_lat - dlat, user_lat + dlat])
+            where_clauses.append("s.lng BETWEEN ? AND ?")
+            params.extend([user_lng - dlng, user_lng + dlng])
+
         where_sql = " AND ".join(where_clauses)
         cursor.execute(f"""
             SELECT h.store_id, h.timestamp, h.packs_json,
@@ -1652,6 +2059,12 @@ def db_get_restock_predictions(
         if clean_chain:
             recent_where.append("s.chain = ?")
             recent_params.append(clean_chain)
+
+        if user_lat is not None and user_lng is not None and max_dist_km is not None and max_dist_km > 0:
+            recent_where.append("s.lat BETWEEN ? AND ?")
+            recent_params.extend([user_lat - dlat, user_lat + dlat])
+            recent_where.append("s.lng BETWEEN ? AND ?")
+            recent_params.extend([user_lng - dlng, user_lng + dlng])
 
         cursor.execute(f"""
             SELECT s.id, s.name, s.pref, s.chain, s.address, s.lat, s.lng,
@@ -1676,12 +2089,21 @@ def db_get_restock_predictions(
             truck_where.append("s.pref = ?")
             truck_params.append(clean_pref)
 
+        if user_lat is not None and user_lng is not None and max_dist_km is not None and max_dist_km > 0:
+            dlat_truck = (max_dist_km + 2.0) / 111.0
+            dlng_truck = (max_dist_km + 2.0) / (111.0 * max(0.01, math.cos(math.radians(user_lat))))
+            truck_where.append("s.lat BETWEEN ? AND ?")
+            truck_params.extend([user_lat - dlat_truck, user_lat + dlat_truck])
+            truck_where.append("s.lng BETWEEN ? AND ?")
+            truck_params.extend([user_lng - dlng_truck, user_lng + dlng_truck])
+
         cursor.execute(f"""
             SELECT s.id, s.name, s.pref, s.chain, s.lat, s.lng, s.last_timestamp
             FROM stores s
             WHERE {" AND ".join(truck_where)};
         """, truck_params)
         active_truck_sources = cursor.fetchall()
+
 
     # 2. Aggregate store data and calculate 24h restock distribution
     stores_data = defaultdict(lambda: {
@@ -1779,20 +2201,14 @@ def db_get_restock_predictions(
             radius_hourly_dist = [0] * 24
             ever_restocked_ids = set()
             if radius_store_ids:
-                id_list = list(radius_store_ids)
-                batch_size = 900
-                for i in range(0, len(id_list), batch_size):
-                    batch = id_list[i:i + batch_size]
-                    q_marks = ",".join("?" for _ in batch)
-                    cursor.execute(f"""
-                        SELECT store_id, timestamp
-                        FROM store_history
-                        WHERE timestamp > 0 AND status_code = 'i' AND store_id IN ({q_marks});
-                    """, batch)
-                    for r_sid, r_ts in cursor.fetchall():
-                        h_jst = (r_ts + 32400) % 86400 // 3600
-                        radius_hourly_dist[h_jst] += 1
-                        ever_restocked_ids.add(r_sid)
+                for sid, d in stores_data.items():
+                    if sid in radius_store_ids:
+                        in_ts = d.get("timestamps", [])
+                        if in_ts:
+                            ever_restocked_ids.add(sid)
+                            for r_ts in in_ts:
+                                h_jst = (r_ts + 32400) % 86400 // 3600
+                                radius_hourly_dist[h_jst] += 1
 
             peak_h = max(range(24), key=lambda h: radius_hourly_dist[h]) if radius_store_ids else 10
             peak_h_cnt = radius_hourly_dist[peak_h]
@@ -2263,11 +2679,74 @@ def db_get_restock_predictions(
         "radius_stats": radius_stats,
         "hourly_distribution": hourly_distribution,
         "total_candidates": len(candidates),
-        "predictions": candidates[:limit]
+        "predictions": candidates[:limit] if (limit is not None and limit >= 0) else ([] if limit is not None else candidates)
     }
 
     _predictions_cache[cache_key] = (now_ts, result_payload)
     return result_payload
 
 
+def db_get_store_prediction(store_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Retrieve prediction and logistics analysis for a single store by ID.
+    Used for AI explanation generation (/api/predictions/{store_id}/explain).
+    """
+    clean_id = store_id[:-2] if store_id.endswith("_c") else store_id
+    store = get_store_by_id(clean_id)
+    if not store:
+        return None
 
+    pref = store.get("pref") or "osaka"
+    chain = store.get("chain") or "other"
+
+    # Query predictions for this store's prefecture with high limit and no min_score threshold
+    preds_data = db_get_restock_predictions(pref=pref, min_score=0, limit=3000)
+    for cand in preds_data.get("predictions", []):
+        if cand.get("store_id") == clean_id:
+            return cand
+
+    # Fallback: synthesize candidate metadata from chain profile if store has no history
+    from .config import CHAIN_NAMES
+    chain_prof = get_chain_logistics_profile(chain)
+    prior_peak = chain_prof.get("peak_hours", [11, 12, 13])
+    display_h = prior_peak[0] if prior_peak else 11
+    predicted_window = f"{display_h:02d}:00 - {(display_h + 1) % 24:02d}:30 JST"
+    now_dt = datetime.now(tz=JST)
+    dow_names = ["Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy", "Chủ Nhật"]
+    curr_dow = now_dt.weekday()
+
+    return {
+        "store_id": clean_id,
+        "name": store.get("name") or clean_id,
+        "pref": pref,
+        "chain": chain,
+        "chain_name": CHAIN_NAMES.get(chain, chain),
+        "address": store.get("address") or "",
+        "lat": store.get("lat"),
+        "lng": store.get("lng"),
+        "current_status": store.get("status") or "u",
+        "score": 40,
+        "flash_mode": "none",
+        "recent_min_ago": None,
+        "is_hot_30m": False,
+        "is_cold_30m": False,
+        "truck_en_route": False,
+        "confidence_level": "medium",
+        "reliability_level": "estimated",
+        "reliability_stars": 1,
+        "reliability_text": "Ước tính theo chuỗi",
+        "action_tip": f"🕒 Canh giờ ghé vào khoảng {display_h:02d}:00 - {(display_h + 1) % 24:02d}:30 để có cơ hội cao nhất.",
+        "chain_pattern_match": True,
+        "predicted_hour": display_h,
+        "predicted_window": predicted_window,
+        "is_prime_now": False,
+        "days_since_last_in": 999.0,
+        "avg_interval_days": chain_prof.get("avg_cycle", 3.0),
+        "total_in_reports": 0,
+        "top_packs": [],
+        "reasons": [
+            f"Theo quy luật chuỗi {CHAIN_NAMES.get(chain, chain)}",
+            f"Khung giờ lên hàng tham khảo: {predicted_window}",
+            f"Ngày trong tuần: {dow_names[curr_dow]}"
+        ]
+    }

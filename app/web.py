@@ -25,6 +25,7 @@ import os
 import json
 import time
 import math
+from typing import Optional, Dict, Any, List
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Query, Request
 from fastapi.middleware.gzip import GZipMiddleware
@@ -34,7 +35,7 @@ import uvicorn
 from .fetcher import fetch_stores, fetch_firestore_document, DEFAULT_CACHE_DIR, fetch_store_history, fetch_realtime_status
 from .parser import merge_stores_with_status, parse_store_status
 from .calendar_tracker import fetch_calendar_events
-from .config import CHAIN_NAMES, PACK_CODES, FIREBASE_API_KEY, PROJECT_ID
+from .config import CHAIN_NAMES, PACK_CODES, COMBINI_CHAINS, FIREBASE_API_KEY, PROJECT_ID
 from .db import (
     init_db,
     seed_stores_if_empty,
@@ -105,7 +106,7 @@ DEFAULT_SETTINGS = {
         "telegramLng": 135.4925,      # Kinh độ vị trí neo Telegram (mặc định: Ga JR Imamiya)
         "telegramLocationName": "Ga Imamiya", # Tên vị trí neo cho Telegram
         "telegramRadius": "all",      # Bán kính lọc cảnh báo Telegram: 'all', '1', '3', '5', '10', '20' (km)
-        "telegramAutoSyncGps": False, # Tự động cập nhật toạ độ Telegram theo GPS khi mở app
+        "telegramAutoSyncGps": True,  # Tự động cập nhật toạ độ Telegram theo GPS khi mở app
         "notifyPrefs": ["osaka", "aichi", "kanagawa", "gifu", "mie"]  # Các tỉnh nhận thông báo
     },
 
@@ -183,6 +184,14 @@ async def update_settings(request: Request):
                 data["notifications"] = {}
             data["notifications"]["telegramEnabledAt"] = 0
 
+        # Seamless GPS & Telegram sync normalization:
+        # If client passes telegram fields at root or inside notifications, ensure both are in sync
+        if not isinstance(data.get("notifications"), dict):
+            data["notifications"] = {}
+        for tg_key in ("telegramLat", "telegramLng", "telegramLocationName", "telegramAutoSyncGps", "telegramRadius", "telegramEnabled"):
+            if tg_key in data:
+                data["notifications"][tg_key] = data[tg_key]
+
         deep_update_dict(current, data)
         save_user_settings(current)
         return JSONResponse(content={"status": "ok", "settings": current})
@@ -208,6 +217,21 @@ REGION_PREFS = {
 }
 
 _recent_notified_keys = {}
+
+def format_distance_pair(dist_km: float) -> Tuple[str, str]:
+    """
+    Standard PokéTan distance formatting:
+    Road distance = dist_km * 1.22
+    - If road_km < 1.0: formatted road distance is '~{road_m}m đường đi'
+    - If road_km >= 1.0: formatted road distance is '~{road_km:.1f}km đường đi'
+    - Straight distance: '< 1.0 km' formatted in meters ('{dist_m}m'),
+                         '>= 1.0 km' formatted in km ('{dist_km:.1f}km').
+    Returns (road_str, straight_str).
+    """
+    road_km = dist_km * 1.22
+    road_str = f"~{int(round(road_km * 1000))}m đường đi" if road_km < 1.0 else f"~{road_km:.1f}km đường đi"
+    straight_str = f"{int(round(dist_km * 1000))}m" if dist_km < 1.0 else f"{dist_km:.1f}km"
+    return road_str, straight_str
 
 def send_telegram_alert(store: dict, info: dict, notif_cfg: dict, is_test: bool = False) -> dict:
     """
@@ -249,10 +273,9 @@ def send_telegram_alert(store: dict, info: dict, notif_cfg: dict, is_test: bool 
             loc_label = (notif_cfg.get("telegramLocationName") or "").strip()
             loc_suffix = f" ({loc_label})" if loc_label else " (mốc Ga Imamiya)"
             road_km = dist_km * 1.22
-            if dist_km < 1.0:
-                dist_str = f"~{int(round(road_km * 1000))}m đường đi • {int(round(dist_km * 1000))}m{loc_suffix}"
-            else:
-                dist_str = f"~{road_km:.1f}km đường đi • {dist_km:.1f}km{loc_suffix}"
+            road_str = f"~{int(round(road_km * 1000))}m đường đi" if road_km < 1.0 else f"~{road_km:.1f}km đường đi"
+            straight_str = f"{int(round(dist_km * 1000))}m" if dist_km < 1.0 else f"{dist_km:.1f}km"
+            dist_str = f"{road_str} • {straight_str}{loc_suffix}"
         except Exception:
             dist_str = "~?km"
 
@@ -362,13 +385,13 @@ def on_csdl_report_added(store: dict, entry: dict):
         tg_chain = (notif_cfg.get("telegramChain") or "all").lower()
         st_chain = (store.get("chain") or "").lower()
         if tg_chain != "all":
-            if tg_chain == "conbini" and st_chain not in ["seven", "lawson", "familymart", "ministop"]:
+            if tg_chain in ("conbini", "combini") and st_chain not in COMBINI_CHAINS:
                 return
             elif tg_chain == "specialty" and st_chain != "specialty":
                 return
             elif tg_chain == "electronics" and st_chain not in ['geo', 'joshin', 'edion', 'aeon', 'yamada', 'ks', 'toysrus', 'biccamera', 'yodobashi']:
                 return
-            elif tg_chain not in ["conbini", "specialty", "electronics"] and st_chain != tg_chain:
+            elif tg_chain not in ["conbini", "combini", "specialty", "electronics"] and st_chain != tg_chain:
                 return
 
         # 6. Check distance radius filter (km)
@@ -970,11 +993,12 @@ def get_stats_predictions_route(
     min_score: int = 40,
     limit: int = 60,
     sort: str = "score",
-    status: Optional[str] = "all"
+    status: Optional[str] = "all",
+    with_ai: bool = False
 ):
     try:
         from .db import db_get_restock_predictions
-        return JSONResponse(content=db_get_restock_predictions(
+        result_payload = db_get_restock_predictions(
             pref=pref,
             chain=chain,
             target_hour=hour,
@@ -986,10 +1010,208 @@ def get_stats_predictions_route(
             limit=limit,
             sort_by=sort,
             status_filter=status
-        ))
+        )
+        if with_ai:
+            from .services.ai_service import generate_store_prediction_explanation
+            predictions = result_payload.get("predictions", [])
+            for cand in predictions[:3]:
+                cand["ai_explanation"] = generate_store_prediction_explanation(cand)
+        return JSONResponse(content=result_payload)
     except Exception as e:
         print("[Stats] Error getting restock predictions:", e)
         return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+@app.get("/api/predictions/{store_id}/explain")
+def get_prediction_explain_route(store_id: str):
+    """
+    Retrieve deep AI restock prediction explanation and action tips for a specific store.
+    Uses Gemini API if configured with automatic fallback to local rule-based explanation engine.
+    """
+    try:
+        from .db import db_get_store_prediction
+        from .services.ai_service import generate_store_prediction_explanation
+
+        store_pred = db_get_store_prediction(store_id)
+        if not store_pred:
+            return JSONResponse(
+                status_code=404,
+                content={"status": "error", "message": f"Store '{store_id}' not found"}
+            )
+
+        explanation = generate_store_prediction_explanation(store_pred)
+        return JSONResponse(content=explanation)
+    except Exception as e:
+        print(f"[AI Explain] Error explaining prediction for store '{store_id}':", e)
+        return JSONResponse(status_code=500, content={"status": "error", "error": str(e)})
+
+
+
+@app.get("/api/stats/combini_analytics")
+def get_combini_analytics_route(chain: Optional[str] = None, pref: Optional[str] = None):
+    try:
+        from .db import get_chain_restock_analytics
+        data = get_chain_restock_analytics(chain_code=chain, pref=pref)
+        return JSONResponse(content=data)
+    except Exception as e:
+        print("[Stats] Error getting combini analytics:", e)
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+_heatmap_cache = {}
+_HEATMAP_CACHE_TTL = 30.0
+
+@app.get("/api/stats/heatmap")
+def get_stats_heatmap_route(mode: str = "chain", pref: Optional[str] = None):
+    """
+    Returns 2D restock heatmap matrix:
+    - mode="chain": Combini Chain x 24 Hours
+    - mode="dow": Day of Week x 24 Hours
+    Includes cell counts, in-stock percentages, and golden hour flags.
+    """
+    import time
+    clean_mode = "dow" if (mode or "").strip().lower() in ("dow", "day", "weekday") else "chain"
+    clean_pref = (pref or "").strip().lower()
+    if clean_pref in ("all", "none", ""):
+        clean_pref = ""
+
+    cache_key = f"{clean_mode}_{clean_pref}"
+    now_mono = time.time()
+    if cache_key in _heatmap_cache:
+        cached_ts, cached_data = _heatmap_cache[cache_key]
+        if (now_mono - cached_ts) < _HEATMAP_CACHE_TTL:
+            return JSONResponse(content=cached_data)
+
+    try:
+        from .db import get_db_connection
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            where_sql = "h.timestamp > 0"
+            params = []
+            if clean_pref:
+                where_sql += " AND s.pref = ?"
+                params.append(clean_pref)
+
+            if clean_mode == "chain":
+                cursor.execute(f"""
+                    SELECT 
+                        s.chain,
+                        ((h.timestamp + 32400) % 86400) / 3600 AS jst_hour,
+                        COUNT(*) as total,
+                        SUM(CASE WHEN h.status_code = 'i' THEN 1 ELSE 0 END) as in_stock
+                    FROM store_history h
+                    JOIN stores s ON h.store_id = s.id
+                    WHERE {where_sql}
+                    GROUP BY s.chain, jst_hour;
+                """, params)
+                rows = cursor.fetchall()
+
+                chain_keys = ["seven", "familymart", "lawson", "ministop", "specialty", "other"]
+                chain_labels = {
+                    "seven": "7-Eleven",
+                    "familymart": "FamilyMart",
+                    "lawson": "Lawson",
+                    "ministop": "Ministop",
+                    "specialty": "Shop Thẻ Bài",
+                    "other": "Chuỗi Khác"
+                }
+                matrix_data = {ck: [{"hour": h, "total": 0, "in_stock": 0, "in_rate": 0.0, "is_golden": False} for h in range(24)] for ck in chain_keys}
+
+                max_cell_val = 0
+                for r in rows:
+                    raw_c = (r[0] or "").lower()
+                    ck = raw_c if raw_c in chain_keys else ("specialty" if raw_c in ("joshin", "yodobashi", "biccamera", "geo") else "other")
+                    h = int(r[1])
+                    tot = int(r[2])
+                    inst = int(r[3] or 0)
+                    if 0 <= h < 24:
+                        matrix_data[ck][h]["total"] += tot
+                        matrix_data[ck][h]["in_stock"] += inst
+                        matrix_data[ck][h]["in_rate"] = round(matrix_data[ck][h]["in_stock"] / matrix_data[ck][h]["total"] * 100, 1) if matrix_data[ck][h]["total"] > 0 else 0.0
+                        if matrix_data[ck][h]["in_stock"] > max_cell_val:
+                            max_cell_val = matrix_data[ck][h]["in_stock"]
+
+                golden_threshold = max(3, int(max_cell_val * 0.6))
+                for ck in chain_keys:
+                    for cell in matrix_data[ck]:
+                        if cell["in_stock"] >= golden_threshold and cell["hour"] in range(8, 20):
+                            cell["is_golden"] = True
+
+                result = {
+                    "status": "ok",
+                    "mode": "chain",
+                    "max_density": max_cell_val,
+                    "golden_threshold": golden_threshold,
+                    "rows": [
+                        {
+                            "key": ck,
+                            "label": chain_labels[ck],
+                            "hours": matrix_data[ck],
+                            "total_in_stock": sum(c["in_stock"] for c in matrix_data[ck]),
+                            "peak_hour": max(matrix_data[ck], key=lambda c: c["in_stock"])["hour"] if matrix_data[ck] else 12
+                        }
+                        for ck in chain_keys
+                    ]
+                }
+            else:
+                cursor.execute(f"""
+                    SELECT 
+                        (CAST(strftime('%w', datetime(h.timestamp, 'unixepoch', '+9 hours')) AS INTEGER) + 6) % 7 AS jst_dow,
+                        ((h.timestamp + 32400) % 86400) / 3600 AS jst_hour,
+                        COUNT(*) as total,
+                        SUM(CASE WHEN h.status_code = 'i' THEN 1 ELSE 0 END) as in_stock
+                    FROM store_history h
+                    JOIN stores s ON h.store_id = s.id
+                    WHERE {where_sql}
+                    GROUP BY jst_dow, jst_hour;
+                """, params)
+                rows = cursor.fetchall()
+
+                dow_names = ["Thứ 2 (Mon)", "Thứ 3 (Tue)", "Thứ 4 (Wed)", "Thứ 5 (Thu)", "Thứ 6 (Fri)", "Thứ Bảy (Sat)", "Chủ Nhật (Sun)"]
+                dow_matrix = {d: [{"hour": h, "total": 0, "in_stock": 0, "in_rate": 0.0, "is_golden": False} for h in range(24)] for d in range(7)}
+
+                max_cell_val = 0
+                for r in rows:
+                    d = int(r[0])
+                    h = int(r[1])
+                    tot = int(r[2])
+                    inst = int(r[3] or 0)
+                    if 0 <= d < 7 and 0 <= h < 24:
+                        dow_matrix[d][h]["total"] += tot
+                        dow_matrix[d][h]["in_stock"] += inst
+                        dow_matrix[d][h]["in_rate"] = round(dow_matrix[d][h]["in_stock"] / dow_matrix[d][h]["total"] * 100, 1) if dow_matrix[d][h]["total"] > 0 else 0.0
+                        if dow_matrix[d][h]["in_stock"] > max_cell_val:
+                            max_cell_val = dow_matrix[d][h]["in_stock"]
+
+                golden_threshold = max(3, int(max_cell_val * 0.6))
+                for d in range(7):
+                    for cell in dow_matrix[d]:
+                        if cell["in_stock"] >= golden_threshold and cell["hour"] in range(8, 20):
+                            cell["is_golden"] = True
+
+                result = {
+                    "status": "ok",
+                    "mode": "dow",
+                    "max_density": max_cell_val,
+                    "golden_threshold": golden_threshold,
+                    "rows": [
+                        {
+                            "key": str(d),
+                            "label": dow_names[d],
+                            "hours": dow_matrix[d],
+                            "total_in_stock": sum(c["in_stock"] for c in dow_matrix[d]),
+                            "peak_hour": max(dow_matrix[d], key=lambda c: c["in_stock"])["hour"] if dow_matrix[d] else 12
+                        }
+                        for d in range(7)
+                    ]
+                }
+
+        _heatmap_cache[cache_key] = (now_mono, result)
+        return JSONResponse(content=result)
+    except Exception as e:
+        print("[Stats] Error getting heatmap data:", e)
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
 
 
 @app.get("/api/stats/export_csv")
@@ -1117,17 +1339,11 @@ def get_thongbao_html():
 
 
 def get_thongke_html():
-    global _cached_thongke_html
-    if _cached_thongke_html is None:
-        _cached_thongke_html = render_thongke_page()
-    return _cached_thongke_html
+    return render_thongke_page()
 
 
 def get_dudoan_html():
-    global _cached_dudoan_html
-    if _cached_dudoan_html is None:
-        _cached_dudoan_html = render_dudoan_page()
-    return _cached_dudoan_html
+    return render_dudoan_page()
 
 
 PAGE_CACHE_HEADERS = {

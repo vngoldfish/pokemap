@@ -238,7 +238,7 @@ __SHARED_BASE_CSS__
       border-radius: 10px;
       border: 1px solid #334155;
     }
-    .filter-input {
+    .filter-input, .filter-select {
       background: #1e293b;
       border: 1px solid #475569;
       color: #f1f5f9;
@@ -248,7 +248,7 @@ __SHARED_BASE_CSS__
       font-weight: 600;
       outline: none;
     }
-    .filter-input:focus {
+    .filter-input:focus, .filter-select:focus {
       border-color: #38bdf8;
       box-shadow: 0 0 0 2px rgba(56,189,248,0.2);
     }
@@ -323,52 +323,191 @@ __SHARED_BASE_CSS__
       display: inline-block;
     }
 
-    /* BAR CHART CSS (0ms LOAD) */
+    /* INTERACTIVE SVG CHART & 2D HEATMAP CSS (0ms LOAD, 100% OFFLINE) */
     .chart-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
       gap: 16px;
       margin-bottom: 20px;
     }
-    .hourly-bar-container {
-      display: flex;
-      align-items: flex-end;
-      gap: 4px;
-      height: 180px;
-      padding: 10px 0 24px;
-      border-bottom: 1px solid #334155;
+    .interactive-chart-container {
       position: relative;
-    }
-    .hourly-col {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      height: 100%;
-      justify-content: flex-end;
-      position: relative;
-    }
-    .hourly-bar {
       width: 100%;
-      background: linear-gradient(180deg, #38bdf8, #2563eb);
-      border-radius: 3px 3px 0 0;
-      min-height: 2px;
-      transition: height 0.3s ease;
+      height: 220px;
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      border-radius: 10px;
+      padding: 10px 8px 6px;
+      box-sizing: border-box;
+      margin-bottom: 8px;
+    }
+    .svg-chart {
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+      display: block;
+    }
+    .svg-grid-line {
+      stroke: #1e293b;
+      stroke-dasharray: 4 4;
+      stroke-width: 1;
+    }
+    .svg-axis-text {
+      fill: #64748b;
+      font-size: 10.5px;
+      font-weight: 700;
+      text-anchor: middle;
+      font-family: inherit;
+    }
+    .svg-bar-total {
+      fill: #1e293b;
+      rx: 3;
+      ry: 3;
+      transition: all 0.3s ease;
+    }
+    .svg-bar-instock {
+      fill: url(#instock-grad);
+      rx: 3;
+      ry: 3;
+      transition: all 0.3s ease;
       cursor: pointer;
     }
-    .hourly-bar:hover {
-      background: #60a5fa;
+    .svg-bar-instock.peak {
+      fill: url(#peak-grad);
+      filter: drop-shadow(0 0 5px rgba(245, 158, 11, 0.6));
     }
-    .hourly-bar.peak {
-      background: linear-gradient(180deg, #f59e0b, #d97706);
+    .svg-col-hover-rect {
+      fill: transparent;
+      cursor: pointer;
+      transition: fill 0.15s ease;
     }
-    .hourly-label {
+    .svg-col-hover-rect:hover {
+      fill: rgba(56, 189, 248, 0.12);
+    }
+
+    /* FLOATING TOOLTIPS */
+    .chart-tooltip {
       position: absolute;
-      bottom: -22px;
-      font-size: 0.6rem;
-      color: #64748b;
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid #38bdf8;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 0.72rem;
+      color: #f1f5f9;
+      pointer-events: none;
+      z-index: 500;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(8px);
+      line-height: 1.5;
+      max-width: 290px;
+      transition: opacity 0.12s ease;
+    }
+
+    /* CHAIN & RADIUS CHIPS */
+    .chain-chip, .radius-chip {
+      background: #0f172a;
+      border: 1px solid #334155;
+      color: #cbd5e1;
+      padding: 5px 10px;
+      border-radius: 8px;
+      font-size: 0.73rem;
       font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.15s ease;
       white-space: nowrap;
+    }
+    .chain-chip:hover, .radius-chip:hover {
+      background: #1e293b;
+      color: #38bdf8;
+      border-color: #38bdf8;
+    }
+    .chain-chip.active, .radius-chip.active {
+      background: rgba(37, 99, 235, 0.25);
+      border-color: #3b82f6;
+      color: #60a5fa;
+      box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
+    }
+
+    /* 2D HEATMAP MATRIX */
+    .heatmap-scroll-wrapper {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      position: relative;
+      border-radius: 8px;
+      border: 1px solid #1e293b;
+      background: #0f172a;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+    .heatmap-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 4px;
+      min-width: 720px;
+      font-size: 0.72rem;
+    }
+    .heatmap-table th {
+      background: #090e17;
+      color: #94a3b8;
+      font-size: 0.65rem;
+      padding: 6px 2px;
+      text-align: center;
+      font-weight: 700;
+      border-radius: 4px;
+    }
+    .heatmap-row-label {
+      background: #1e293b;
+      color: #f1f5f9;
+      font-weight: 800;
+      padding: 7px 10px;
+      border-radius: 6px;
+      white-space: nowrap;
+      position: sticky;
+      left: 0;
+      z-index: 2;
+      border: 1px solid #334155;
+      font-size: 0.75rem;
+    }
+    .heatmap-cell {
+      text-align: center;
+      border-radius: 4px;
+      padding: 6px 0;
+      color: #cbd5e1;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+      user-select: none;
+      position: relative;
+      border: 1px solid transparent;
+      min-width: 24px;
+    }
+    .heatmap-cell:hover {
+      transform: scale(1.18);
+      z-index: 10;
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.7);
+      outline: 1px solid #38bdf8;
+    }
+    .heatmap-cell.golden-cell {
+      border: 1px solid #f59e0b !important;
+      box-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
+      color: #ffffff;
+      font-weight: 900;
+    }
+    .dist-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: #38bdf8;
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 6px;
     }
 
     /* PROGRESS BARS */
@@ -591,7 +730,11 @@ __SHARED_BASE_CSS__
         width: 100% !important;
         box-sizing: border-box !important;
       }
-      .filter-select {
+      .filter-select,
+      .filter-bar select,
+      .filter-bar select.filter-select,
+      .filter-bar select.filter-input {
+        grid-column: auto !important;
         font-size: 0.7rem !important;
         padding: 3px 6px !important;
         height: 28px !important;
@@ -599,21 +742,78 @@ __SHARED_BASE_CSS__
         box-sizing: border-box !important;
       }
 
-      /* Dense Tables */
-      .stats-table {
-        font-size: 0.72rem !important;
+      /* Table Mobile Card Wrap (<640px) */
+      .stats-table-wrapper {
+        overflow-x: auto;
       }
-      .stats-table th {
-        padding: 5px 6px !important;
-        font-size: 0.66rem !important;
+      #leaderboard-table thead,
+      #history-table thead {
+        display: none !important;
       }
-      .stats-table td {
-        padding: 5px 6px !important;
-        font-size: 0.7rem !important;
+      #leaderboard-table,
+      #leaderboard-table tbody,
+      #history-table,
+      #history-tbody {
+        display: block !important;
+        width: 100% !important;
+      }
+      #leaderboard-table tbody tr,
+      #history-tbody tr {
+        display: block !important;
+        background: #1e293b !important;
+        border: 1px solid #334155 !important;
+        border-radius: 10px !important;
+        padding: 10px 12px !important;
+        margin-bottom: 10px !important;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3) !important;
+      }
+      #leaderboard-table tbody td,
+      #history-tbody td {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        padding: 5px 0 !important;
+        border: none !important;
+        border-bottom: 1px solid rgba(51, 65, 85, 0.4) !important;
+        font-size: 0.78rem !important;
+        white-space: normal !important;
+        text-align: right !important;
+      }
+      #leaderboard-table tbody td::before,
+      #history-tbody td::before {
+        content: attr(data-label);
+        font-size: 0.72rem;
+        font-weight: 700;
+        color: #94a3b8;
+        text-align: left;
+        margin-right: 8px;
+        flex-shrink: 0;
+      }
+      #leaderboard-table tbody td:nth-child(2),
+      #history-tbody td:nth-child(2) {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        text-align: left !important;
+      }
+      #leaderboard-table tbody td:nth-child(2)::before,
+      #history-tbody td:nth-child(2)::before {
+        margin-bottom: 4px;
+      }
+      #leaderboard-table tbody td:last-child,
+      #history-tbody td:last-child {
+        border-bottom: none !important;
+        padding-top: 8px !important;
+        justify-content: flex-end !important;
+      }
+      #leaderboard-table .stats-btn,
+      #history-tbody .stats-btn {
+        padding: 6px 12px !important;
+        min-height: 32px !important;
+        font-size: 0.78rem !important;
       }
       .stats-table .badge {
-        padding: 1px 4px !important;
-        font-size: 0.62rem !important;
+        padding: 2px 6px !important;
+        font-size: 0.68rem !important;
       }
       
       /* Progress bars */
@@ -655,6 +855,33 @@ __SHARED_BASE_CSS__
       }
       .stats-modal-body {
         padding: 8px 10px !important;
+      }
+    }
+
+    /* ULTRA COMPACT MOBILE (<400px) */
+    @media (max-width: 400px) {
+      #stats-top-header {
+        height: 38px !important;
+        padding: 0 6px !important;
+      }
+      .stats-header-brand {
+        gap: 4px !important;
+      }
+      .stats-header-brand .logo-badge {
+        display: none !important; /* Hide badge on <400px to give ample space for title */
+      }
+      .stats-header-title {
+        font-size: 0.78rem !important;
+        font-weight: 800 !important;
+        letter-spacing: -0.2px !important;
+        white-space: nowrap !important;
+      }
+      .stats-header-actions {
+        gap: 3px !important;
+      }
+      .stats-header-actions .stats-btn {
+        padding: 4px 6px !important;
+        font-size: 0.72rem !important;
       }
     }
   </style>
@@ -753,8 +980,8 @@ __SHARED_BASE_CSS__
 
         <!-- Filter Toolbar -->
         <div class="filter-bar">
-          <input type="text" class="filter-input" id="lb-search" placeholder="🔍 Lọc nhanh tên / địa chỉ..." oninput="filterLeaderboardClient()" style="min-width:200px;">
-          <select class="filter-input" id="lb-pref-select" onchange="fetchLeaderboard()">
+          <input type="text" class="filter-input" id="lb-search" placeholder="🔍 Lọc nhanh tên / địa chỉ..." oninput="filterLeaderboardClient()" style="min-width:200px; flex:1;">
+          <select class="filter-select" id="lb-pref-select" onchange="fetchLeaderboard()">
             <option value="">📍 Tất cả Tỉnh thành</option>
             <option value="osaka">大阪 Osaka</option>
             <option value="tokyo">東京 Tokyo</option>
@@ -764,7 +991,7 @@ __SHARED_BASE_CSS__
             <option value="gifu">岐阜 Gifu</option>
             <option value="mie">三重 Mie</option>
           </select>
-          <select class="filter-input" id="lb-chain-select" onchange="fetchLeaderboard()">
+          <select class="filter-select" id="lb-chain-select" onchange="fetchLeaderboard()">
             <option value="">🏢 Tất cả Chuỗi</option>
             <option value="seven">7-Eleven</option>
             <option value="lawson">Lawson</option>
@@ -776,6 +1003,36 @@ __SHARED_BASE_CSS__
             <option value="yodobashi">Yodobashi Camera</option>
             <option value="biccamera">Bic Camera</option>
           </select>
+          <select class="filter-select" id="lb-anchor-select" onchange="onLbAnchorChange()">
+            <option value="all">🗾 Tất cả (Không đo khoảng cách)</option>
+            <option value="gps">📍 Vị trí GPS của tôi (Browser GPS)</option>
+            <option value="namba">📍 Ga Namba (Osaka)</option>
+            <option value="umeda">📍 Ga Umeda / Osaka</option>
+            <option value="imamiya">📍 Ga Imamiya (Osaka)</option>
+            <option value="ota">📍 Ota Road (Nipponbashi)</option>
+            <option value="tennoji">📍 Ga Tennoji (Osaka)</option>
+            <option value="shinjuku">📍 Ga Shinjuku (Tokyo)</option>
+            <option value="akiba">📍 Ga Akihabara (Tokyo)</option>
+            <option value="shibuya">📍 Ga Shibuya (Tokyo)</option>
+            <option value="nagoya">📍 Ga Nagoya (Aichi)</option>
+            <option value="yokohama">📍 Ga Yokohama (Kanagawa)</option>
+          </select>
+          <select class="filter-select" id="lb-sort-select" onchange="filterLeaderboardClient()">
+            <option value="reports">🔥 Sắp xếp: Nhiều báo cáo nhất</option>
+            <option value="rate">🟢 Sắp xếp: Tỉ lệ có hàng cao nhất</option>
+            <option value="distance">📍 Sắp xếp: Gần vị trí neo nhất</option>
+          </select>
+        </div>
+
+        <!-- Radius Filter Chips Row -->
+        <div class="radius-chips-bar" id="lb-radius-chips-bar" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:12px; padding:0 4px;">
+          <span style="font-size:0.75rem; color:#94a3b8; font-weight:700;">📍 Bán kính lọc:</span>
+          <button type="button" class="radius-chip active" data-radius="" onclick="selectLbRadius('')">Tất cả</button>
+          <button type="button" class="radius-chip" data-radius="1" onclick="selectLbRadius(1)">1 km</button>
+          <button type="button" class="radius-chip" data-radius="2" onclick="selectLbRadius(2)">2 km</button>
+          <button type="button" class="radius-chip" data-radius="3" onclick="selectLbRadius(3)">3 km</button>
+          <button type="button" class="radius-chip" data-radius="5" onclick="selectLbRadius(5)">5 km</button>
+          <button type="button" class="radius-chip" data-radius="10" onclick="selectLbRadius(10)">10 km</button>
         </div>
 
         <!-- Table -->
@@ -785,7 +1042,7 @@ __SHARED_BASE_CSS__
               <tr>
                 <th style="width:40px;">#</th>
                 <th>Cửa Hàng</th>
-                <th>Khu Vực</th>
+                <th>Khu Vực &amp; Khoảng Cách</th>
                 <th>Chuỗi</th>
                 <th style="text-align:center;">Tổng Báo Cáo</th>
                 <th>Tỷ Lệ Có Hàng</th>
@@ -816,14 +1073,14 @@ __SHARED_BASE_CSS__
 
         <!-- Filter Bar -->
         <div class="filter-bar">
-          <input type="text" class="filter-input" id="hist-q" placeholder="🔍 Tên quán, địa chỉ, ghi chú, ID..." style="min-width:220px;" onkeydown="if(event.key==='Enter') fetchHistoryPage(1)">
-          <select class="filter-input" id="hist-status" onchange="fetchHistoryPage(1)">
+          <input type="text" class="filter-input" id="hist-q" placeholder="🔍 Tên quán, địa chỉ, ghi chú, ID..." style="min-width:220px; flex:1;" onkeydown="if(event.key==='Enter') fetchHistoryPage(1)">
+          <select class="filter-select" id="hist-status" onchange="fetchHistoryPage(1)">
             <option value="">🎯 Tất cả Trạng thái</option>
             <option value="i">🟢 Có hàng (In Stock)</option>
             <option value="o">🔴 Hết hàng (Out of Stock)</option>
             <option value="n">⚪ Không bán thẻ (Not Handled)</option>
           </select>
-          <select class="filter-input" id="hist-pref" onchange="fetchHistoryPage(1)">
+          <select class="filter-select" id="hist-pref" onchange="fetchHistoryPage(1)">
             <option value="">📍 Tất cả Tỉnh</option>
             <option value="osaka">Osaka</option>
             <option value="tokyo">Tokyo</option>
@@ -833,7 +1090,7 @@ __SHARED_BASE_CSS__
             <option value="gifu">Gifu</option>
             <option value="mie">Mie</option>
           </select>
-          <select class="filter-input" id="hist-chain" onchange="fetchHistoryPage(1)">
+          <select class="filter-select" id="hist-chain" onchange="fetchHistoryPage(1)">
             <option value="">🏢 Tất cả Chuỗi</option>
             <option value="seven">7-Eleven</option>
             <option value="lawson">Lawson</option>
@@ -843,9 +1100,29 @@ __SHARED_BASE_CSS__
             <option value="joshin">Joshin</option>
             <option value="aeon">AEON</option>
           </select>
+          <select class="filter-select" id="hist-anchor-select" onchange="onHistAnchorChange()">
+            <option value="all">🗾 Mọi khoảng cách</option>
+            <option value="gps">📍 GPS của tôi</option>
+            <option value="namba">📍 Ga Namba</option>
+            <option value="umeda">📍 Ga Umeda</option>
+            <option value="imamiya">📍 Ga Imamiya</option>
+            <option value="ota">📍 Ota Road</option>
+            <option value="shinjuku">📍 Ga Shinjuku</option>
+            <option value="akiba">📍 Ga Akiba</option>
+            <option value="nagoya">📍 Ga Nagoya</option>
+          </select>
           <button class="stats-btn stats-btn-primary" onclick="fetchHistoryPage(1)">
             <span>🔍</span> <span>Tìm kiếm</span>
           </button>
+        </div>
+
+        <!-- History Radius Filter Chips -->
+        <div class="radius-chips-bar" id="hist-radius-chips-bar" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:12px; padding:0 4px;">
+          <span style="font-size:0.75rem; color:#94a3b8; font-weight:700;">📍 Bán kính:</span>
+          <button type="button" class="radius-chip active" data-radius="" onclick="selectHistRadius('')">Tất cả</button>
+          <button type="button" class="radius-chip" data-radius="2" onclick="selectHistRadius(2)">2 km</button>
+          <button type="button" class="radius-chip" data-radius="5" onclick="selectHistRadius(5)">5 km</button>
+          <button type="button" class="radius-chip" data-radius="10" onclick="selectHistRadius(10)">10 km</button>
         </div>
 
         <!-- Table -->
@@ -881,20 +1158,71 @@ __SHARED_BASE_CSS__
 
     <!-- PANE 3: ANALYTICS (BIỂU ĐỒ & PHÂN TÍCH) -->
     <section id="pane-analytics" class="stats-pane">
-      <!-- Hourly Peak Chart -->
-      <div class="panel-card">
+      <!-- 1. Interactive SVG Hourly Peak Chart -->
+      <div class="panel-card" id="hourly-chart-card">
         <div class="panel-card-header">
           <div>
-            <div class="panel-title">⏰ Khung Giờ Vàng Restock Thẻ (Giờ Nhật Bản JST)</div>
-            <div class="panel-sub">Tần suất người dùng phát hiện và báo cáo thẻ bài theo từng khung giờ trong ngày (00:00 - 23:00)</div>
+            <div class="panel-title">📊 Biểu Đồ Trực Quan Tương Tác Khung Giờ Restock (24h JST)</div>
+            <div class="panel-sub">Thống kê tần suất và tỷ lệ có hàng theo từng giờ, phân tích so sánh chi tiết theo chuỗi combini</div>
           </div>
-          <div style="font-size:0.75rem; color:#f59e0b; font-weight:800;">
+          <div class="chart-golden-badge" style="font-size:0.75rem; color:#f59e0b; font-weight:800; background:rgba(245,158,11,0.15); border:1px solid #f59e0b; padding:4px 10px; border-radius:8px;">
             🔥 Giờ cao điểm: 09:00 - 15:00 JST
           </div>
         </div>
 
-        <div class="hourly-bar-container" id="hourly-chart-bars">
-          <!-- Dynamic hourly bars generated by JS -->
+        <!-- Interactive Combini Chain Toggle Chips -->
+        <div class="chart-chain-selector" style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:12px;">
+          <span style="font-size:0.75rem; color:#94a3b8; font-weight:700;">🏢 So sánh chuỗi:</span>
+          <button type="button" class="chain-chip active" data-chain="" onclick="selectChartChain('')">🌐 Tất cả chuỗi</button>
+          <button type="button" class="chain-chip" data-chain="seven" onclick="selectChartChain('seven')">7️⃣ 7-Eleven</button>
+          <button type="button" class="chain-chip" data-chain="familymart" onclick="selectChartChain('familymart')">🟢 FamilyMart</button>
+          <button type="button" class="chain-chip" data-chain="lawson" onclick="selectChartChain('lawson')">🔵 Lawson</button>
+          <button type="button" class="chain-chip" data-chain="ministop" onclick="selectChartChain('ministop')">🟡 Ministop</button>
+          <button type="button" class="chain-chip" data-chain="specialty" onclick="selectChartChain('specialty')">🃏 Shop Thẻ Bài</button>
+        </div>
+
+        <!-- Interactive SVG Chart Container -->
+        <div class="interactive-chart-container" id="interactive-chart-container">
+          <div id="hourly-chart-bars" style="width:100%; height:100%;">
+            <!-- Dynamic SVG Chart generated by JS -->
+          </div>
+          <!-- Chart Floating Tooltip -->
+          <div id="chart-tooltip" class="chart-tooltip" style="display:none;"></div>
+        </div>
+      </div>
+
+      <!-- 2. 2D Prime Time Heatmap Matrix -->
+      <div class="panel-card" id="heatmap-card">
+        <div class="panel-card-header">
+          <div>
+            <div class="panel-title">🗺️ Ma Trận Khung Giờ Vàng Restock 2D (Heatmap Matrix)</div>
+            <div class="panel-sub">Mật độ restock thực tế kết hợp 2 chiều: Chuỗi cửa hàng / Thứ trong tuần × 24 Khung giờ (00:00 - 23:00 JST)</div>
+          </div>
+          <!-- Mode Switch Buttons -->
+          <div style="display:flex; gap:6px;">
+            <button type="button" class="stats-btn stats-btn-primary" id="btn-hm-chain" onclick="switchHeatmapMode('chain')">🏢 Theo Chuỗi Combini</button>
+            <button type="button" class="stats-btn stats-btn-outline" id="btn-hm-dow" onclick="switchHeatmapMode('dow')">📅 Theo Thứ Trong Tuần</button>
+          </div>
+        </div>
+
+        <!-- Heatmap Legend -->
+        <div class="heatmap-legend" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:12px; font-size:0.72rem; color:#94a3b8;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span>Mật độ hàng về:</span>
+            <span style="display:inline-flex; align-items:center; gap:4px;"><span style="display:inline-block; width:12px; height:12px; background:#0f172a; border:1px solid #334155; border-radius:3px;"></span> 0/Thấp</span>
+            <span style="display:inline-flex; align-items:center; gap:4px;"><span style="display:inline-block; width:12px; height:12px; background:#0369a1; border-radius:3px;"></span> Trung bình</span>
+            <span style="display:inline-flex; align-items:center; gap:4px;"><span style="display:inline-block; width:12px; height:12px; background:#10b981; border-radius:3px;"></span> Cao</span>
+            <span style="display:inline-flex; align-items:center; gap:4px;"><span style="display:inline-block; width:12px; height:12px; background:linear-gradient(135deg, #f59e0b, #ef4444); border-radius:3px; box-shadow:0 0 6px #f59e0b;"></span> ⭐ Giờ vàng (Golden Hour)</span>
+          </div>
+          <div style="color:#f59e0b; font-weight:700;">💡 Rê chuột / chạm ô để xem chi tiết số lượt &amp; tỷ lệ</div>
+        </div>
+
+        <!-- Heatmap Grid / Table Container -->
+        <div class="heatmap-scroll-wrapper">
+          <div id="heatmap-matrix-container">
+            <div style="text-align:center; padding:20px; color:#64748b;">Đang tải ma trận heatmap 2D...</div>
+          </div>
+          <div id="heatmap-tooltip" class="chart-tooltip" style="display:none;"></div>
         </div>
       </div>
 
@@ -1037,6 +1365,151 @@ __SHARED_BASE_CSS__
       'mie': '三重 Mie'
     };
 
+    // Known Station Coordinates for Distance & Proximity Filtering
+    const ANCHOR_COORDS = {
+      namba: { lat: 34.6667, lng: 135.5000, name: 'Ga Namba (Osaka)' },
+      umeda: { lat: 34.7024, lng: 135.4959, name: 'Ga Umeda (Osaka)' },
+      imamiya: { lat: 34.6540, lng: 135.4925, name: 'Ga JR Imamiya (Osaka)' },
+      ota: { lat: 34.6628, lng: 135.5058, name: 'Nipponbashi Ota Road' },
+      tennoji: { lat: 34.6472, lng: 135.5140, name: 'Ga Tennoji (Osaka)' },
+      shinjuku: { lat: 35.6896, lng: 139.7006, name: 'Ga Shinjuku (Tokyo)' },
+      akiba: { lat: 35.6983, lng: 139.7731, name: 'Ga Akihabara (Tokyo)' },
+      shibuya: { lat: 35.6580, lng: 139.7016, name: 'Ga Shibuya (Tokyo)' },
+      nagoya: { lat: 35.1709, lng: 136.8815, name: 'Ga Nagoya (Aichi)' },
+      yokohama: { lat: 35.4658, lng: 139.6227, name: 'Ga Yokohama (Kanagawa)' }
+    };
+
+    let userGpsLat = null;
+    let userGpsLng = null;
+    let currentLbAnchor = 'all';
+    let currentLbRadius = '';
+    let currentHistAnchor = 'all';
+    let currentHistRadius = '';
+    let currentChartChain = '';
+    let currentHeatmapMode = 'chain';
+    let rawHourlyData = [];
+    const chainAnalyticsCache = {};
+    const heatmapDataCache = {};
+
+    function calcDistanceKm(lat1, lon1, lat2, lon2) {
+      if (lat1 === null || lon1 === null || lat2 === null || lon2 === null) return null;
+      if (lat1 === undefined || lon1 === undefined || lat2 === undefined || lon2 === undefined) return null;
+      const R = 6371.0;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    }
+
+    function formatDistanceBadge(dKm, anchorName) {
+      if (dKm === null || dKm === undefined) return '';
+      const roadKm = dKm * 1.22;
+      let text = '';
+      if (dKm < 1.0) {
+        const dM = Math.round(dKm * 1000);
+        if (roadKm < 1.0) {
+          const roadM = Math.round(roadKm * 1000);
+          text = `~${roadM}m đường đi (${dM}m thẳng)`;
+        } else {
+          text = `~${roadKm.toFixed(1)}km đường đi (${dM}m thẳng)`;
+        }
+      } else {
+        text = `~${roadKm.toFixed(1)}km đường đi (${dKm.toFixed(1)}km thẳng)`;
+      }
+      return `<span class="dist-badge" title="Khoảng cách từ ${anchorName}: ${text}">📍 ${text}</span>`;
+    }
+
+    function getAnchorCoords(anchorKey) {
+      if (anchorKey === 'gps' && userGpsLat !== null && userGpsLng !== null) {
+        return { lat: userGpsLat, lng: userGpsLng, name: 'Vị trí của bạn' };
+      }
+      if (ANCHOR_COORDS[anchorKey]) {
+        return ANCHOR_COORDS[anchorKey];
+      }
+      return null;
+    }
+
+    function onLbAnchorChange() {
+      const val = document.getElementById('lb-anchor-select').value;
+      currentLbAnchor = val;
+      if (val === 'gps') {
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            pos => {
+              userGpsLat = pos.coords.latitude;
+              userGpsLng = pos.coords.longitude;
+              filterLeaderboardClient();
+            },
+            err => {
+              alert('Không thể lấy vị trí GPS từ trình duyệt: ' + err.message);
+              document.getElementById('lb-anchor-select').value = 'all';
+              currentLbAnchor = 'all';
+              filterLeaderboardClient();
+            }
+          );
+        } else {
+          alert('Trình duyệt không hỗ trợ Geolocation GPS.');
+          document.getElementById('lb-anchor-select').value = 'all';
+          currentLbAnchor = 'all';
+          filterLeaderboardClient();
+        }
+      } else {
+        filterLeaderboardClient();
+      }
+    }
+
+    function selectLbRadius(rad) {
+      currentLbRadius = rad !== '' ? parseFloat(rad) : '';
+      document.querySelectorAll('#lb-radius-chips-bar .radius-chip').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-radius') === String(rad));
+      });
+      if (currentLbRadius !== '' && currentLbAnchor === 'all') {
+        document.getElementById('lb-anchor-select').value = 'namba';
+        currentLbAnchor = 'namba';
+      }
+      filterLeaderboardClient();
+    }
+
+    function onHistAnchorChange() {
+      currentHistAnchor = document.getElementById('hist-anchor-select').value;
+      if (currentHistAnchor === 'gps') {
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            pos => {
+              userGpsLat = pos.coords.latitude;
+              userGpsLng = pos.coords.longitude;
+              fetchHistoryPage(1);
+            },
+            err => {
+              document.getElementById('hist-anchor-select').value = 'all';
+              currentHistAnchor = 'all';
+              fetchHistoryPage(1);
+            }
+          );
+        } else {
+          currentHistAnchor = 'all';
+          fetchHistoryPage(1);
+        }
+      } else {
+        fetchHistoryPage(1);
+      }
+    }
+
+    function selectHistRadius(rad) {
+      currentHistRadius = rad !== '' ? parseFloat(rad) : '';
+      document.querySelectorAll('#hist-radius-chips-bar .radius-chip').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-radius') === String(rad));
+      });
+      if (currentHistRadius !== '' && currentHistAnchor === 'all') {
+        document.getElementById('hist-anchor-select').value = 'namba';
+        currentHistAnchor = 'namba';
+      }
+      fetchHistoryPage(1);
+    }
+
     // Switch Top Tabs
     function switchStatsTab(tabId) {
       document.querySelectorAll('.nav-tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -1071,11 +1544,15 @@ __SHARED_BASE_CSS__
         document.getElementById('kpi-latest-time').textContent = data.latest_formatted_time || 'Chưa có';
         document.getElementById('kpi-latest-ago').textContent = data.latest_timestamp ? formatTimeAgoJST(data.latest_timestamp) : 'Tự động 15s';
 
-        // Render Charts
-        renderHourlyChart(data.by_hour || []);
+        // Render Charts & 2D Heatmap
+        rawHourlyData = data.by_hour || [];
+        renderHourlyChart(rawHourlyData);
         renderDistribution(data.by_pref || [], 'pref-distribution-container', PREF_NAMES);
         renderDistribution(data.by_chain || [], 'chain-distribution-container', CHAIN_NAMES);
         renderTopPacks(data.top_packs || []);
+
+        // Load Heatmap Matrix
+        loadHeatmapData('chain');
 
       } catch (e) {
         console.error('Error loading overview stats:', e);
@@ -1085,39 +1562,321 @@ __SHARED_BASE_CSS__
       fetchLeaderboard();
     }
 
-    // Render Hourly Bars
+    // Interactive SVG Chart Renderer
+    async function selectChartChain(chainCode) {
+      currentChartChain = chainCode;
+      document.querySelectorAll('.chain-chip').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-chain') === chainCode);
+      });
+
+      if (!chainCode) {
+        renderInteractiveSvgChart(rawHourlyData, null, '');
+        return;
+      }
+
+      if (chainAnalyticsCache[chainCode]) {
+        renderInteractiveSvgChart(chainAnalyticsCache[chainCode].by_hour_objs, chainAnalyticsCache[chainCode], chainCode);
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/stats/combini_analytics?chain=${encodeURIComponent(chainCode)}`);
+        const data = await res.json();
+        const byHourObjs = (data.hourly_distribution || []).map(h => ({
+          hour: h.hour,
+          total: h.count,
+          in_stock: h.count
+        }));
+        data.by_hour_objs = byHourObjs;
+        chainAnalyticsCache[chainCode] = data;
+        renderInteractiveSvgChart(byHourObjs, data, chainCode);
+      } catch (e) {
+        console.error('Error fetching chain analytics:', e);
+      }
+    }
+
     function renderHourlyChart(hourlyData) {
+      rawHourlyData = hourlyData || [];
+      renderInteractiveSvgChart(rawHourlyData, null, currentChartChain);
+    }
+
+    function renderInteractiveSvgChart(hourlyData, chainData, selectedChain) {
       const container = document.getElementById('hourly-chart-bars');
       if (!container) return;
-      container.innerHTML = '';
 
-      const maxVal = Math.max(...hourlyData.map(h => h.total || 0), 1);
-
-      // Create map of hours 0 to 23
       const hourMap = {};
-      hourlyData.forEach(h => { hourMap[h.hour] = h; });
+      (hourlyData || []).forEach(h => { hourMap[h.hour] = h; });
 
-      for (let hr = 0; hr < 24; hr++) {
-        const item = hourMap[hr] || { hour: hr, total: 0, in_stock: 0 };
-        const pct = Math.max(3, (item.total / maxVal) * 100);
-        const isPeak = hr >= 9 && hr <= 15;
-
-        const col = document.createElement('div');
-        col.className = 'hourly-col';
-        col.title = `${String(hr).padStart(2,'0')}:00 JST - Tổng: ${item.total} (Có hàng: ${item.in_stock})`;
-
-        const bar = document.createElement('div');
-        bar.className = 'hourly-bar' + (isPeak ? ' peak' : '');
-        bar.style.height = `${pct}%`;
-
-        const label = document.createElement('div');
-        label.className = 'hourly-label';
-        label.textContent = hr % 2 === 0 ? `${hr}h` : '';
-
-        col.appendChild(bar);
-        col.appendChild(label);
-        container.appendChild(col);
+      const hours = [];
+      let maxVal = 1;
+      for (let h = 0; h < 24; h++) {
+        const item = hourMap[h] || { hour: h, total: 0, in_stock: 0 };
+        hours.push(item);
+        if (item.total > maxVal) maxVal = item.total;
+        if (item.in_stock > maxVal) maxVal = item.in_stock;
       }
+
+      const svgWidth = 840;
+      const svgHeight = 200;
+      const chartTop = 20;
+      const chartBottom = 165;
+      const chartLeft = 40;
+      const chartRight = 820;
+      const plotWidth = chartRight - chartLeft;
+      const plotHeight = chartBottom - chartTop;
+
+      const colWidth = (plotWidth / 24);
+      const barWidth = Math.max(8, colWidth - 8);
+
+      let gridLinesHtml = '';
+      for (let g = 0; g <= 4; g++) {
+        const y = chartBottom - (plotHeight * (g / 4));
+        const val = Math.round(maxVal * (g / 4));
+        gridLinesHtml += `
+          <line x1="${chartLeft}" y1="${y}" x2="${chartRight}" y2="${y}" class="svg-grid-line" />
+          <text x="${chartLeft - 6}" y="${y + 3.5}" text-anchor="end" fill="#64748b" font-size="9.5" font-weight="700">${val}</text>
+        `;
+      }
+
+      let barsHtml = '';
+      let hoverRectsHtml = '';
+      const chainName = selectedChain ? (CHAIN_NAMES[selectedChain] || selectedChain) : 'Tất cả chuỗi';
+
+      hours.forEach((item, hr) => {
+        const x = chartLeft + (hr * colWidth) + (colWidth - barWidth) / 2;
+        const totalHeight = Math.max(2, (item.total / maxVal) * plotHeight);
+        const instockHeight = Math.max(2, (item.in_stock / maxVal) * plotHeight);
+        const yTotal = chartBottom - totalHeight;
+        const yInstock = chartBottom - instockHeight;
+        const isPeak = hr >= 9 && hr <= 15;
+        const inRate = item.total > 0 ? ((item.in_stock / item.total) * 100).toFixed(1) : '0';
+
+        barsHtml += `
+          <rect x="${x}" y="${yTotal}" width="${barWidth}" height="${totalHeight}" class="svg-bar-total" />
+          <rect x="${x}" y="${yInstock}" width="${barWidth}" height="${instockHeight}" class="svg-bar-instock${isPeak ? ' peak' : ''}" />
+        `;
+
+        if (isPeak) {
+          barsHtml += `
+            <text x="${x + barWidth / 2}" y="${Math.min(yInstock, yTotal) - 4}" text-anchor="middle" font-size="9" fill="#f59e0b" font-weight="900">⭐</text>
+          `;
+        }
+
+        const xLabel = x + barWidth / 2;
+        barsHtml += `
+          <text x="${xLabel}" y="${chartBottom + 16}" class="svg-axis-text">${hr % 2 === 0 ? String(hr).padStart(2,'0') + 'h' : ''}</text>
+        `;
+
+        const colLeft = chartLeft + (hr * colWidth);
+        hoverRectsHtml += `
+          <rect class="svg-col-hover-rect" x="${colLeft}" y="${chartTop}" width="${colWidth}" height="${plotHeight}"
+                onmouseenter="showChartTooltip(event, ${hr}, ${item.total}, ${item.in_stock}, '${inRate}', '${chainName}', ${isPeak})"
+                onmousemove="moveChartTooltip(event)"
+                onmouseleave="hideChartTooltip()" />
+        `;
+      });
+
+      container.innerHTML = `
+        <svg class="svg-chart" viewBox="0 0 ${svgWidth} ${svgHeight}" preserveAspectRatio="xMidYMid meet">
+          <defs>
+            <linearGradient id="instock-grad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#38bdf8" />
+              <stop offset="100%" stop-color="#2563eb" />
+            </linearGradient>
+            <linearGradient id="peak-grad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#fbbf24" />
+              <stop offset="100%" stop-color="#d97706" />
+            </linearGradient>
+          </defs>
+          ${gridLinesHtml}
+          ${barsHtml}
+          ${hoverRectsHtml}
+        </svg>
+      `;
+    }
+
+    function showChartTooltip(event, hour, total, instock, inRate, chainLabel, isPeak) {
+      const tip = document.getElementById('chart-tooltip');
+      if (!tip) return;
+      const hStr = String(hour).padStart(2, '0');
+      const peakHtml = isPeak 
+        ? `<div style="color:#f59e0b; font-weight:800; margin-top:4px;">🔥 Khung giờ vàng Restock cao điểm!</div>`
+        : '';
+
+      tip.innerHTML = `
+        <div style="font-weight:800; color:#38bdf8; font-size:0.8rem; margin-bottom:4px;">⏰ ${hStr}:00 - ${hStr}:59 JST</div>
+        <div style="color:#cbd5e1; font-size:0.7rem;">🏢 Phạm vi: <strong>${chainLabel}</strong></div>
+        <div style="margin-top:4px; display:flex; justify-content:space-between; gap:10px;">
+          <span>📦 Tổng lượt báo cáo:</span>
+          <strong>${total.toLocaleString()}</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; gap:10px; color:#34d399;">
+          <span>🟢 Lượt có hàng:</span>
+          <strong>${instock.toLocaleString()} (${inRate}%)</strong>
+        </div>
+        ${peakHtml}
+      `;
+      tip.style.display = 'block';
+      moveChartTooltip(event);
+    }
+
+    function moveChartTooltip(event) {
+      const tip = document.getElementById('chart-tooltip');
+      const container = document.getElementById('interactive-chart-container');
+      if (!tip || !container) return;
+      const rect = container.getBoundingClientRect();
+      const x = event.clientX - rect.left + 12;
+      const y = event.clientY - rect.top - 10;
+      tip.style.left = Math.min(x, rect.width - 240) + 'px';
+      tip.style.top = Math.max(10, Math.min(y, rect.height - 100)) + 'px';
+    }
+
+    function hideChartTooltip() {
+      const tip = document.getElementById('chart-tooltip');
+      if (tip) tip.style.display = 'none';
+    }
+
+    // 2D Heatmap Matrix Implementation
+    function switchHeatmapMode(mode) {
+      currentHeatmapMode = mode;
+      document.getElementById('btn-hm-chain').className = mode === 'chain' ? 'stats-btn stats-btn-primary' : 'stats-btn stats-btn-outline';
+      document.getElementById('btn-hm-dow').className = mode === 'dow' ? 'stats-btn stats-btn-primary' : 'stats-btn stats-btn-outline';
+      loadHeatmapData(mode);
+    }
+
+    async function loadHeatmapData(mode) {
+      const container = document.getElementById('heatmap-matrix-container');
+      if (!container) return;
+
+      if (heatmapDataCache[mode]) {
+        renderHeatmapMatrix(heatmapDataCache[mode]);
+        return;
+      }
+
+      container.innerHTML = '<div style="text-align:center; padding:24px; color:#64748b;">Đang phân tích mật độ 2D Heatmap...</div>';
+
+      try {
+        const res = await fetch(`/api/stats/heatmap?mode=${encodeURIComponent(mode)}`);
+        const data = await res.json();
+        heatmapDataCache[mode] = data;
+        renderHeatmapMatrix(data);
+      } catch (e) {
+        container.innerHTML = `<div style="text-align:center; padding:20px; color:#ef4444;">Lỗi tải dữ liệu Heatmap: ${e.message}</div>`;
+      }
+    }
+
+    function renderHeatmapMatrix(data) {
+      const container = document.getElementById('heatmap-matrix-container');
+      if (!container) return;
+
+      const rows = data.rows || [];
+      const maxDensity = data.max_density || 1;
+      const mode = data.mode || 'chain';
+
+      let html = `<table class="heatmap-table"><thead><tr>`;
+      html += `<th style="width:130px; text-align:left; padding-left:10px;">${mode === 'chain' ? 'Chuỗi Combini' : 'Thứ Trong Tuần'}</th>`;
+      for (let h = 0; h < 24; h++) {
+        const isPeakH = h >= 9 && h <= 15;
+        const hStyle = isPeakH ? 'color:#f59e0b; font-weight:900;' : '';
+        html += `<th style="${hStyle}">${String(h).padStart(2, '0')}h</th>`;
+      }
+      html += `<th style="width:70px;">Tổng Restock</th>`;
+      html += `</tr></thead><tbody>`;
+
+      rows.forEach(r => {
+        html += `<tr>`;
+        html += `<td class="heatmap-row-label">${r.label}</td>`;
+
+        (r.hours || []).forEach(cell => {
+          const count = cell.in_stock || 0;
+          const ratio = maxDensity > 0 ? (count / maxDensity) : 0;
+          const isGolden = cell.is_golden || (ratio >= 0.65 && cell.hour >= 9 && cell.hour <= 16);
+
+          let bg = '#090e17';
+          let textColor = '#475569';
+          if (count > 0) {
+            if (ratio < 0.2) {
+              bg = 'rgba(2, 132, 199, 0.35)';
+              textColor = '#93c5fd';
+            } else if (ratio < 0.5) {
+              bg = 'rgba(16, 185, 129, 0.45)';
+              textColor = '#a7f3d0';
+            } else if (ratio < 0.75) {
+              bg = 'linear-gradient(135deg, rgba(245, 158, 11, 0.6), rgba(217, 119, 6, 0.65))';
+              textColor = '#ffffff';
+            } else {
+              bg = 'linear-gradient(135deg, #f59e0b, #ef4444)';
+              textColor = '#ffffff';
+            }
+          }
+
+          const cellClass = 'heatmap-cell' + (isGolden ? ' golden-cell' : '');
+          const goldenIcon = isGolden ? '⭐' : '';
+          const displayVal = count > 0 ? (count >= 100 ? `${Math.round(count/1000 * 10)/10}k` : count) : '·';
+
+          html += `
+            <td class="${cellClass}" style="background:${bg}; color:${textColor};"
+                onmouseenter="showHeatmapTooltip(event, '${r.label}', ${cell.hour}, ${cell.total}, ${cell.in_stock}, '${cell.in_rate}', ${isGolden})"
+                onmousemove="moveHeatmapTooltip(event)"
+                onmouseleave="hideHeatmapTooltip()">
+              ${goldenIcon ? `<div style="font-size:0.6rem; line-height:1;">${goldenIcon}</div>` : ''}
+              <div>${displayVal}</div>
+            </td>
+          `;
+        });
+
+        const peakHStr = String(r.peak_hour).padStart(2, '0') + ':00';
+        html += `
+          <td style="text-align:center; padding:6px; font-weight:800; color:#38bdf8; background:#0f172a; border-radius:4px;">
+            <div>${(r.total_in_stock || 0).toLocaleString()}</div>
+            <div style="font-size:0.62rem; color:#f59e0b; margin-top:2px;" title="Giờ đỉnh điểm">🔥 ${peakHStr}</div>
+          </td>
+        `;
+        html += `</tr>`;
+      });
+
+      html += `</tbody></table>`;
+      container.innerHTML = html;
+    }
+
+    function showHeatmapTooltip(event, label, hour, total, instock, inRate, isGolden) {
+      const tip = document.getElementById('heatmap-tooltip');
+      if (!tip) return;
+      const hStr = String(hour).padStart(2, '0');
+      const goldenNotice = isGolden 
+        ? `<div style="color:#f59e0b; font-weight:800; margin-top:4px;">⭐ KHUNG GIỜ VÀNG RESTOCK CỰC CAO!</div>`
+        : '';
+
+      tip.innerHTML = `
+        <div style="font-weight:800; color:#f8fafc; font-size:0.8rem; margin-bottom:4px;">🏢 ${label} • ${hStr}:00 - ${hStr}:59 JST</div>
+        <div style="display:flex; justify-content:space-between; gap:10px; color:#94a3b8;">
+          <span>Tổng số báo cáo:</span>
+          <strong style="color:#ffffff;">${total.toLocaleString()}</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; gap:10px; color:#34d399;">
+          <span>🟢 Lượt có hàng:</span>
+          <strong>${instock.toLocaleString()} (${inRate}%)</strong>
+        </div>
+        ${goldenNotice}
+      `;
+      tip.style.display = 'block';
+      moveHeatmapTooltip(event);
+    }
+
+    function moveHeatmapTooltip(event) {
+      const tip = document.getElementById('heatmap-tooltip');
+      const container = document.getElementById('heatmap-card');
+      if (!tip || !container) return;
+      const rect = container.getBoundingClientRect();
+      const x = event.clientX - rect.left + 12;
+      const y = event.clientY - rect.top - 10;
+      tip.style.left = Math.min(x, rect.width - 250) + 'px';
+      tip.style.top = Math.max(10, Math.min(y, rect.height - 90)) + 'px';
+    }
+
+    function hideHeatmapTooltip() {
+      const tip = document.getElementById('heatmap-tooltip');
+      if (tip) tip.style.display = 'none';
     }
 
     // Render Progress distribution
@@ -1188,13 +1947,32 @@ __SHARED_BASE_CSS__
       }
     }
 
-    // Filter Leaderboard client-side by keyword
+    // Filter Leaderboard client-side by keyword, distance and sort
     function filterLeaderboardClient() {
       const q = (document.getElementById('lb-search').value || '').trim().toLowerCase();
+      const sortMode = (document.getElementById('lb-sort-select') ? document.getElementById('lb-sort-select').value : 'reports') || 'reports';
       const tbody = document.getElementById('leaderboard-tbody');
       tbody.innerHTML = '';
 
-      let list = rawLeaderboardData;
+      let list = [...rawLeaderboardData];
+      const anchor = getAnchorCoords(currentLbAnchor);
+
+      // Attach distance to stores if anchor is active
+      if (anchor) {
+        list.forEach(st => {
+          if (st.lat && st.lng) {
+            st._distKm = calcDistanceKm(anchor.lat, anchor.lng, parseFloat(st.lat), parseFloat(st.lng));
+          } else {
+            st._distKm = null;
+          }
+        });
+
+        // Filter by radius if selected
+        if (currentLbRadius !== '') {
+          list = list.filter(st => st._distKm !== null && st._distKm <= currentLbRadius);
+        }
+      }
+
       if (q) {
         list = list.filter(item => 
           (item.name && item.name.toLowerCase().includes(q)) || 
@@ -1203,10 +1981,23 @@ __SHARED_BASE_CSS__
         );
       }
 
+      // Sort
+      if (sortMode === 'distance' && anchor) {
+        list.sort((a, b) => {
+          if (a._distKm === null) return 1;
+          if (b._distKm === null) return -1;
+          return a._distKm - b._distKm;
+        });
+      } else if (sortMode === 'rate') {
+        list.sort((a, b) => (b.in_rate || 0) - (a.in_rate || 0));
+      } else {
+        list.sort((a, b) => (b.total_reports || 0) - (a.total_reports || 0));
+      }
+
       document.getElementById('lb-count-display').textContent = list.length;
 
       if (list.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:30px; color:#64748b;">Không tìm thấy cửa hàng nào thỏa mãn điều kiện.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:30px; color:#64748b;">Không tìm thấy cửa hàng nào thỏa mãn điều kiện hoặc nằm trong bán kính đã chọn.</td></tr>';
         return;
       }
 
@@ -1223,23 +2014,33 @@ __SHARED_BASE_CSS__
         const inBadge = `<span class="badge badge-in">🟢 ${st.in_count}</span>`;
         const outBadge = `<span class="badge badge-out">🔴 ${st.out_count}</span>`;
 
+        let distBadgeHtml = '';
+        if (anchor && st._distKm !== null && st._distKm !== undefined) {
+          distBadgeHtml = formatDistanceBadge(st._distKm, anchor.name);
+        }
+
         tr.innerHTML = `
-          <td style="text-align:center;">${rankBadge}</td>
-          <td>
+          <td data-label="Thứ hạng" style="text-align:center;">${rankBadge}</td>
+          <td data-label="Cửa hàng">
             <div style="font-weight:800; color:#f8fafc; cursor:pointer;" onclick="openStoreModal('${st.id}')">${st.name}</div>
             <div style="font-size:0.68rem; color:#64748b; max-width:260px; overflow:hidden; text-overflow:ellipsis;" title="${st.address}">${st.address || 'Chưa cập nhật địa chỉ'}</div>
           </td>
-          <td><span style="font-size:0.75rem; font-weight:700; color:#38bdf8;">${prefLabel}</span></td>
-          <td><span style="font-size:0.75rem; color:#cbd5e1;">${chainLabel}</span></td>
-          <td style="text-align:center; font-weight:900; font-size:0.92rem; color:#f8fafc;">${st.total_reports}</td>
-          <td>
+          <td data-label="Khu vực & Khoảng cách">
+            <div style="display:flex; flex-direction:column; gap:2px;">
+              <span style="font-size:0.75rem; font-weight:700; color:#38bdf8;">${prefLabel}</span>
+              ${distBadgeHtml}
+            </div>
+          </td>
+          <td data-label="Chuỗi"><span style="font-size:0.75rem; color:#cbd5e1;">${chainLabel}</span></td>
+          <td data-label="Tổng báo cáo" style="text-align:center; font-weight:900; font-size:0.92rem; color:#f8fafc;">${st.total_reports}</td>
+          <td data-label="Tỷ lệ có hàng">
             <div style="display:flex; align-items:center; gap:6px;">
               ${inBadge} ${outBadge}
               <span style="font-size:0.7rem; font-weight:800; color:#94a3b8;">${st.in_rate}%</span>
             </div>
           </td>
-          <td style="font-size:0.72rem; color:#94a3b8;">${st.last_reported_at || 'Chưa có'}</td>
-          <td style="text-align:center;">
+          <td data-label="Lần cuối báo cáo" style="font-size:0.72rem; color:#94a3b8;">${st.last_reported_at || 'Chưa có'}</td>
+          <td data-label="Thao tác" style="text-align:center;">
             <div style="display:inline-flex; gap:4px;">
               <a href="/map?focus=${st.id}" class="stats-btn stats-btn-outline" style="padding:4px 8px; font-size:0.7rem;" title="Xem trên Bản đồ">🗺️</a>
               <button class="stats-btn stats-btn-outline" style="padding:4px 8px; font-size:0.7rem;" onclick="openStoreModal('${st.id}')" title="Xem chi tiết">📋</button>
@@ -1250,7 +2051,7 @@ __SHARED_BASE_CSS__
       });
     }
 
-    // Fetch Paginated History
+    // Fetch Paginated History with distance filtering
     async function fetchHistoryPage(page) {
       currentHistPage = Math.max(1, page);
       const q = (document.getElementById('hist-q').value || '').trim();
@@ -1279,12 +2080,28 @@ __SHARED_BASE_CSS__
         document.getElementById('btn-next-page').disabled = currentHistPage >= totalHistPages;
 
         tbody.innerHTML = '';
-        if (!data.items || data.items.length === 0) {
+        const items = data.items || [];
+        if (items.length === 0) {
           tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:30px; color:#64748b;">Không tìm thấy báo cáo nào thỏa điều kiện tìm kiếm.</td></tr>';
           return;
         }
 
-        data.items.forEach(item => {
+        const anchor = getAnchorCoords(currentHistAnchor);
+        let renderedCount = 0;
+
+        items.forEach(item => {
+          let distBadgeHtml = '';
+          if (anchor && item.lat && item.lng) {
+            const dKm = calcDistanceKm(anchor.lat, anchor.lng, parseFloat(item.lat), parseFloat(item.lng));
+            if (dKm !== null) {
+              if (currentHistRadius !== '' && dKm > currentHistRadius) {
+                return;
+              }
+              distBadgeHtml = `<div style="margin-top:2px;">${formatDistanceBadge(dKm, anchor.name)}</div>`;
+            }
+          }
+
+          renderedCount++;
           const tr = document.createElement('tr');
           let statusBadge = `<span class="badge badge-none">⚪ Chưa rõ</span>`;
           if (item.status_code === 'i') statusBadge = `<span class="badge badge-in">🟢 Có hàng</span>`;
@@ -1300,21 +2117,26 @@ __SHARED_BASE_CSS__
           const authorHtml = `<div style="font-weight:700; color:#94a3b8;">${item.user || '匿名トレーナー'}</div>${item.onsite ? '<span style="color:#38bdf8; font-size:0.65rem; font-weight:800;">📍 Tại quán</span>' : ''}`;
 
           tr.innerHTML = `
-            <td style="font-weight:700; color:#38bdf8; font-size:0.75rem;">${item.formatted_time || '--'}</td>
-            <td>
+            <td data-label="Thời gian" style="font-weight:700; color:#38bdf8; font-size:0.75rem;">${item.formatted_time || '--'}</td>
+            <td data-label="Cửa hàng">
               <div style="font-weight:800; color:#f8fafc; cursor:pointer;" onclick="openStoreModal('${item.store_id}')">${item.name}</div>
               <div style="font-size:0.68rem; color:#64748b; max-width:240px; overflow:hidden; text-overflow:ellipsis;">${item.address || ''}</div>
+              ${distBadgeHtml}
             </td>
-            <td>${statusBadge}</td>
-            <td>${packsHtml}</td>
-            <td style="max-width:200px; overflow:hidden; text-overflow:ellipsis;">${noteHtml}</td>
-            <td style="font-size:0.72rem;">${authorHtml}</td>
-            <td style="text-align:center;">
+            <td data-label="Trạng thái">${statusBadge}</td>
+            <td data-label="Packs">${packsHtml}</td>
+            <td data-label="Ghi chú" style="max-width:200px; overflow:hidden; text-overflow:ellipsis;">${noteHtml}</td>
+            <td data-label="Người gửi" style="font-size:0.72rem;">${authorHtml}</td>
+            <td data-label="Thao tác" style="text-align:center;">
               <a href="/map?focus=${item.store_id}" class="stats-btn stats-btn-outline" style="padding:4px 8px; font-size:0.7rem;" title="Xem trên Bản đồ">🗺️</a>
             </td>
           `;
           tbody.appendChild(tr);
         });
+
+        if (renderedCount === 0) {
+          tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:30px; color:#64748b;">Không có báo cáo nào nằm trong bán kính đã chọn.</td></tr>';
+        }
 
       } catch (e) {
         tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:30px; color:#ef4444;">Lỗi tải dữ liệu: ${e.message}</td></tr>`;

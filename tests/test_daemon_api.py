@@ -29,6 +29,7 @@ from app.db import (
     record_new_report,
     get_recent_reports,
     get_store_history as db_get_store_history,
+    _db_write_lock,
 )
 
 
@@ -95,32 +96,43 @@ def test_api_latest_reports_format_and_since_filtering(client):
     # 2. Insert a fresh distinct report
     now_ts = int(time.time())
     test_sid = f"test_m2_lr_{int(time.time() * 1000) % 100000}"
-    is_new, rep = record_new_report(
-        store_id=test_sid,
-        status_code="i",
-        timestamp=now_ts,
-        onsite=True,
-        packs=["SV8a"],
-        source="test_daemon"
-    )
-    assert is_new is True
+    try:
+        is_new, rep = record_new_report(
+            store_id=test_sid,
+            status_code="i",
+            timestamp=now_ts,
+            onsite=True,
+            packs=["SV8a"],
+            source="test_daemon"
+        )
+        assert is_new is True
 
-    # 3. Query with since strictly before now_ts -> MUST include this report
-    res_since = client.get(f"/api/latest_reports?since={now_ts - 5}&limit=50")
-    assert res_since.status_code == 200
-    since_reports = res_since.json()
-    matching = [r for r in since_reports if r["store_id"] == test_sid]
-    assert len(matching) == 1
-    assert matching[0]["status_code"] == "i"
-    assert matching[0]["onsite"] is True
-    assert "SV8a" in matching[0]["packs"]
-    assert "created_at" in matching[0]
+        # 3. Query with since strictly before now_ts -> MUST include this report
+        res_since = client.get(f"/api/latest_reports?since={now_ts - 5}&limit=50")
+        assert res_since.status_code == 200
+        since_reports = res_since.json()
+        matching = [r for r in since_reports if r["store_id"] == test_sid]
+        assert len(matching) == 1
+        assert matching[0]["status_code"] == "i"
+        assert matching[0]["onsite"] is True
+        assert "SV8a" in matching[0]["packs"]
+        assert "created_at" in matching[0]
 
-    # 4. Query with since strictly after now_ts -> MUST exclude this report
-    res_future = client.get(f"/api/latest_reports?since={now_ts + 100}&limit=50")
-    assert res_future.status_code == 200
-    future_reports = res_future.json()
-    assert all(r["store_id"] != test_sid for r in future_reports)
+        # 4. Query with since strictly after now_ts -> MUST exclude this report
+        res_future = client.get(f"/api/latest_reports?since={now_ts + 100}&limit=50")
+        assert res_future.status_code == 200
+        future_reports = res_future.json()
+        assert all(r["store_id"] != test_sid for r in future_reports)
+    finally:
+        try:
+            with _db_write_lock:
+                with get_db_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("DELETE FROM store_history WHERE store_id = ?;", (test_sid,))
+                    cursor.execute("DELETE FROM stores WHERE id = ?;", (test_sid,))
+                    conn.commit()
+        except Exception:
+            pass
 
 
 def test_api_store_history_order_and_limit(client):
@@ -259,24 +271,39 @@ def test_concurrent_api_polling_and_daemon_recording_no_locks(client):
                 errors.append(f"Reader-{r_id} Error: {type(e).__name__}: {e}")
             time.sleep(0.01)
 
-    threads = []
-    for w in range(num_writers):
-        t = threading.Thread(target=writer_worker, args=(w,))
-        threads.append(t)
-    for r in range(num_readers):
-        t = threading.Thread(target=reader_worker, args=(r,))
-        threads.append(t)
+    def _cleanup_conc_test():
+        try:
+            with _db_write_lock:
+                with get_db_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("DELETE FROM store_history WHERE source = 'conc_test';")
+                    cursor.execute("DELETE FROM stores WHERE id LIKE 'test_conc_%';")
+                    conn.commit()
+        except Exception:
+            pass
 
-    for t in threads:
-        t.start()
-    for t in threads:
-        t.join(timeout=30)
+    _cleanup_conc_test()
+    try:
+        threads = []
+        for w in range(num_writers):
+            t = threading.Thread(target=writer_worker, args=(w,))
+            threads.append(t)
+        for r in range(num_readers):
+            t = threading.Thread(target=reader_worker, args=(r,))
+            threads.append(t)
 
-    # Fail if any thread timed out
-    for t in threads:
-        assert not t.is_alive(), "A worker thread is still alive after timeout"
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=30)
 
-    # Assert 0 errors occurred and explicitly check for database is locked
-    lock_errors = [e for e in errors if "locked" in e.lower()]
-    assert len(lock_errors) == 0, f"Encountered SQLite lock errors: {lock_errors}"
-    assert len(errors) == 0, f"Encountered concurrent errors: {errors}"
+        # Fail if any thread timed out
+        for t in threads:
+            assert not t.is_alive(), "A worker thread is still alive after timeout"
+
+        # Assert 0 errors occurred and explicitly check for database is locked
+        lock_errors = [e for e in errors if "locked" in e.lower()]
+        assert len(lock_errors) == 0, f"Encountered SQLite lock errors: {lock_errors}"
+        assert len(errors) == 0, f"Encountered concurrent errors: {errors}"
+    finally:
+        _cleanup_conc_test()
