@@ -859,3 +859,73 @@ def test_telegram_location_autosave_and_gps_ui():
     assert 'setTelegramLocToCurrentGps' in thongbao_html
     assert 'saveTelegramConfigSilently' in thongbao_html
     assert 'tg-loc-autosave-msg' in thongbao_html
+
+
+def test_telegram_radius_filter_and_divergence_ui():
+    """Verify SHARED_MODALS_HTML and both templates have telegram radius filters and divergence warnings."""
+    assert 'id="tg-cfg-radius"' in SHARED_MODALS_HTML
+    assert 'id="tg-modal-radius-group"' in SHARED_MODALS_HTML
+    assert 'id="tg-anchor-divergence-warn"' in SHARED_MODALS_HTML
+    assert 'id="tg-cfg-autosync-gps"' in SHARED_MODALS_HTML
+
+    map_html = render_map_page()
+    assert 'selectTgModalRadius' in map_html
+    assert 'updateTelegramAnchorWarning' in map_html
+    assert 'onTelegramAutoSyncGpsToggle' in map_html
+    assert 'telegramRadius' in map_html
+
+    thongbao_html = render_thongbao_page()
+    assert 'selectTgModalRadius' in thongbao_html
+    assert 'updateTelegramAnchorWarning' in thongbao_html
+    assert 'onTelegramAutoSyncGpsToggle' in thongbao_html
+    assert 'telegramRadius' in thongbao_html
+
+
+def test_on_csdl_report_added_radius_filter():
+    """Verify on_csdl_report_added respects telegramRadius setting."""
+    from unittest.mock import patch
+    from app.web import on_csdl_report_added
+
+    store_near = {
+        "id": "st_near", "name": "Store Near Imamiya",
+        "lat": 34.6550, "lng": 135.4930, "pref": "osaka", "chain": "seven"
+    }
+    store_far = {
+        "id": "st_far", "name": "Store Far Takatsuki",
+        "lat": 34.8470, "lng": 135.6270, "pref": "osaka", "chain": "seven"
+    }
+    import time
+    entry = {
+        "timestamp": int(time.time()),
+        "status_code": "i",
+        "source": "firestore",
+        "reported_at": "12:00 01/10/2026"
+    }
+
+    mock_cfg = {
+        "notifications": {
+            "telegramEnabled": True,
+            "telegramBotToken": "dummy",
+            "telegramChatId": "123",
+            "telegramLat": 34.6540,
+            "telegramLng": 135.4925,
+            "telegramLocationName": "Ga Imamiya",
+            "telegramRadius": "5", # Only <= 5km
+            "telegramStatus": "in",
+            "telegramChain": "all",
+            "telegramRegion": "osaka"
+        }
+    }
+
+    alerts_sent = []
+    with patch("app.web.load_user_settings", return_value=mock_cfg):
+        with patch("app.web.send_telegram_alert", side_effect=lambda s, e, c, is_test=False: alerts_sent.append(s["name"])):
+            # Store near (~0.1km) should be sent
+            on_csdl_report_added(store_near, entry)
+            assert len(alerts_sent) == 1
+            assert alerts_sent[0] == "Store Near Imamiya"
+
+            # Store far (~24km > 5km) should NOT be sent
+            on_csdl_report_added(store_far, entry)
+            assert len(alerts_sent) == 1 # unchanged!
+

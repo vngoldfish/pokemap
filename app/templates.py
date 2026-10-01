@@ -996,6 +996,16 @@ SHARED_MODALS_HTML = """
                   Mốc toạ độ cố định lưu trên máy chủ VPS để Bot Telegram tính khoảng cách (~km) khi gửi thông báo. Định vị điện thoại của bạn chỉ lưu ở LocalStorage trên máy này để xem bản đồ, không ảnh hưởng đến Telegram.
                 </div>
 
+                <!-- Status badge showing current active anchor -->
+                <div style="background:#ffffff; border:1px solid #bae6fd; border-radius:8px; padding:7px 10px; margin-bottom:8px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:4px;">
+                  <span style="font-size:0.72rem; color:#475569; font-weight:700;">📍 Mốc neo đang dùng:</span>
+                  <span id="tg-current-anchor-label" style="font-size:0.75rem; color:#0369a1; font-weight:800;">Ga Imamiya (34.6540, 135.4925)</span>
+                </div>
+
+                <!-- Divergence warning if device GPS is far from anchor -->
+                <div id="tg-anchor-divergence-warn" style="display:none; font-size:0.72rem; font-weight:700; line-height:1.4; padding:8px 10px; border-radius:8px; margin-bottom:10px; background:#fffbeb; color:#b45309; border:1.5px solid #fde68a;">
+                </div>
+
                 <!-- Smart Google Maps Link / Address Resolver -->
                 <div style="margin-bottom:10px; padding:10px; background:#ffffff; border:1.5px solid #0284c7; border-radius:10px; box-shadow:0 1px 3px rgba(2,132,199,0.1);">
                   <div style="font-size:0.72rem; color:#0369a1; font-weight:800; margin-bottom:4px; display:flex; align-items:center; gap:4px;">
@@ -1051,6 +1061,14 @@ SHARED_MODALS_HTML = """
                     </button>
                   </div>
                 </div>
+
+                <!-- Auto-sync GPS toggle -->
+                <div style="margin-top:10px; padding-top:8px; border-top:1px dashed #cbd5e1;">
+                  <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:700; font-size:0.74rem; color:#0369a1; background:#ffffff; padding:7px 10px; border-radius:8px; border:1px solid #cbd5e1;">
+                    <input type="checkbox" id="tg-cfg-autosync-gps" onchange="onTelegramAutoSyncGpsToggle(this.checked)">
+                    <span>🔄 Tự động đồng bộ toạ độ GPS thiết bị lên mốc Telegram khi mở bản đồ</span>
+                  </label>
+                </div>
               </div>
             </div>
           </div>
@@ -1063,6 +1081,14 @@ SHARED_MODALS_HTML = """
               <option value="tokyo">tokyo</option>
               <option value="nagoya">nagoya</option>
               <option value="all">all</option>
+            </select>
+            <select id="tg-cfg-radius" style="display:none;">
+              <option value="all">all</option>
+              <option value="1">1</option>
+              <option value="3">3</option>
+              <option value="5">5</option>
+              <option value="10">10</option>
+              <option value="20">20</option>
             </select>
             <select id="tg-cfg-status" style="display:none;">
               <option value="in">in</option>
@@ -1153,6 +1179,31 @@ SHARED_MODALS_HTML = """
                 </button>
                 <button type="button" class="filter-option-btn" data-val="electronics" onclick="selectTgModalChain('electronics')">
                   🎮 Điện máy, GEO
+                </button>
+              </div>
+            </div>
+
+            <!-- D. BÁN KÍNH KHOẢNG CÁCH GỬI TIN -->
+            <div>
+              <div class="filter-group-title">🎯 Bán kính khoảng cách từ mốc neo (距離フィルター)</div>
+              <div class="filter-options-grid" id="tg-modal-radius-group">
+                <button type="button" class="filter-option-btn" data-val="1" onclick="selectTgModalRadius('1')">
+                  ⚡ Dưới 1 km (Đi bộ ngay)
+                </button>
+                <button type="button" class="filter-option-btn" data-val="3" onclick="selectTgModalRadius('3')">
+                  🚴 Trong 3 km (Xe đạp / Xe máy)
+                </button>
+                <button type="button" class="filter-option-btn" data-val="5" onclick="selectTgModalRadius('5')">
+                  🚗 Trong 5 km (Khuyên dùng)
+                </button>
+                <button type="button" class="filter-option-btn" data-val="10" onclick="selectTgModalRadius('10')">
+                  🚆 Trong 10 km (Đi tàu nhanh)
+                </button>
+                <button type="button" class="filter-option-btn" data-val="20" onclick="selectTgModalRadius('20')">
+                  🚀 Trong 20 km (Cả thành phố)
+                </button>
+                <button type="button" class="filter-option-btn active" data-val="all" onclick="selectTgModalRadius('all')">
+                  🌐 Toàn bộ (Không giới hạn km)
                 </button>
               </div>
             </div>
@@ -2582,6 +2633,12 @@ def render_map_page() -> str:
           localStorage.setItem('poketan_user_lng', String(userLng));
         } catch(e) {}
         updateUserMarker(userLat, userLng, pos.coords.accuracy || 25);
+        if (typeof checkAutoSyncGpsToTelegram === 'function') {
+          checkAutoSyncGpsToTelegram(userLat, userLng);
+        }
+        if (typeof updateTelegramAnchorWarning === 'function') {
+          updateTelegramAnchorWarning();
+        }
         if (btn) {
           btn.classList.remove('locating');
           updateGpsBtnState();
@@ -2731,6 +2788,7 @@ def render_map_page() -> str:
           msgEl.innerText = `✅ Đã lưu mốc vị trí: "${locName}" (~${latVal.toFixed(4)}, ${lngVal.toFixed(4)})`;
           setTimeout(() => { if (msgEl) msgEl.style.display = 'none'; }, 3500);
         }
+        updateTelegramAnchorWarning();
       } catch(e) {
         if (msgEl) {
           msgEl.style.background = '#fee2e2';
@@ -2756,7 +2814,7 @@ def render_map_page() -> str:
         msgEl.style.display = 'block';
         msgEl.style.background = '#f0f9ff';
         msgEl.style.color = '#0369a1';
-        msgEl.innerText = '⏳ Đang lấy toạ độ GPS hiện tại của thiết bị...';
+        msgEl.innerText = '⏳ Đang kết nối GPS thiết bị để lấy toạ độ thực mới nhất...';
       }
 
       const applyGps = async (lat, lng) => {
@@ -2771,28 +2829,131 @@ def render_map_page() -> str:
         await saveTelegramLocationAuto();
       };
 
-      if (typeof userLat === 'number' && typeof userLng === 'number' && userLat && userLng) {
-        await applyGps(userLat, userLng);
-      } else if (navigator.geolocation) {
+      if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           async (pos) => {
-            await applyGps(pos.coords.latitude, pos.coords.longitude);
-          },
-          (err) => {
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            userLat = lat;
+            userLng = lng;
+            try {
+              localStorage.setItem('poketan_user_lat', String(lat));
+              localStorage.setItem('poketan_user_lng', String(lng));
+            } catch(e) {}
+            if (typeof updateUserMarker === 'function') updateUserMarker(lat, lng, pos.coords.accuracy || 25);
+            await applyGps(lat, lng);
             if (msgEl) {
-              msgEl.style.background = '#fee2e2';
-              msgEl.style.color = '#b91c1c';
-              msgEl.innerText = '⚠️ Không thể lấy GPS (vui lòng bật cấp quyền vị trí trình duyệt).';
+              msgEl.style.background = '#dcfce7';
+              msgEl.style.color = '#15803d';
+              msgEl.innerText = `✅ Đã lưu toạ độ GPS chính xác: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+              setTimeout(() => { if (msgEl) msgEl.style.display = 'none'; }, 3500);
             }
           },
-          { enableHighAccuracy: true, timeout: 8000 }
+          async (err) => {
+            if (typeof userLat === 'number' && typeof userLng === 'number' && userLat && userLng) {
+              await applyGps(userLat, userLng);
+            } else if (msgEl) {
+              msgEl.style.background = '#fee2e2';
+              msgEl.style.color = '#b91c1c';
+              msgEl.innerText = '⚠️ Không thể lấy GPS (vui lòng bật quyền truy cập vị trí trình duyệt).';
+            }
+          },
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
+      } else if (typeof userLat === 'number' && typeof userLng === 'number' && userLat && userLng) {
+        await applyGps(userLat, userLng);
       } else {
         if (msgEl) {
           msgEl.style.background = '#fee2e2';
           msgEl.style.color = '#b91c1c';
           msgEl.innerText = '⚠️ Thiết bị không hỗ trợ Geolocation.';
         }
+      }
+    }
+
+    function updateTelegramAnchorWarning() {
+      const warnEl = document.getElementById('tg-anchor-divergence-warn');
+      const labelEl = document.getElementById('tg-current-anchor-label');
+      const latVal = (document.getElementById('tg-cfg-lat') && document.getElementById('tg-cfg-lat').value !== '') ? parseFloat(document.getElementById('tg-cfg-lat').value) : (configData.telegramLat || 34.6540);
+      const lngVal = (document.getElementById('tg-cfg-lng') && document.getElementById('tg-cfg-lng').value !== '') ? parseFloat(document.getElementById('tg-cfg-lng').value) : (configData.telegramLng || 135.4925);
+      const locName = (document.getElementById('tg-cfg-loc-name') && document.getElementById('tg-cfg-loc-name').value.trim()) ? document.getElementById('tg-cfg-loc-name').value.trim() : (configData.telegramLocationName || 'Ga Imamiya');
+
+      if (labelEl) {
+        labelEl.innerText = `${locName} (${latVal.toFixed(4)}, ${lngVal.toFixed(4)})`;
+      }
+
+      if (!warnEl) return;
+      if (typeof userLat === 'number' && typeof userLng === 'number' && userLat && userLng) {
+        const d = (typeof calcDistanceKm === 'function') ? calcDistanceKm(userLat, userLng, latVal, lngVal) : 0;
+        if (d > 3.0) {
+          warnEl.style.display = 'block';
+          warnEl.style.background = '#fffbeb';
+          warnEl.style.color = '#b45309';
+          warnEl.style.border = '1.5px solid #fde68a';
+          warnEl.innerHTML = `⚠️ <b>LƯU Ý LỆCH VỊ TRÍ:</b> Thiết bị của bạn đang cách mốc neo Telegram (${locName}) tận <b>${d.toFixed(1)} km</b>.<br>Khoảng cách trong tin Telegram sẽ được tính từ <b>${locName}</b> chứ KHÔNG phải từ chỗ bạn đứng. Nếu muốn bot tính từ chỗ bạn đang đứng, hãy bấm <b>🎯 Lấy GPS hiện tại</b> bên dưới!`;
+        } else {
+          warnEl.style.display = 'block';
+          warnEl.style.background = '#f0fdf4';
+          warnEl.style.color = '#15803d';
+          warnEl.style.border = '1px solid #bbf7d0';
+          warnEl.innerHTML = `✅ Thiết bị của bạn đang ở gần mốc neo Telegram (~${d.toFixed(1)} km).`;
+        }
+      } else {
+        warnEl.style.display = 'none';
+      }
+    }
+
+    async function onTelegramAutoSyncGpsToggle(checked) {
+      configData.telegramAutoSyncGps = checked;
+      try {
+        await fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            notifications: {
+              telegramAutoSyncGps: checked
+            }
+          })
+        });
+      } catch(e) {}
+      if (checked) {
+        await setTelegramLocToCurrentGps();
+      }
+    }
+
+    let lastAutoSyncTs = 0;
+    async function checkAutoSyncGpsToTelegram(lat, lng) {
+      if (!configData || !configData.telegramAutoSyncGps) return;
+      const now = Date.now();
+      if (now - lastAutoSyncTs < 30000) return; // debounce 30s
+      lastAutoSyncTs = now;
+      const anchorLat = configData.telegramLat || 34.6540;
+      const anchorLng = configData.telegramLng || 135.4925;
+      const dist = (typeof calcDistanceKm === 'function') ? calcDistanceKm(lat, lng, anchorLat, anchorLng) : 0;
+      if (dist > 0.2) {
+        configData.telegramLat = lat;
+        configData.telegramLng = lng;
+        configData.telegramLocationName = 'Vị trí GPS của tôi';
+        const nameEl = document.getElementById('tg-cfg-loc-name');
+        const latEl = document.getElementById('tg-cfg-lat');
+        const lngEl = document.getElementById('tg-cfg-lng');
+        if (nameEl) nameEl.value = 'Vị trí GPS của tôi';
+        if (latEl) latEl.value = Number(lat.toFixed(5));
+        if (lngEl) lngEl.value = Number(lng.toFixed(5));
+        try {
+          await fetch('/api/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              notifications: {
+                telegramLocationName: 'Vị trí GPS của tôi',
+                telegramLat: lat,
+                telegramLng: lng
+              }
+            })
+          });
+          updateTelegramAnchorWarning();
+        } catch(e) {}
       }
     }
 
@@ -2886,11 +3047,13 @@ def render_map_page() -> str:
       const statusEl = document.getElementById('tg-cfg-status');
       const chainEl = document.getElementById('tg-cfg-chain');
       const timeEl = document.getElementById('tg-cfg-time');
+      const radiusEl = document.getElementById('tg-cfg-radius');
 
       const region = regionEl ? regionEl.value : (configData.telegramRegion || 'osaka');
       const status = statusEl ? statusEl.value : (configData.telegramStatus || 'in');
       const chain = chainEl ? chainEl.value : (configData.telegramChain || 'all');
       const time = timeEl ? String(timeEl.value) : String(configData.telegramTime || '24');
+      const radius = radiusEl ? radiusEl.value : (configData.telegramRadius || 'all');
 
       document.querySelectorAll('#tg-modal-region-group .filter-option-btn').forEach(btn => {
         btn.classList.toggle('active', btn.getAttribute('data-val') === region);
@@ -2901,6 +3064,14 @@ def render_map_page() -> str:
       document.querySelectorAll('#tg-modal-chain-group .filter-option-btn').forEach(btn => {
         btn.classList.toggle('active', btn.getAttribute('data-val') === chain);
       });
+      document.querySelectorAll('#tg-modal-radius-group .filter-option-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-val') === String(radius));
+      });
+      const autoSyncEl = document.getElementById('tg-cfg-autosync-gps');
+      if (autoSyncEl) {
+        autoSyncEl.checked = !!configData.telegramAutoSyncGps;
+      }
+      updateTelegramAnchorWarning();
     }
 
     function selectTgModalRegion(val) {
@@ -2924,6 +3095,15 @@ def render_map_page() -> str:
       if (el) el.value = val;
       document.querySelectorAll('#tg-modal-chain-group .filter-option-btn').forEach(btn => {
         btn.classList.toggle('active', btn.getAttribute('data-val') === val);
+      });
+    }
+
+    function selectTgModalRadius(val) {
+      const el = document.getElementById('tg-cfg-radius');
+      if (el) el.value = val;
+      configData.telegramRadius = String(val);
+      document.querySelectorAll('#tg-modal-radius-group .filter-option-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-val') === String(val));
       });
     }
     function selectTgModalTime(val) {}
@@ -2961,6 +3141,8 @@ def render_map_page() -> str:
       const chainEl = document.getElementById('tg-cfg-chain');
       const timeEl = document.getElementById('tg-cfg-time');
       const regionEl = document.getElementById('tg-cfg-region');
+      const radiusEl = document.getElementById('tg-cfg-radius');
+      const autoSyncEl = document.getElementById('tg-cfg-autosync-gps');
       const locNameEl = document.getElementById('tg-cfg-loc-name');
       const latEl = document.getElementById('tg-cfg-lat');
       const lngEl = document.getElementById('tg-cfg-lng');
@@ -2982,6 +3164,8 @@ def render_map_page() -> str:
       if (chainEl) chainEl.value = configData.telegramChain || 'all';
       if (timeEl) timeEl.value = String(configData.telegramTime || '24');
       if (regionEl) regionEl.value = configData.telegramRegion || 'osaka';
+      if (radiusEl) radiusEl.value = configData.telegramRadius || 'all';
+      if (autoSyncEl) autoSyncEl.checked = !!configData.telegramAutoSyncGps;
       if (locNameEl) locNameEl.value = configData.telegramLocationName || 'Ga Imamiya';
       if (latEl) latEl.value = (typeof configData.telegramLat !== 'undefined' && configData.telegramLat !== null) ? configData.telegramLat : 34.6540;
       if (lngEl) lngEl.value = (typeof configData.telegramLng !== 'undefined' && configData.telegramLng !== null) ? configData.telegramLng : 135.4925;
@@ -3011,6 +3195,7 @@ def render_map_page() -> str:
 
       switchSettingsTab(initialTab || 'map');
       syncTelegramModalUI();
+      updateTelegramAnchorWarning();
       document.getElementById('settings-modal').classList.add('open');
     }
     async function saveTelegramConfigSilently() {
@@ -3021,6 +3206,8 @@ def render_map_page() -> str:
       const chain = document.getElementById('tg-cfg-chain') ? document.getElementById('tg-cfg-chain').value : 'all';
       const time = document.getElementById('tg-cfg-time') ? document.getElementById('tg-cfg-time').value : '24';
       const region = document.getElementById('tg-cfg-region') ? document.getElementById('tg-cfg-region').value : 'osaka';
+      const radius = document.getElementById('tg-cfg-radius') ? document.getElementById('tg-cfg-radius').value : (configData.telegramRadius || 'all');
+      const autoSync = document.getElementById('tg-cfg-autosync-gps') ? document.getElementById('tg-cfg-autosync-gps').checked : !!configData.telegramAutoSyncGps;
       const locName = (document.getElementById('tg-cfg-loc-name') ? document.getElementById('tg-cfg-loc-name').value : (configData.telegramLocationName || 'Ga Imamiya')).trim();
       const latVal = (document.getElementById('tg-cfg-lat') && document.getElementById('tg-cfg-lat').value !== '') ? parseFloat(document.getElementById('tg-cfg-lat').value) : (configData.telegramLat || 34.6540);
       const lngVal = (document.getElementById('tg-cfg-lng') && document.getElementById('tg-cfg-lng').value !== '') ? parseFloat(document.getElementById('tg-cfg-lng').value) : (configData.telegramLng || 135.4925);
@@ -3032,6 +3219,8 @@ def render_map_page() -> str:
       configData.telegramChain = chain;
       configData.telegramTime = time;
       configData.telegramRegion = region;
+      configData.telegramRadius = radius;
+      configData.telegramAutoSyncGps = autoSync;
       configData.telegramLocationName = locName;
       configData.telegramLat = latVal;
       configData.telegramLng = lngVal;
@@ -3044,6 +3233,7 @@ def render_map_page() -> str:
             notifications: {
               telegramBotToken: token, telegramChatId: chatId, telegramEnabled: enabled,
               telegramStatus: status, telegramChain: chain, telegramTime: time, telegramRegion: region,
+              telegramRadius: radius, telegramAutoSyncGps: autoSync,
               telegramLocationName: locName, telegramLat: latVal, telegramLng: lngVal
             }
           })
@@ -3106,6 +3296,8 @@ def render_map_page() -> str:
       const chain = document.getElementById('tg-cfg-chain') ? document.getElementById('tg-cfg-chain').value : 'all';
       const time = document.getElementById('tg-cfg-time') ? document.getElementById('tg-cfg-time').value : '24';
       const region = document.getElementById('tg-cfg-region') ? document.getElementById('tg-cfg-region').value : 'osaka';
+      const radius = document.getElementById('tg-cfg-radius') ? document.getElementById('tg-cfg-radius').value : (configData.telegramRadius || 'all');
+      const autoSync = document.getElementById('tg-cfg-autosync-gps') ? document.getElementById('tg-cfg-autosync-gps').checked : !!configData.telegramAutoSyncGps;
       const locName = (document.getElementById('tg-cfg-loc-name') ? document.getElementById('tg-cfg-loc-name').value : 'Ga Imamiya').trim();
       const latVal = (document.getElementById('tg-cfg-lat') && document.getElementById('tg-cfg-lat').value !== '') ? parseFloat(document.getElementById('tg-cfg-lat').value) : 34.6540;
       const lngVal = (document.getElementById('tg-cfg-lng') && document.getElementById('tg-cfg-lng').value !== '') ? parseFloat(document.getElementById('tg-cfg-lng').value) : 135.4925;
@@ -3117,6 +3309,8 @@ def render_map_page() -> str:
       configData.telegramChain = chain;
       configData.telegramTime = time;
       configData.telegramRegion = region;
+      configData.telegramRadius = radius;
+      configData.telegramAutoSyncGps = autoSync;
       configData.telegramLocationName = locName;
       configData.telegramLat = latVal;
       configData.telegramLng = lngVal;
@@ -3137,6 +3331,7 @@ def render_map_page() -> str:
             notifications: {
               telegramBotToken: token, telegramChatId: chatId, telegramEnabled: enabled,
               telegramStatus: status, telegramChain: chain, telegramTime: time, telegramRegion: region,
+              telegramRadius: radius, telegramAutoSyncGps: autoSync,
               telegramLocationName: locName, telegramLat: latVal, telegramLng: lngVal
             }
           })
@@ -3148,6 +3343,7 @@ def render_map_page() -> str:
           resEl.innerText = '✅ Đã lưu cấu hình và bộ lọc Telegram thành công!';
           setTimeout(() => { if (resEl) resEl.style.display = 'none'; }, 4000);
         }
+        updateTelegramAnchorWarning();
       } catch(e) {
         if (resEl) {
           resEl.style.background = '#fee2e2';
@@ -5184,6 +5380,7 @@ def render_thongbao_page() -> str:
           msgEl.innerText = `✅ Đã lưu mốc vị trí: "${locName}" (~${latVal.toFixed(4)}, ${lngVal.toFixed(4)})`;
           setTimeout(() => { if (msgEl) msgEl.style.display = 'none'; }, 3500);
         }
+        updateTelegramAnchorWarning();
       } catch(e) {
         if (msgEl) {
           msgEl.style.background = '#fee2e2';
@@ -5209,7 +5406,7 @@ def render_thongbao_page() -> str:
         msgEl.style.display = 'block';
         msgEl.style.background = '#f0f9ff';
         msgEl.style.color = '#0369a1';
-        msgEl.innerText = '⏳ Đang lấy toạ độ GPS hiện tại của thiết bị...';
+        msgEl.innerText = '⏳ Đang kết nối GPS thiết bị để lấy toạ độ thực mới nhất...';
       }
 
       const applyGps = async (lat, lng) => {
@@ -5224,28 +5421,130 @@ def render_thongbao_page() -> str:
         await saveTelegramLocationAuto();
       };
 
-      if (typeof userLat === 'number' && typeof userLng === 'number' && userLat && userLng) {
-        await applyGps(userLat, userLng);
-      } else if (navigator.geolocation) {
+      if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           async (pos) => {
-            await applyGps(pos.coords.latitude, pos.coords.longitude);
-          },
-          (err) => {
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            userLat = lat;
+            userLng = lng;
+            try {
+              localStorage.setItem('poketan_user_lat', String(lat));
+              localStorage.setItem('poketan_user_lng', String(lng));
+            } catch(e) {}
+            await applyGps(lat, lng);
             if (msgEl) {
-              msgEl.style.background = '#fee2e2';
-              msgEl.style.color = '#b91c1c';
-              msgEl.innerText = '⚠️ Không thể lấy GPS (vui lòng bật cấp quyền vị trí trình duyệt).';
+              msgEl.style.background = '#dcfce7';
+              msgEl.style.color = '#15803d';
+              msgEl.innerText = `✅ Đã lưu toạ độ GPS chính xác: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+              setTimeout(() => { if (msgEl) msgEl.style.display = 'none'; }, 3500);
             }
           },
-          { enableHighAccuracy: true, timeout: 8000 }
+          async (err) => {
+            if (typeof userLat === 'number' && typeof userLng === 'number' && userLat && userLng) {
+              await applyGps(userLat, userLng);
+            } else if (msgEl) {
+              msgEl.style.background = '#fee2e2';
+              msgEl.style.color = '#b91c1c';
+              msgEl.innerText = '⚠️ Không thể lấy GPS (vui lòng bật quyền truy cập vị trí trình duyệt).';
+            }
+          },
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
+      } else if (typeof userLat === 'number' && typeof userLng === 'number' && userLat && userLng) {
+        await applyGps(userLat, userLng);
       } else {
         if (msgEl) {
           msgEl.style.background = '#fee2e2';
           msgEl.style.color = '#b91c1c';
           msgEl.innerText = '⚠️ Thiết bị không hỗ trợ Geolocation.';
         }
+      }
+    }
+
+    function updateTelegramAnchorWarning() {
+      const warnEl = document.getElementById('tg-anchor-divergence-warn');
+      const labelEl = document.getElementById('tg-current-anchor-label');
+      const latVal = (document.getElementById('tg-cfg-lat') && document.getElementById('tg-cfg-lat').value !== '') ? parseFloat(document.getElementById('tg-cfg-lat').value) : (configData.telegramLat || 34.6540);
+      const lngVal = (document.getElementById('tg-cfg-lng') && document.getElementById('tg-cfg-lng').value !== '') ? parseFloat(document.getElementById('tg-cfg-lng').value) : (configData.telegramLng || 135.4925);
+      const locName = (document.getElementById('tg-cfg-loc-name') && document.getElementById('tg-cfg-loc-name').value.trim()) ? document.getElementById('tg-cfg-loc-name').value.trim() : (configData.telegramLocationName || 'Ga Imamiya');
+
+      if (labelEl) {
+        labelEl.innerText = `${locName} (${latVal.toFixed(4)}, ${lngVal.toFixed(4)})`;
+      }
+
+      if (!warnEl) return;
+      if (typeof userLat === 'number' && typeof userLng === 'number' && userLat && userLng) {
+        const d = (typeof calcDistanceKm === 'function') ? calcDistanceKm(userLat, userLng, latVal, lngVal) : 0;
+        if (d > 3.0) {
+          warnEl.style.display = 'block';
+          warnEl.style.background = '#fffbeb';
+          warnEl.style.color = '#b45309';
+          warnEl.style.border = '1.5px solid #fde68a';
+          warnEl.innerHTML = `⚠️ <b>LƯU Ý LỆCH VỊ TRÍ:</b> Thiết bị của bạn đang cách mốc neo Telegram (${locName}) tận <b>${d.toFixed(1)} km</b>.<br>Khoảng cách trong tin Telegram sẽ được tính từ <b>${locName}</b> chứ KHÔNG phải từ chỗ bạn đứng. Nếu muốn bot tính từ chỗ bạn đang đứng, hãy bấm <b>🎯 Lấy GPS hiện tại</b> bên dưới!`;
+        } else {
+          warnEl.style.display = 'block';
+          warnEl.style.background = '#f0fdf4';
+          warnEl.style.color = '#15803d';
+          warnEl.style.border = '1px solid #bbf7d0';
+          warnEl.innerHTML = `✅ Thiết bị của bạn đang ở gần mốc neo Telegram (~${d.toFixed(1)} km).`;
+        }
+      } else {
+        warnEl.style.display = 'none';
+      }
+    }
+
+    async function onTelegramAutoSyncGpsToggle(checked) {
+      configData.telegramAutoSyncGps = checked;
+      try {
+        await fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            notifications: {
+              telegramAutoSyncGps: checked
+            }
+          })
+        });
+      } catch(e) {}
+      if (checked) {
+        await setTelegramLocToCurrentGps();
+      }
+    }
+
+    let lastAutoSyncTs = 0;
+    async function checkAutoSyncGpsToTelegram(lat, lng) {
+      if (!configData || !configData.telegramAutoSyncGps) return;
+      const now = Date.now();
+      if (now - lastAutoSyncTs < 30000) return; // debounce 30s
+      lastAutoSyncTs = now;
+      const anchorLat = configData.telegramLat || 34.6540;
+      const anchorLng = configData.telegramLng || 135.4925;
+      const dist = (typeof calcDistanceKm === 'function') ? calcDistanceKm(lat, lng, anchorLat, anchorLng) : 0;
+      if (dist > 0.2) {
+        configData.telegramLat = lat;
+        configData.telegramLng = lng;
+        configData.telegramLocationName = 'Vị trí GPS của tôi';
+        const nameEl = document.getElementById('tg-cfg-loc-name');
+        const latEl = document.getElementById('tg-cfg-lat');
+        const lngEl = document.getElementById('tg-cfg-lng');
+        if (nameEl) nameEl.value = 'Vị trí GPS của tôi';
+        if (latEl) latEl.value = Number(lat.toFixed(5));
+        if (lngEl) lngEl.value = Number(lng.toFixed(5));
+        try {
+          await fetch('/api/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              notifications: {
+                telegramLocationName: 'Vị trí GPS của tôi',
+                telegramLat: lat,
+                telegramLng: lng
+              }
+            })
+          });
+          updateTelegramAnchorWarning();
+        } catch(e) {}
       }
     }
 
@@ -5339,11 +5638,13 @@ def render_thongbao_page() -> str:
       const statusEl = document.getElementById('tg-cfg-status');
       const chainEl = document.getElementById('tg-cfg-chain');
       const timeEl = document.getElementById('tg-cfg-time');
+      const radiusEl = document.getElementById('tg-cfg-radius');
 
       const region = regionEl ? regionEl.value : (configData.telegramRegion || 'osaka');
       const status = statusEl ? statusEl.value : (configData.telegramStatus || 'in');
       const chain = chainEl ? chainEl.value : (configData.telegramChain || 'all');
       const time = timeEl ? String(timeEl.value) : String(configData.telegramTime || '24');
+      const radius = radiusEl ? radiusEl.value : (configData.telegramRadius || 'all');
 
       document.querySelectorAll('#tg-modal-region-group .filter-option-btn').forEach(btn => {
         btn.classList.toggle('active', btn.getAttribute('data-val') === region);
@@ -5354,6 +5655,14 @@ def render_thongbao_page() -> str:
       document.querySelectorAll('#tg-modal-chain-group .filter-option-btn').forEach(btn => {
         btn.classList.toggle('active', btn.getAttribute('data-val') === chain);
       });
+      document.querySelectorAll('#tg-modal-radius-group .filter-option-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-val') === String(radius));
+      });
+      const autoSyncEl = document.getElementById('tg-cfg-autosync-gps');
+      if (autoSyncEl) {
+        autoSyncEl.checked = !!configData.telegramAutoSyncGps;
+      }
+      updateTelegramAnchorWarning();
     }
 
     function selectTgModalRegion(val) {
@@ -5377,6 +5686,15 @@ def render_thongbao_page() -> str:
       if (el) el.value = val;
       document.querySelectorAll('#tg-modal-chain-group .filter-option-btn').forEach(btn => {
         btn.classList.toggle('active', btn.getAttribute('data-val') === val);
+      });
+    }
+
+    function selectTgModalRadius(val) {
+      const el = document.getElementById('tg-cfg-radius');
+      if (el) el.value = val;
+      configData.telegramRadius = String(val);
+      document.querySelectorAll('#tg-modal-radius-group .filter-option-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-val') === String(val));
       });
     }
     function selectTgModalTime(val) {}
@@ -5454,6 +5772,8 @@ def render_thongbao_page() -> str:
       const chainEl = document.getElementById('tg-cfg-chain');
       const timeEl = document.getElementById('tg-cfg-time');
       const regionEl = document.getElementById('tg-cfg-region');
+      const radiusEl = document.getElementById('tg-cfg-radius');
+      const autoSyncEl = document.getElementById('tg-cfg-autosync-gps');
       const locNameEl = document.getElementById('tg-cfg-loc-name');
       const latEl = document.getElementById('tg-cfg-lat');
       const lngEl = document.getElementById('tg-cfg-lng');
@@ -5475,6 +5795,8 @@ def render_thongbao_page() -> str:
       if (chainEl) chainEl.value = configData.telegramChain || 'all';
       if (timeEl) timeEl.value = String(configData.telegramTime || '24');
       if (regionEl) regionEl.value = configData.telegramRegion || 'osaka';
+      if (radiusEl) radiusEl.value = configData.telegramRadius || 'all';
+      if (autoSyncEl) autoSyncEl.checked = !!configData.telegramAutoSyncGps;
       if (locNameEl) locNameEl.value = configData.telegramLocationName || 'Ga Imamiya';
       if (latEl) latEl.value = (typeof configData.telegramLat !== 'undefined' && configData.telegramLat !== null) ? configData.telegramLat : 34.6540;
       if (lngEl) lngEl.value = (typeof configData.telegramLng !== 'undefined' && configData.telegramLng !== null) ? configData.telegramLng : 135.4925;
@@ -5506,6 +5828,7 @@ def render_thongbao_page() -> str:
 
       switchSettingsTab(initialTab || 'map');
       syncTelegramModalUI();
+      updateTelegramAnchorWarning();
       document.getElementById('settings-modal').classList.add('open');
     }
     async function saveTelegramConfigSilently() {
@@ -5516,6 +5839,8 @@ def render_thongbao_page() -> str:
       const chain = document.getElementById('tg-cfg-chain') ? document.getElementById('tg-cfg-chain').value : 'all';
       const time = document.getElementById('tg-cfg-time') ? document.getElementById('tg-cfg-time').value : '24';
       const region = document.getElementById('tg-cfg-region') ? document.getElementById('tg-cfg-region').value : 'osaka';
+      const radius = document.getElementById('tg-cfg-radius') ? document.getElementById('tg-cfg-radius').value : (configData.telegramRadius || 'all');
+      const autoSync = document.getElementById('tg-cfg-autosync-gps') ? document.getElementById('tg-cfg-autosync-gps').checked : !!configData.telegramAutoSyncGps;
       const locName = (document.getElementById('tg-cfg-loc-name') ? document.getElementById('tg-cfg-loc-name').value : (configData.telegramLocationName || 'Ga Imamiya')).trim();
       const latVal = (document.getElementById('tg-cfg-lat') && document.getElementById('tg-cfg-lat').value !== '') ? parseFloat(document.getElementById('tg-cfg-lat').value) : (configData.telegramLat || 34.6540);
       const lngVal = (document.getElementById('tg-cfg-lng') && document.getElementById('tg-cfg-lng').value !== '') ? parseFloat(document.getElementById('tg-cfg-lng').value) : (configData.telegramLng || 135.4925);
@@ -5527,6 +5852,8 @@ def render_thongbao_page() -> str:
       configData.telegramChain = chain;
       configData.telegramTime = time;
       configData.telegramRegion = region;
+      configData.telegramRadius = radius;
+      configData.telegramAutoSyncGps = autoSync;
       configData.telegramLocationName = locName;
       configData.telegramLat = latVal;
       configData.telegramLng = lngVal;
@@ -5539,6 +5866,7 @@ def render_thongbao_page() -> str:
             notifications: {
               telegramBotToken: token, telegramChatId: chatId, telegramEnabled: enabled,
               telegramStatus: status, telegramChain: chain, telegramTime: time, telegramRegion: region,
+              telegramRadius: radius, telegramAutoSyncGps: autoSync,
               telegramLocationName: locName, telegramLat: latVal, telegramLng: lngVal
             }
           })
@@ -5597,6 +5925,8 @@ def render_thongbao_page() -> str:
       const chain = document.getElementById('tg-cfg-chain') ? document.getElementById('tg-cfg-chain').value : 'all';
       const time = document.getElementById('tg-cfg-time') ? document.getElementById('tg-cfg-time').value : '24';
       const region = document.getElementById('tg-cfg-region') ? document.getElementById('tg-cfg-region').value : 'osaka';
+      const radius = document.getElementById('tg-cfg-radius') ? document.getElementById('tg-cfg-radius').value : (configData.telegramRadius || 'all');
+      const autoSync = document.getElementById('tg-cfg-autosync-gps') ? document.getElementById('tg-cfg-autosync-gps').checked : !!configData.telegramAutoSyncGps;
       const locName = (document.getElementById('tg-cfg-loc-name') ? document.getElementById('tg-cfg-loc-name').value : 'Ga Imamiya').trim();
       const latVal = (document.getElementById('tg-cfg-lat') && document.getElementById('tg-cfg-lat').value !== '') ? parseFloat(document.getElementById('tg-cfg-lat').value) : 34.6540;
       const lngVal = (document.getElementById('tg-cfg-lng') && document.getElementById('tg-cfg-lng').value !== '') ? parseFloat(document.getElementById('tg-cfg-lng').value) : 135.4925;
@@ -5608,6 +5938,8 @@ def render_thongbao_page() -> str:
       configData.telegramChain = chain;
       configData.telegramTime = time;
       configData.telegramRegion = region;
+      configData.telegramRadius = radius;
+      configData.telegramAutoSyncGps = autoSync;
       configData.telegramLocationName = locName;
       configData.telegramLat = latVal;
       configData.telegramLng = lngVal;
@@ -5628,6 +5960,7 @@ def render_thongbao_page() -> str:
             notifications: {
               telegramBotToken: token, telegramChatId: chatId, telegramEnabled: enabled,
               telegramStatus: status, telegramChain: chain, telegramTime: time, telegramRegion: region,
+              telegramRadius: radius, telegramAutoSyncGps: autoSync,
               telegramLocationName: locName, telegramLat: latVal, telegramLng: lngVal
             }
           })
@@ -5639,6 +5972,7 @@ def render_thongbao_page() -> str:
           resEl.innerText = '✅ Đã lưu cấu hình và bộ lọc Telegram thành công!';
           setTimeout(() => { if (resEl) resEl.style.display = 'none'; }, 4000);
         }
+        updateTelegramAnchorWarning();
       } catch(e) {
         if (resEl) {
           resEl.style.background = '#fee2e2';
@@ -6007,6 +6341,12 @@ def render_thongbao_page() -> str:
             localStorage.setItem('poketan_user_lat', String(userLat));
             localStorage.setItem('poketan_user_lng', String(userLng));
           } catch(e) {}
+          if (typeof checkAutoSyncGpsToTelegram === 'function') {
+            checkAutoSyncGpsToTelegram(userLat, userLng);
+          }
+          if (typeof updateTelegramAnchorWarning === 'function') {
+            updateTelegramAnchorWarning();
+          }
           renderStoreList(document.getElementById('list-search-input').value);
         },
         (err) => {},

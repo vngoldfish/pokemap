@@ -24,6 +24,7 @@ import sys
 import os
 import json
 import time
+import math
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Query, Request
 from fastapi.middleware.gzip import GZipMiddleware
@@ -103,6 +104,8 @@ DEFAULT_SETTINGS = {
         "telegramLat": 34.6540,       # Vĩ độ vị trí neo Telegram (mặc định: Ga JR Imamiya)
         "telegramLng": 135.4925,      # Kinh độ vị trí neo Telegram (mặc định: Ga JR Imamiya)
         "telegramLocationName": "Ga Imamiya", # Tên vị trí neo cho Telegram
+        "telegramRadius": "all",      # Bán kính lọc cảnh báo Telegram: 'all', '1', '3', '5', '10', '20' (km)
+        "telegramAutoSyncGps": False, # Tự động cập nhật toạ độ Telegram theo GPS khi mở app
         "notifyPrefs": ["osaka", "aichi", "kanagawa", "gifu", "mie"]  # Các tỉnh nhận thông báo
     },
 
@@ -366,6 +369,27 @@ def on_csdl_report_added(store: dict, entry: dict):
                 return
             elif tg_chain not in ["conbini", "specialty", "electronics"] and st_chain != tg_chain:
                 return
+
+        # 6. Check distance radius filter (km)
+        tg_radius = notif_cfg.get("telegramRadius")
+        if tg_radius and str(tg_radius).lower() not in ("all", "", "none"):
+            try:
+                max_dist_km = float(tg_radius)
+                st_lat = store.get("lat")
+                st_lng = store.get("lng")
+                if st_lat is not None and st_lng is not None:
+                    lat1, lon1 = float(st_lat), float(st_lng)
+                    lat2 = float(notif_cfg.get("telegramLat") if notif_cfg.get("telegramLat") is not None else 34.6540)
+                    lon2 = float(notif_cfg.get("telegramLng") if notif_cfg.get("telegramLng") is not None else 135.4925)
+                    dlat = math.radians(lat2 - lat1)
+                    dlon = math.radians(lon2 - lon1)
+                    a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon/2)**2
+                    act_dist_km = 6371 * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+                    if act_dist_km > max_dist_km:
+                        print(f"  [CSDL -> Telegram] Bỏ qua quán ngoài bán kính ({act_dist_km:.1f}km > {max_dist_km}km): {store.get('name')}")
+                        return
+            except Exception as dist_e:
+                print(f"  [CSDL -> Telegram] Lỗi lọc bán kính: {dist_e}")
 
         print(f"  [CSDL -> Telegram] ⚡ BẢN GHI MỚI VỪA ADD VÀO CSDL: {store.get('name')} (pref={store_pref}, ts={entry.get('timestamp')}, code={code})")
         res = send_telegram_alert(store, entry, notif_cfg, is_test=False)
@@ -1052,6 +1076,8 @@ def get_config():
         "telegramLat": float(notif.get("telegramLat") if notif.get("telegramLat") is not None else 34.6540),
         "telegramLng": float(notif.get("telegramLng") if notif.get("telegramLng") is not None else 135.4925),
         "telegramLocationName": str(notif.get("telegramLocationName") or "Ga Imamiya"),
+        "telegramRadius": str(notif.get("telegramRadius", "all")),
+        "telegramAutoSyncGps": bool(notif.get("telegramAutoSyncGps", False)),
         "currentRegion": user_settings.get("currentRegion", "all"),
         "activeFilter": user_settings.get("activeFilter", "all"),
         "activeTime": user_settings.get("activeTime", "all"),
