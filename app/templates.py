@@ -2973,7 +2973,7 @@ def render_map_page() -> str:
 
     let lastAutoSyncTs = 0;
     async function checkAutoSyncGpsToTelegram(lat, lng) {
-      if (!configData || !configData.telegramAutoSyncGps) return;
+      if (!configData || configData.telegramAutoSyncGps === false) return;
       const now = Date.now();
       if (now - lastAutoSyncTs < 30000) return; // debounce 30s
       lastAutoSyncTs = now;
@@ -5035,6 +5035,7 @@ def render_thongbao_page() -> str:
       const allowedPrefs = (REGIONS[targetRegion] ? REGIONS[targetRegion].prefs : [targetRegion]) || ['osaka'];
 
       let refLat = userLat, refLng = userLng;
+      const isRealUserGps = (userLat !== null && userLng !== null);
       if (refLat === null && REGIONS[targetRegion]) {
         refLat = REGIONS[targetRegion].center[0];
         refLng = REGIONS[targetRegion].center[1];
@@ -5171,7 +5172,9 @@ def render_thongbao_page() -> str:
           counts = { in: info.code === 'i' ? 1 : 0, out: info.code === 'o' ? 1 : 0 };
         }
         const chain = (configData.chainNames && configData.chainNames[store.chain]) || store.chain || 'Cửa hàng';
-        const distStr = dist !== null ? ` • 📍 Cách ${formatDist(dist)}` : '';
+        const distLabel = isRealUserGps ? 'Cách bạn' : `Cách TT ${regName}`;
+        const distGpsNotice = !isRealUserGps ? ' (chưa có GPS)' : '';
+        const distStr = dist !== null ? ` • 📍 ${distLabel} ${formatDist(dist)}${distGpsNotice}` : '';
         
         let timeReportHtml = '';
         if (info.timestamp > 0) {
@@ -5658,7 +5661,7 @@ def render_thongbao_page() -> str:
 
     let lastAutoSyncTs = 0;
     async function checkAutoSyncGpsToTelegram(lat, lng) {
-      if (!configData || !configData.telegramAutoSyncGps) return;
+      if (!configData || configData.telegramAutoSyncGps === false) return;
       const now = Date.now();
       if (now - lastAutoSyncTs < 30000) return; // debounce 30s
       lastAutoSyncTs = now;

@@ -1848,9 +1848,14 @@ __SHARED_BASE_CSS__
           </div>
         ` : '';
 
+        const anchorSel = document.getElementById('anchor-select');
+        const anchorName = isGpsActive ? 'bạn' : (anchorSel && anchorSel.options[anchorSel.selectedIndex] ? anchorSel.options[anchorSel.selectedIndex].text.replace(/\\s*\\([^)]*\\)/, '') : 'mốc');
+        const travelText = p.travel_time_str || (p.walk_time_min ? `~${p.walk_time_min}p đi bộ` : '');
+        const roadTitle = p.road_str ? ` (${p.road_str})` : '';
+
         const distHtml = p.distance_str ? `
-          <span class="dist-badge" title="Khoảng cách từ vị trí của bạn">
-            📍 ${p.distance_str} ${p.walk_time_min ? `(~${p.walk_time_min}p đi bộ)` : ''}
+          <span class="dist-badge" title="Khoảng cách tính từ ${anchorName}: đường chim bay ${p.distance_str}${roadTitle}">
+            📍 ${p.distance_str} (từ ${anchorName}) ${travelText ? `• ${travelText}` : ''}
           </span>
         ` : '';
 
@@ -1867,7 +1872,7 @@ __SHARED_BASE_CSS__
         const safeName = (p.name || '').replace(/'/g, "\\'");
         const encodedQuery = encodeURIComponent(p.name + ' ' + (p.address || ''));
         const gmapsWalkingUrl = (p.lat && p.lng) 
-          ? `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}&travelmode=walking`
+          ? `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}`
           : `https://www.google.com/maps/search/?api=1&query=${encodedQuery}`;
 
         return `
@@ -2050,9 +2055,31 @@ __SHARED_BASE_CSS__
       document.getElementById('pred-store-modal').style.display = 'none';
     }
 
-    // Auto-boot on load
+    // Auto-boot on load with immediate GPS check if available
     document.addEventListener('DOMContentLoaded', () => {
-      loadPredictions();
+      if (navigator.geolocation && !isGpsActive) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            userLat = pos.coords.latitude;
+            userLng = pos.coords.longitude;
+            isGpsActive = true;
+            try {
+              localStorage.setItem('user_last_lat', String(userLat));
+              localStorage.setItem('user_last_lng', String(userLng));
+            } catch(e) {}
+            updateGpsButtonUI();
+            const anchorSel = document.getElementById('anchor-select');
+            if (anchorSel) anchorSel.value = 'gps';
+            loadPredictions();
+          },
+          (err) => {
+            loadPredictions();
+          },
+          { enableHighAccuracy: true, timeout: 5000 }
+        );
+      } else {
+        loadPredictions();
+      }
     });
   </script>
 </body>

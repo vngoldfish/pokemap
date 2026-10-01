@@ -247,7 +247,7 @@ def send_telegram_alert(store: dict, info: dict, notif_cfg: dict, is_test: bool 
             a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon/2)**2
             dist_km = 6371 * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
             loc_label = (notif_cfg.get("telegramLocationName") or "").strip()
-            loc_suffix = f" ({loc_label})" if loc_label else ""
+            loc_suffix = f" ({loc_label})" if loc_label else " (mốc Ga Imamiya)"
             if dist_km < 1.0:
                 dist_str = f"~{int(round(dist_km * 1000))}m{loc_suffix}"
             else:

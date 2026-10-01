@@ -2130,10 +2130,13 @@ def db_get_restock_predictions(
         if flash_mode == "none" and not truck_en_route and total_score < min_score:
             continue
 
-        # Proximity & Walking Distance calculation
+        # Proximity, Estimated Road Distance & Realistic Travel Time calculation
         dist_km = None
         dist_m = None
         dist_str = ""
+        road_km = None
+        road_str = ""
+        travel_time_str = ""
         walk_min = None
         if user_lat is not None and user_lng is not None and d["lat"] is not None and d["lng"] is not None:
             try:
@@ -2142,9 +2145,28 @@ def db_get_restock_predictions(
                     continue
                 dist_m = int(round(dist_km * 1000))
                 dist_str = f"~{dist_m}m" if dist_km < 1.0 else f"~{dist_km:.1f}km"
-                walk_min = max(1, int(round(dist_km * 12.5)))
+                # Urban road distance is typically ~1.25x straight-line distance due to street grid
+                road_km = round(dist_km * 1.25, 1)
+                road_str = f"~{int(round(road_km * 1000))}m đường đi" if road_km < 1.0 else f"~{road_km:.1f}km đường đi"
+
+                # Realistic multimodal travel time estimate in Japanese cities
+                if dist_km < 1.2:
+                    walk_min = max(1, int(round(dist_km * 14)))
+                    travel_time_str = f"~{walk_min}p đi bộ"
+                elif dist_km < 3.5:
+                    bike_min = max(3, int(round(dist_km * 4)))
+                    walk_min = int(round(dist_km * 14))
+                    travel_time_str = f"~{bike_min}p xe đạp / ~{walk_min}p bộ"
+                elif dist_km < 8.0:
+                    transit_min = max(7, int(round(dist_km * 2.6)))
+                    travel_time_str = f"~{transit_min}p tàu/xe"
+                    walk_min = transit_min
+                else:
+                    transit_min = max(15, int(round(dist_km * 2.2)))
+                    travel_time_str = f"~{transit_min}p tàu/xe"
+                    walk_min = transit_min
             except Exception:
-                dist_km, dist_m, dist_str, walk_min = None, None, "", None
+                dist_km, dist_m, dist_str, road_km, road_str, travel_time_str, walk_min = None, None, "", None, "", "", None
 
         # Extract top cards/packs
         pack_counter = Counter(d["packs"])
@@ -2190,6 +2212,9 @@ def db_get_restock_predictions(
             "distance_km": round(dist_km, 2) if dist_km is not None else None,
             "distance_m": dist_m,
             "distance_str": dist_str,
+            "road_km": road_km,
+            "road_str": road_str,
+            "travel_time_str": travel_time_str,
             "walk_time_min": walk_min
         })
 
