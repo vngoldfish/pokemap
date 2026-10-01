@@ -30,7 +30,7 @@
     "telegramLng": 135.4925,
     "telegramLocationName": "Ga Imamiya",
     "telegramRadius": "all",
-    "telegramAutoSyncGps": false,
+    "telegramAutoSyncGps": true,
     "notifyPrefs": [
       "osaka",
       "aichi",

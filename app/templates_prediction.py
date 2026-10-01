@@ -1589,6 +1589,18 @@ __SHARED_BASE_CSS__
           try {
             localStorage.setItem('user_last_lat', String(userLat));
             localStorage.setItem('user_last_lng', String(userLng));
+            fetch('/api/settings', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                notifications: {
+                  telegramLocationName: 'Vị trí của bạn (GPS)',
+                  telegramLat: userLat,
+                  telegramLng: userLng,
+                  telegramAutoSyncGps: true
+                }
+              })
+            }).catch(() => {});
           } catch(e) {}
           updateGpsButtonUI();
           const anchorSel = document.getElementById('anchor-select');
@@ -1600,7 +1612,7 @@ __SHARED_BASE_CSS__
           lbl.textContent = 'Định vị GPS';
           isGpsActive = false;
         },
-        { enableHighAccuracy: true, timeout: 8000 }
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
     }
 
@@ -2066,6 +2078,18 @@ __SHARED_BASE_CSS__
             try {
               localStorage.setItem('user_last_lat', String(userLat));
               localStorage.setItem('user_last_lng', String(userLng));
+              fetch('/api/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  notifications: {
+                    telegramLocationName: 'Vị trí của bạn (GPS)',
+                    telegramLat: userLat,
+                    telegramLng: userLng,
+                    telegramAutoSyncGps: true
+                  }
+                })
+              }).catch(() => {});
             } catch(e) {}
             updateGpsButtonUI();
             const anchorSel = document.getElementById('anchor-select');
