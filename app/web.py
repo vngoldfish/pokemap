@@ -22,6 +22,18 @@ Features:
 
 import sys
 import os
+
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+if hasattr(sys.stderr, "reconfigure"):
+    try:
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 import json
 import time
 import math
@@ -185,12 +197,14 @@ async def update_settings(request: Request):
             data["notifications"]["telegramEnabledAt"] = 0
 
         # Seamless GPS & Telegram sync normalization:
-        # If client passes telegram fields at root or inside notifications, ensure both are in sync
+        # If client passes telegram fields at root or inside notifications, ensure they are stored under notifications
         if not isinstance(data.get("notifications"), dict):
             data["notifications"] = {}
         for tg_key in ("telegramLat", "telegramLng", "telegramLocationName", "telegramAutoSyncGps", "telegramRadius", "telegramEnabled"):
             if tg_key in data:
-                data["notifications"][tg_key] = data[tg_key]
+                data["notifications"][tg_key] = data.pop(tg_key)
+            if tg_key in current:
+                current.pop(tg_key, None)
 
         deep_update_dict(current, data)
         save_user_settings(current)
@@ -410,16 +424,31 @@ def on_csdl_report_added(store: dict, entry: dict):
                     a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon/2)**2
                     act_dist_km = 6371 * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
                     if act_dist_km > max_dist_km:
-                        print(f"  [CSDL -> Telegram] Bỏ qua quán ngoài bán kính ({act_dist_km:.1f}km > {max_dist_km}km): {store.get('name')}")
+                        try:
+                            print(f"  [CSDL -> Telegram] Bỏ qua quán ngoài bán kính ({act_dist_km:.1f}km > {max_dist_km}km): {store.get('name')}")
+                        except Exception:
+                            pass
                         return
             except Exception as dist_e:
-                print(f"  [CSDL -> Telegram] Lỗi lọc bán kính: {dist_e}")
+                try:
+                    print(f"  [CSDL -> Telegram] Lỗi lọc bán kính: {dist_e}")
+                except Exception:
+                    pass
 
-        print(f"  [CSDL -> Telegram] ⚡ BẢN GHI MỚI VỪA ADD VÀO CSDL: {store.get('name')} (pref={store_pref}, ts={entry.get('timestamp')}, code={code})")
+        try:
+            print(f"  [CSDL -> Telegram] ⚡ BẢN GHI MỚI VỪA ADD VÀO CSDL: {store.get('name')} (pref={store_pref}, ts={entry.get('timestamp')}, code={code})")
+        except Exception:
+            pass
         res = send_telegram_alert(store, entry, notif_cfg, is_test=False)
-        print(f"  [CSDL -> Telegram] Kết quả gửi: {res}")
+        try:
+            print(f"  [CSDL -> Telegram] Kết quả gửi: {res}")
+        except Exception:
+            pass
     except Exception as e:
-        print(f"  [CSDL -> Telegram] Lỗi dispatch alert: {e}")
+        try:
+            print(f"  [CSDL -> Telegram] Lỗi dispatch alert: {e}")
+        except Exception:
+            pass
 
 # Register event hook
 register_on_report_added(on_csdl_report_added)

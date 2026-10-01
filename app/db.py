@@ -989,7 +989,10 @@ def record_new_report(
             try:
                 callback(s_dict, rep_entry)
             except Exception as cb_err:
-                print(f"  [CSDL Event Error] Failed executing callback: {cb_err}")
+                try:
+                    print(f"  [CSDL Event Error] Failed executing callback: {cb_err}")
+                except Exception:
+                    pass
 
         for cb in list(_on_report_added_callbacks):
             threading.Thread(target=_safe_dispatch, args=(cb, store_dict, entry), daemon=True).start()

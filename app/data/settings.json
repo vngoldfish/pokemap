@@ -26,17 +26,13 @@
     "telegramChain": "all",
     "telegramTime": "24",
     "telegramRegion": "osaka",
-    "telegramLat": 35.6812,
-    "telegramLng": 139.7671,
-    "telegramLocationName": "Ga Tokyo",
+    "telegramLat": 34.652867657474786,
+    "telegramLng": 135.48783460335392,
+    "telegramLocationName": "Vị trí của bạn (GPS)",
     "telegramRadius": "all",
     "telegramAutoSyncGps": true,
     "notifyPrefs": [
-      "osaka",
-      "aichi",
-      "kanagawa",
-      "gifu",
-      "mie"
+      "osaka"
     ],
     "discordEnabled": false,
     "stockPinEffectHours": "1",
@@ -63,9 +59,5 @@
   "allChain": "",
   "allSortMode": "newest",
   "activeFilter": "onsite",
-  "activeTime": 3,
-  "telegramLat": 35.6812,
-  "telegramLng": 139.7671,
-  "telegramLocationName": "Ga Tokyo",
-  "telegramAutoSyncGps": true
+  "activeTime": 3
 }

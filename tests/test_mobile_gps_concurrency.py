@@ -22,11 +22,12 @@ import math
 import re
 import subprocess
 import time
+import copy
 import pytest
 from unittest.mock import patch
 from fastapi.testclient import TestClient
 
-from app.web import app, format_distance_pair, send_telegram_alert
+from app.web import app, format_distance_pair, send_telegram_alert, load_user_settings, save_user_settings
 from app.templates_stats import render_thongke_page
 from app.templates_prediction import render_dudoan_page
 from app.templates import render_map_page, render_thongbao_page
@@ -214,37 +215,40 @@ def test_telegram_alert_distance_boundary_consistency():
 def test_gps_settings_sync_endpoint():
     """Verify /api/settings handles GPS sync from frontend without silent drops."""
     client = TestClient(app)
+    orig_settings = copy.deepcopy(load_user_settings())
+    try:
+        # 1. POST settings with nested notifications
+        payload_nested = {
+            "notifications": {
+                "telegramLocationName": "Vị trí GPS của tôi",
+                "telegramLat": 34.6700,
+                "telegramLng": 135.5100,
+                "telegramAutoSyncGps": True
+            }
+        }
+        res = client.post("/api/settings", json=payload_nested)
+        assert res.status_code == 200
+        cfg = res.json()["settings"]["notifications"]
+        assert cfg["telegramLocationName"] == "Vị trí GPS của tôi"
+        assert abs(cfg["telegramLat"] - 34.6700) < 1e-4
+        assert abs(cfg["telegramLng"] - 135.5100) < 1e-4
+        assert cfg["telegramAutoSyncGps"] is True
 
-    # 1. POST settings with nested notifications
-    payload_nested = {
-        "notifications": {
-            "telegramLocationName": "Vị trí GPS của tôi",
-            "telegramLat": 34.6700,
-            "telegramLng": 135.5100,
+        # 2. POST settings with root-level telegramLat and telegramLng (seamless normalization)
+        payload_root = {
+            "telegramLat": 35.6812,
+            "telegramLng": 139.7671,
+            "telegramLocationName": "Ga Tokyo",
             "telegramAutoSyncGps": True
         }
-    }
-    res = client.post("/api/settings", json=payload_nested)
-    assert res.status_code == 200
-    cfg = res.json()["settings"]["notifications"]
-    assert cfg["telegramLocationName"] == "Vị trí GPS của tôi"
-    assert abs(cfg["telegramLat"] - 34.6700) < 1e-4
-    assert abs(cfg["telegramLng"] - 135.5100) < 1e-4
-    assert cfg["telegramAutoSyncGps"] is True
-
-    # 2. POST settings with root-level telegramLat and telegramLng (seamless normalization)
-    payload_root = {
-        "telegramLat": 35.6812,
-        "telegramLng": 139.7671,
-        "telegramLocationName": "Ga Tokyo",
-        "telegramAutoSyncGps": True
-    }
-    res2 = client.post("/api/settings", json=payload_root)
-    assert res2.status_code == 200
-    cfg2 = res2.json()["settings"]["notifications"]
-    assert abs(cfg2["telegramLat"] - 35.6812) < 1e-4
-    assert abs(cfg2["telegramLng"] - 139.7671) < 1e-4
-    assert cfg2["telegramLocationName"] == "Ga Tokyo"
+        res2 = client.post("/api/settings", json=payload_root)
+        assert res2.status_code == 200
+        cfg2 = res2.json()["settings"]["notifications"]
+        assert abs(cfg2["telegramLat"] - 35.6812) < 1e-4
+        assert abs(cfg2["telegramLng"] - 139.7671) < 1e-4
+        assert cfg2["telegramLocationName"] == "Ga Tokyo"
+    finally:
+        save_user_settings(orig_settings)
 
 
 def test_templates_gps_auto_sync_payload_consistency():
