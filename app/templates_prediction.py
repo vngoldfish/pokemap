@@ -14,18 +14,24 @@ def render_dudoan_page() -> str:
 __SHARED_BASE_CSS__
   <style>
     /* CUSTOM STYLES FOR PREDICTION DASHBOARD */
-    body {
+    html, body {
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
       background: #0b1120;
       color: #f1f5f9;
-      overflow-y: auto;
-      height: 100vh;
-      height: 100dvh;
+      margin: 0;
+      padding: 0;
     }
 
     #radar-header {
+      height: 52px;
       background: #0f172a;
       border-bottom: 1px solid #1e293b;
-      padding: 10px 16px;
+      padding: 0 16px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -112,11 +118,13 @@ __SHARED_BASE_CSS__
     /* MAIN CONTAINER */
     #radar-container {
       flex: 1;
+      min-height: 0;
       overflow-y: auto;
-      padding: 12px 14px 80px 14px;
+      padding: 12px 14px 24px 14px;
       max-width: 1100px;
       width: 100%;
       margin: 0 auto;
+      box-sizing: border-box;
       -webkit-overflow-scrolling: touch;
     }
 
@@ -954,6 +962,187 @@ __SHARED_BASE_CSS__
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
+
+    /* COMPREHENSIVE MOBILE OPTIMIZATIONS FOR PREDICTION PAGE */
+    @media (max-width: 640px) {
+      #radar-header {
+        padding: 0 10px;
+        height: 48px;
+      }
+      .radar-brand {
+        gap: 6px;
+        min-width: 0;
+        flex: 1;
+        overflow: hidden;
+      }
+      .radar-brand .logo-badge {
+        font-size: 0.68rem;
+        padding: 3px 6px;
+        flex-shrink: 0;
+      }
+      .radar-title {
+        font-size: 0.82rem;
+        font-weight: 800;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .radar-subtitle {
+        display: none !important;
+      }
+      .radar-actions {
+        gap: 4px;
+        flex-shrink: 0;
+      }
+      .radar-btn {
+        padding: 5px 8px;
+        font-size: 0.72rem;
+        border-radius: 6px;
+      }
+      .hide-sm {
+        display: none !important;
+      }
+
+      /* Container */
+      #radar-container {
+        padding: 10px 10px 24px 10px;
+      }
+
+      /* Live Status Banner */
+      .radar-status-banner {
+        padding: 9px 11px;
+        margin-bottom: 10px;
+        gap: 6px;
+      }
+      .status-left {
+        gap: 8px;
+      }
+      .status-info-title {
+        font-size: 0.78rem;
+        line-height: 1.25;
+      }
+      .status-info-desc {
+        font-size: 0.65rem;
+        line-height: 1.3;
+      }
+      .status-badge-time {
+        font-size: 0.68rem;
+        padding: 3px 8px;
+      }
+
+      /* Radius Section */
+      .radius-card {
+        padding: 10px 12px;
+        margin-bottom: 10px;
+      }
+      .radius-header-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 6px;
+      }
+      .radius-title {
+        font-size: 0.74rem;
+      }
+      #anchor-select {
+        width: 100%;
+        font-size: 0.75rem;
+        padding: 6px 8px;
+      }
+      .radius-chips-row {
+        gap: 5px;
+        scrollbar-width: none;
+      }
+      .radius-chips-row::-webkit-scrollbar {
+        display: none;
+      }
+      .radius-chip {
+        padding: 5px 9px;
+        font-size: 0.7rem;
+        border-radius: 6px;
+      }
+
+      /* Radius KPI Grid */
+      .radius-kpi-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 6px !important;
+        margin-top: 8px !important;
+      }
+      .radius-kpi-box {
+        padding: 8px 10px;
+      }
+      .radius-kpi-val {
+        font-size: 1.15rem;
+        line-height: 1.1;
+      }
+      .radius-kpi-label {
+        font-size: 0.64rem;
+        margin-top: 2px;
+      }
+      .radius-kpi-sub {
+        font-size: 0.6rem;
+        margin-top: 1px;
+      }
+
+      /* Timeline Card */
+      .timeline-card {
+        padding: 10px 12px;
+        margin-bottom: 10px;
+      }
+      .timeline-presets {
+        scrollbar-width: none;
+        gap: 5px;
+        padding-bottom: 4px;
+        margin-bottom: 6px;
+      }
+      .timeline-presets::-webkit-scrollbar {
+        display: none;
+      }
+      .preset-chip {
+        padding: 4px 8px;
+        font-size: 0.68rem;
+      }
+      .hour-scroller {
+        scrollbar-width: none;
+        padding-bottom: 4px;
+      }
+      .hour-scroller::-webkit-scrollbar {
+        display: none;
+      }
+      .hour-pill {
+        min-width: 44px;
+        padding: 4px 2px;
+      }
+      .hour-pill-time {
+        font-size: 0.65rem;
+      }
+
+      /* Status Tabs */
+      .status-filter-tabs {
+        scrollbar-width: none;
+        gap: 5px;
+        margin-bottom: 10px;
+      }
+      .status-filter-tabs::-webkit-scrollbar {
+        display: none;
+      }
+      .status-tab-btn {
+        padding: 6px 9px;
+        font-size: 0.72rem;
+      }
+
+      /* Prediction Cards */
+      .pred-card {
+        padding: 10px 12px;
+        gap: 6px;
+        border-radius: 10px;
+      }
+      .pred-card-title {
+        font-size: 0.85rem;
+      }
+      .prob-number {
+        font-size: 1.3rem;
+      }
+    }
   </style>
 
   <!-- 1. TOP HEADER -->
@@ -970,11 +1159,11 @@ __SHARED_BASE_CSS__
     <div class="radar-actions">
       <button type="button" class="radar-btn radar-btn-outline radar-btn-gps" id="btn-gps-toggle" onclick="toggleGPSLocation()" title="Lấy định vị GPS của bạn để đo lường bán kính chính xác">
         <span id="gps-icon">📍</span>
-        <span id="gps-label">Định vị GPS</span>
+        <span id="gps-label"><span class="hide-sm">Định vị </span>GPS</span>
       </button>
       <button type="button" class="radar-btn radar-btn-primary" onclick="loadPredictions()" title="Tải lại dự đoán mới nhất">
         <span>🔄</span>
-        <span>Làm mới</span>
+        <span class="hide-sm">Làm mới</span>
       </button>
     </div>
   </header>
@@ -1024,7 +1213,7 @@ __SHARED_BASE_CSS__
       <div class="radius-chips-row">
         <button class="radius-chip" data-radius="1" onclick="selectRadiusKm(1)">📍 1 km</button>
         <button class="radius-chip" data-radius="2" onclick="selectRadiusKm(2)">📍 2 km</button>
-        <button class="radius-chip active" data-radius="3" onclick="selectRadiusKm(3)">📍 3 km (Quanh bạn)</button>
+        <button class="radius-chip active" data-radius="3" onclick="selectRadiusKm(3)">📍 3 km</button>
         <button class="radius-chip" data-radius="5" onclick="selectRadiusKm(5)">📍 5 km</button>
         <button class="radius-chip" data-radius="10" onclick="selectRadiusKm(10)">📍 10 km</button>
         <button class="radius-chip" data-radius="20" onclick="selectRadiusKm(20)">📍 20 km</button>

@@ -14,16 +14,21 @@ def render_thongke_page() -> str:
 __SHARED_BASE_CSS__
   <style>
     /* CUSTOM STYLES FOR STATS & ADMIN DASHBOARD */
-    body {
+    html, body {
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
       background: #0b1120;
       color: #f1f5f9;
-      overflow-y: auto;
-      height: 100vh;
-      height: 100dvh;
+      margin: 0;
+      padding: 0;
     }
 
     #stats-top-header {
-      height: 54px;
+      height: 52px;
       background: #0f172a;
       border-bottom: 1px solid #1e293b;
       display: flex;
@@ -473,6 +478,128 @@ __SHARED_BASE_CSS__
       padding: 16px;
       overflow-y: auto;
       flex: 1;
+    }
+
+    /* COMPREHENSIVE MOBILE OPTIMIZATIONS */
+    @media (max-width: 640px) {
+      #stats-top-header {
+        height: 48px;
+        padding: 0 10px;
+      }
+      .stats-header-brand {
+        gap: 6px;
+        min-width: 0;
+        flex: 1;
+        overflow: hidden;
+      }
+      .stats-header-brand .logo-badge {
+        font-size: 0.68rem;
+        padding: 3px 6px;
+        flex-shrink: 0;
+      }
+      .stats-header-title {
+        font-size: 0.82rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .stats-header-actions {
+        gap: 4px;
+        flex-shrink: 0;
+      }
+      .stats-btn {
+        padding: 5px 8px;
+        font-size: 0.72rem;
+        border-radius: 6px;
+      }
+      .hide-sm {
+        display: none !important;
+      }
+
+      /* Navigation Tabs */
+      #stats-nav-tabs {
+        padding: 0 8px;
+        gap: 2px;
+      }
+      .nav-tab-btn {
+        padding: 9px 10px;
+        font-size: 0.75rem;
+        gap: 4px;
+      }
+
+      /* KPI Cards 2x2 Grid */
+      #stats-body-wrapper {
+        padding: 10px 10px 24px 10px;
+      }
+      .kpi-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 8px !important;
+        margin-bottom: 12px !important;
+      }
+      .kpi-card {
+        padding: 10px 12px;
+        border-radius: 10px;
+        gap: 2px;
+      }
+      .kpi-card .kpi-label {
+        font-size: 0.62rem;
+      }
+      .kpi-card .kpi-val {
+        font-size: 1.25rem;
+      }
+      .kpi-card .kpi-sub {
+        font-size: 0.62rem;
+      }
+
+      /* Panels */
+      .panel-card {
+        padding: 12px;
+        border-radius: 10px;
+        margin-bottom: 12px;
+      }
+      .panel-title {
+        font-size: 0.85rem;
+      }
+      .panel-card-header {
+        margin-bottom: 10px;
+        gap: 6px;
+      }
+
+      /* Filter Toolbar */
+      .filter-bar {
+        padding: 8px 10px;
+        gap: 6px;
+      }
+      .filter-input, .filter-select {
+        font-size: 0.75rem;
+        padding: 6px 8px;
+        width: 100%;
+      }
+      
+      /* Progress bars */
+      .progress-label {
+        width: 85px;
+        font-size: 0.72rem;
+      }
+      .progress-val {
+        width: 45px;
+        font-size: 0.7rem;
+      }
+
+      /* Detail Modal */
+      .stats-modal {
+        padding: 8px;
+      }
+      .stats-modal-card {
+        max-height: 92vh;
+        border-radius: 10px;
+      }
+      .stats-modal-header {
+        padding: 10px 14px;
+      }
+      .stats-modal-body {
+        padding: 12px;
+      }
     }
   </style>
 </head>
