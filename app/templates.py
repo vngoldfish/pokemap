@@ -691,6 +691,56 @@ SHARED_BASE_CSS = """
       color: #1e293b;
       background: #e2e8f0;
     }
+
+    /* COMPREHENSIVE MOBILE HEADER & FOOTER OPTIMIZATIONS */
+    @media (max-width: 640px) {
+      #poketan-header {
+        height: 40px !important;
+        padding: 0 8px !important;
+      }
+      .brand-pin-icon {
+        width: 18px !important;
+        height: 18px !important;
+      }
+      .brand-pin-icon::after {
+        width: 6px !important;
+        height: 6px !important;
+        top: 6px !important;
+        left: 6px !important;
+      }
+      .brand-title-text {
+        font-size: 0.95rem !important;
+      }
+      .location-pill {
+        padding: 2px 5px !important;
+        border-radius: 6px !important;
+      }
+      .loc-main-title {
+        font-size: 0.66rem !important;
+      }
+      .loc-sub-title {
+        font-size: 0.52rem !important;
+      }
+      .header-menu-btn {
+        width: 28px !important;
+        height: 28px !important;
+        font-size: 0.9rem !important;
+      }
+      #poketan-footer {
+        height: 48px !important;
+      }
+      .footer-tab-btn {
+        padding: 2px 0 !important;
+        font-size: 0.58rem !important;
+        gap: 1px !important;
+      }
+      .footer-tab-btn .tab-icon {
+        font-size: 1.05rem !important;
+      }
+      .footer-tab-btn .tab-label {
+        font-size: 0.58rem !important;
+      }
+    }
   </style>
 """
 
@@ -4463,6 +4513,100 @@ THONGBAO_PAGE_CSS = """
       outline: none;
       cursor: pointer;
     }
+
+    /* COMPREHENSIVE MOBILE OPTIMIZATIONS FOR THONGBAO / STORES */
+    @media (max-width: 640px) {
+      #list-active-settings-banner {
+        padding: 3px 8px;
+        font-size: 0.66rem;
+      }
+      .list-tabs-row {
+        padding: 4px 6px 3px 6px;
+        gap: 3px;
+      }
+      .list-tab-chip {
+        padding: 3px 7px;
+        font-size: 0.68rem;
+      }
+      .list-radius-row {
+        padding: 3px 6px;
+        gap: 3px;
+      }
+      .list-radius-chip {
+        padding: 2px 6px;
+        font-size: 0.65rem;
+      }
+      .list-search-row {
+        padding: 4px 6px;
+        gap: 4px;
+      }
+      .list-search-box input {
+        height: 28px;
+        font-size: 0.72rem;
+        padding: 0 8px 0 26px;
+      }
+      .list-search-box .icon {
+        left: 8px;
+        font-size: 0.68rem;
+      }
+      .list-sort-bar {
+        padding: 3px 8px;
+        font-size: 0.66rem;
+      }
+      .list-sort-btn {
+        padding: 2px 6px;
+        font-size: 0.65rem;
+      }
+      .list-cards-scroll {
+        padding: 4px 6px;
+      }
+      .store-list-card {
+        padding: 5px 7px;
+        margin-bottom: 4px;
+        border-radius: 8px;
+      }
+      .card-store-name {
+        font-size: 0.78rem;
+      }
+      .card-chain-time {
+        font-size: 0.65rem;
+      }
+      .card-time-pill {
+        padding: 1px 4px;
+        font-size: 0.63rem;
+        gap: 2px;
+      }
+      .report-count-tag {
+        font-size: 0.62rem;
+        padding: 1px 4px;
+      }
+      .card-actions-col {
+        margin-left: 6px;
+        gap: 3px;
+      }
+      .card-btn-map {
+        padding: 3px 6px;
+        font-size: 0.64rem;
+        border-radius: 4px;
+      }
+      .card-btn-hist {
+        padding: 2px 5px;
+        font-size: 0.62rem;
+        border-radius: 4px;
+      }
+      .pagination-container {
+        padding: 8px 6px 16px 6px;
+        gap: 6px;
+        margin-top: 4px;
+      }
+      .page-btn {
+        min-width: 28px;
+        height: 28px;
+        padding: 0 5px;
+        font-size: 0.7rem;
+        border-radius: 5px;
+      }
+    }
   </style>
 """
 
@@ -5032,27 +5176,25 @@ def render_thongbao_page() -> str:
         let timeReportHtml = '';
         if (info.timestamp > 0) {
           timeReportHtml = `
-            <div style="margin:4px 0 2px 0;">
-              <span class="card-time-pill" title="Thời gian người dùng gửi báo cáo">
-                <span>🕒 Báo lúc:</span>
-                <b>${escapeHtml(info.timeOnly || info.reported_at)}</b>
-                ${info.dateOnly ? `<span style="color:#64748b; font-size:0.68rem;">(${escapeHtml(info.dateOnly)})</span>` : ''}
-                <span>•</span>
-                <span class="time-ago-highlight" data-timestamp="${info.timestamp || 0}">${escapeHtml(info.timeAgo)}</span>
-              </span>
-            </div>
+            <span class="card-time-pill" title="Thời gian người dùng gửi báo cáo">
+              <span>🕒 Báo:</span>
+              <b>${escapeHtml(info.timeOnly || info.reported_at)}</b>
+              ${info.dateOnly ? `<span style="color:#64748b; font-size:0.65rem;">(${escapeHtml(info.dateOnly)})</span>` : ''}
+              <span>•</span>
+              <span class="time-ago-highlight" data-timestamp="${info.timestamp || 0}">${escapeHtml(info.timeAgo)}</span>
+            </span>
           `;
         }
 
-        const packHtml = info.packs.length ? `<div style="font-size:0.72rem; color:#2563eb; font-weight:700; margin-top:3px;">📦 ${escapeHtml(info.packs.join(', '))}</div>` : '';
+        const packHtml = info.packs.length ? `<div style="font-size:0.68rem; color:#2563eb; font-weight:700; margin-top:2px;">📦 ${escapeHtml(info.packs.join(', '))}</div>` : '';
 
         let countsHtml = '';
         if (counts.in > 0 || counts.out > 0) {
           countsHtml = `
-            <div class="popup-report-counts-bar" style="margin:4px 0 2px 0;">
-              <span class="report-count-tag tag-green" style="font-size:0.67rem; padding:1px 6px;">🟢 Có: <b>${counts.in}</b> lần</span>
-              <span class="report-count-tag tag-red" style="font-size:0.67rem; padding:1px 6px;">🔴 Hết: <b>${counts.out}</b> lần</span>
-            </div>
+            <span class="popup-report-counts-bar" style="display:inline-flex; align-items:center; gap:4px;">
+              <span class="report-count-tag tag-green" style="font-size:0.64rem; padding:1px 4px;">🟢 Có: <b>${counts.in}</b></span>
+              <span class="report-count-tag tag-red" style="font-size:0.64rem; padding:1px 4px;">🔴 Hết: <b>${counts.out}</b></span>
+            </span>
           `;
         }
 
@@ -5061,15 +5203,17 @@ def render_thongbao_page() -> str:
         return `
           <div class="store-list-card">
             <div class="card-left-info">
-              <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                <span style="font-size:0.68rem; color:#94a3b8; font-weight:700;">#${itemNum}</span>
-                <span class="card-badge ${badgeClass}">${badgeText}</span>
+              <div style="display:flex; align-items:center; gap:5px; flex-wrap:wrap;">
+                <span style="font-size:0.66rem; color:#94a3b8; font-weight:700;">#${itemNum}</span>
+                <span class="card-badge ${badgeClass}" style="padding:1px 5px; font-size:0.66rem;">${badgeText}</span>
                 ${onsiteBadge}
                 <div class="card-store-name">${escapeHtml(store.name || '')}</div>
               </div>
               <div class="card-chain-time">${escapeHtml(chain)}${distStr}</div>
-              ${timeReportHtml}
-              ${countsHtml}
+              <div style="display:flex; align-items:center; gap:5px; flex-wrap:wrap; margin-top:2px;">
+                ${timeReportHtml}
+                ${countsHtml}
+              </div>
               ${packHtml}
             </div>
             <div class="card-actions-col">

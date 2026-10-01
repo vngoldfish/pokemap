@@ -963,25 +963,26 @@ __SHARED_BASE_CSS__
       to { transform: rotate(360deg); }
     }
 
-    /* COMPREHENSIVE MOBILE OPTIMIZATIONS FOR PREDICTION PAGE */
+    /* COMPREHENSIVE MOBILE OPTIMIZATIONS (ULTRA-COMPACT DENSE VIEW) */
     @media (max-width: 640px) {
       #radar-header {
-        padding: 0 10px;
-        height: 48px;
+        padding: 0 8px;
+        height: 40px;
       }
       .radar-brand {
-        gap: 6px;
+        gap: 5px;
         min-width: 0;
         flex: 1;
         overflow: hidden;
       }
       .radar-brand .logo-badge {
-        font-size: 0.68rem;
-        padding: 3px 6px;
+        font-size: 0.62rem;
+        padding: 2px 5px;
+        border-radius: 4px;
         flex-shrink: 0;
       }
       .radar-title {
-        font-size: 0.82rem;
+        font-size: 0.76rem;
         font-weight: 800;
         white-space: nowrap;
         overflow: hidden;
@@ -991,13 +992,13 @@ __SHARED_BASE_CSS__
         display: none !important;
       }
       .radar-actions {
-        gap: 4px;
+        gap: 3px;
         flex-shrink: 0;
       }
       .radar-btn {
-        padding: 5px 8px;
-        font-size: 0.72rem;
-        border-radius: 6px;
+        padding: 4px 6px;
+        font-size: 0.68rem;
+        border-radius: 5px;
       }
       .hide-sm {
         display: none !important;
@@ -1005,142 +1006,242 @@ __SHARED_BASE_CSS__
 
       /* Container */
       #radar-container {
-        padding: 10px 10px 24px 10px;
+        padding: 6px 6px 20px 6px;
       }
 
       /* Live Status Banner */
       .radar-status-banner {
-        padding: 9px 11px;
-        margin-bottom: 10px;
-        gap: 6px;
+        padding: 5px 8px;
+        margin-bottom: 6px;
+        gap: 4px;
+        border-radius: 8px;
       }
       .status-left {
-        gap: 8px;
+        gap: 6px;
       }
       .status-info-title {
-        font-size: 0.78rem;
-        line-height: 1.25;
+        font-size: 0.72rem;
+        line-height: 1.2;
       }
       .status-info-desc {
-        font-size: 0.65rem;
-        line-height: 1.3;
+        display: none !important;
       }
       .status-badge-time {
-        font-size: 0.68rem;
-        padding: 3px 8px;
+        font-size: 0.65rem;
+        padding: 2px 6px;
       }
 
       /* Radius Section */
       .radius-card {
-        padding: 10px 12px;
-        margin-bottom: 10px;
+        padding: 6px 8px;
+        margin-bottom: 6px;
+        border-radius: 8px;
       }
       .radius-header-row {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 6px;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        gap: 4px;
+        margin-bottom: 5px;
       }
       .radius-title {
-        font-size: 0.74rem;
+        font-size: 0.72rem;
       }
       #anchor-select {
-        width: 100%;
-        font-size: 0.75rem;
-        padding: 6px 8px;
+        width: auto;
+        max-width: 140px;
+        font-size: 0.7rem;
+        padding: 3px 6px;
+        height: 28px;
+        border-radius: 6px;
       }
       .radius-chips-row {
-        gap: 5px;
+        gap: 4px;
+        padding-bottom: 2px;
+        margin-bottom: 2px;
         scrollbar-width: none;
       }
       .radius-chips-row::-webkit-scrollbar {
         display: none;
       }
       .radius-chip {
-        padding: 5px 9px;
-        font-size: 0.7rem;
+        padding: 3px 7px;
+        font-size: 0.66rem;
         border-radius: 6px;
       }
 
-      /* Radius KPI Grid */
+      /* Radius KPI Grid - 2x2 Ultra Compact */
       .radius-kpi-grid {
         grid-template-columns: repeat(2, 1fr) !important;
-        gap: 6px !important;
-        margin-top: 8px !important;
+        gap: 4px !important;
+        margin-top: 5px !important;
       }
       .radius-kpi-box {
-        padding: 8px 10px;
+        padding: 4px 6px !important;
+        border-radius: 6px !important;
       }
       .radius-kpi-val {
-        font-size: 1.15rem;
-        line-height: 1.1;
+        font-size: 0.95rem !important;
+        line-height: 1.1 !important;
       }
       .radius-kpi-label {
-        font-size: 0.64rem;
-        margin-top: 2px;
+        font-size: 0.56rem !important;
+        margin-top: 1px !important;
       }
       .radius-kpi-sub {
-        font-size: 0.6rem;
-        margin-top: 1px;
+        font-size: 0.54rem !important;
+        margin-top: 0 !important;
       }
 
       /* Timeline Card */
       .timeline-card {
-        padding: 10px 12px;
-        margin-bottom: 10px;
+        padding: 6px 8px;
+        margin-bottom: 6px;
+        border-radius: 8px;
+      }
+      .timeline-title-row {
+        margin-bottom: 4px;
+      }
+      .timeline-title {
+        font-size: 0.72rem;
       }
       .timeline-presets {
         scrollbar-width: none;
-        gap: 5px;
-        padding-bottom: 4px;
-        margin-bottom: 6px;
+        gap: 4px;
+        padding-bottom: 2px;
+        margin-bottom: 4px;
       }
       .timeline-presets::-webkit-scrollbar {
         display: none;
       }
       .preset-chip {
-        padding: 4px 8px;
-        font-size: 0.68rem;
+        padding: 3px 6px;
+        font-size: 0.66rem;
+        border-radius: 5px;
       }
       .hour-scroller {
         scrollbar-width: none;
-        padding-bottom: 4px;
+        padding-bottom: 2px;
+        gap: 3px;
       }
       .hour-scroller::-webkit-scrollbar {
         display: none;
       }
       .hour-pill {
-        min-width: 44px;
-        padding: 4px 2px;
+        min-width: 36px;
+        padding: 3px 2px;
+        border-radius: 6px;
       }
-      .hour-pill-time {
-        font-size: 0.65rem;
+      .hour-label {
+        font-size: 0.64rem;
+      }
+      .hour-freq {
+        font-size: 0.52rem;
+      }
+
+      /* Filter bar */
+      .radar-filters-card {
+        padding: 5px 8px;
+        margin-bottom: 6px;
+        gap: 4px;
+        border-radius: 8px;
+      }
+      .radar-select {
+        height: 28px;
+        padding: 3px 6px;
+        font-size: 0.7rem;
+        border-radius: 6px;
+      }
+      .filter-count-badge {
+        font-size: 0.68rem;
       }
 
       /* Status Tabs */
       .status-filter-tabs {
         scrollbar-width: none;
-        gap: 5px;
-        margin-bottom: 10px;
+        gap: 4px;
+        margin-bottom: 6px;
+        padding-bottom: 2px;
       }
       .status-filter-tabs::-webkit-scrollbar {
         display: none;
       }
       .status-tab-btn {
-        padding: 6px 9px;
-        font-size: 0.72rem;
+        padding: 4px 7px;
+        font-size: 0.68rem;
+        border-radius: 6px;
       }
 
-      /* Prediction Cards */
+      /* Prediction Cards - Ultra Compact */
       .pred-card {
-        padding: 10px 12px;
-        gap: 6px;
-        border-radius: 10px;
+        padding: 7px 9px !important;
+        gap: 4px !important;
+        border-radius: 8px !important;
       }
-      .pred-card-title {
-        font-size: 0.85rem;
+      .card-store-name {
+        font-size: 0.82rem !important;
+        line-height: 1.25 !important;
       }
-      .prob-number {
-        font-size: 1.3rem;
+      .score-badge {
+        font-size: 0.64rem !important;
+        padding: 2px 5px !important;
+      }
+      .window-badge {
+        font-size: 0.64rem !important;
+        padding: 2px 5px !important;
+      }
+      .card-meta-row {
+        gap: 4px !important;
+        margin-top: 2px !important;
+      }
+      .chain-badge, .pref-badge, .dist-badge {
+        font-size: 0.6rem !important;
+        padding: 1px 4px !important;
+      }
+      .reliability-row {
+        margin-top: 2px !important;
+        gap: 4px !important;
+      }
+      .reliability-stars {
+        font-size: 0.6rem !important;
+      }
+      .reliability-label {
+        font-size: 0.58rem !important;
+      }
+      .card-address {
+        font-size: 0.64rem !important;
+        -webkit-line-clamp: 1 !important;
+      }
+      .card-action-tip {
+        padding: 3px 6px !important;
+        margin: 3px 0 2px 0 !important;
+        border-radius: 6px !important;
+      }
+      .tip-icon {
+        font-size: 0.72rem !important;
+      }
+      .tip-text {
+        font-size: 0.64rem !important;
+        line-height: 1.25 !important;
+      }
+      .ai-reasons-box {
+        padding: 4px 6px !important;
+        gap: 2px !important;
+        border-radius: 0 4px 4px 0 !important;
+      }
+      .ai-reason-item {
+        font-size: 0.63rem !important;
+        line-height: 1.2 !important;
+      }
+      .card-actions-row {
+        gap: 4px !important;
+        padding-top: 4px !important;
+        margin-top: 2px !important;
+      }
+      .card-action-btn {
+        padding: 4px 5px !important;
+        font-size: 0.66rem !important;
+        border-radius: 5px !important;
       }
     }
   </style>

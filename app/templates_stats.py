@@ -480,37 +480,38 @@ __SHARED_BASE_CSS__
       flex: 1;
     }
 
-    /* COMPREHENSIVE MOBILE OPTIMIZATIONS */
+    /* COMPREHENSIVE MOBILE OPTIMIZATIONS (ULTRA-COMPACT DENSE VIEW) */
     @media (max-width: 640px) {
       #stats-top-header {
-        height: 48px;
-        padding: 0 10px;
+        height: 40px;
+        padding: 0 8px;
       }
       .stats-header-brand {
-        gap: 6px;
+        gap: 5px;
         min-width: 0;
         flex: 1;
         overflow: hidden;
       }
       .stats-header-brand .logo-badge {
-        font-size: 0.68rem;
-        padding: 3px 6px;
+        font-size: 0.62rem;
+        padding: 2px 5px;
+        border-radius: 4px;
         flex-shrink: 0;
       }
       .stats-header-title {
-        font-size: 0.82rem;
+        font-size: 0.76rem;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
       }
       .stats-header-actions {
-        gap: 4px;
+        gap: 3px;
         flex-shrink: 0;
       }
       .stats-btn {
-        padding: 5px 8px;
-        font-size: 0.72rem;
-        border-radius: 6px;
+        padding: 4px 6px;
+        font-size: 0.68rem;
+        border-radius: 5px;
       }
       .hide-sm {
         display: none !important;
@@ -518,87 +519,142 @@ __SHARED_BASE_CSS__
 
       /* Navigation Tabs */
       #stats-nav-tabs {
-        padding: 0 8px;
+        padding: 0 6px;
         gap: 2px;
       }
       .nav-tab-btn {
-        padding: 9px 10px;
-        font-size: 0.75rem;
-        gap: 4px;
+        padding: 6px 8px;
+        font-size: 0.72rem;
+        gap: 3px;
       }
 
-      /* KPI Cards 2x2 Grid */
+      /* KPI Cards 2x2 Grid - Ultra Compact */
       #stats-body-wrapper {
-        padding: 10px 10px 24px 10px;
+        padding: 6px 6px 20px 6px;
       }
       .kpi-grid {
         grid-template-columns: repeat(2, 1fr) !important;
-        gap: 8px !important;
-        margin-bottom: 12px !important;
+        gap: 5px !important;
+        margin-bottom: 8px !important;
       }
       .kpi-card {
-        padding: 10px 12px;
-        border-radius: 10px;
-        gap: 2px;
+        padding: 6px 8px !important;
+        border-radius: 8px !important;
+        gap: 1px !important;
       }
       .kpi-card .kpi-label {
-        font-size: 0.62rem;
+        font-size: 0.58rem !important;
+        font-weight: 700 !important;
       }
       .kpi-card .kpi-val {
-        font-size: 1.25rem;
+        font-size: 1.05rem !important;
+        font-weight: 900 !important;
+        line-height: 1.15 !important;
       }
       .kpi-card .kpi-sub {
-        font-size: 0.62rem;
+        font-size: 0.55rem !important;
+        margin-top: 1px !important;
       }
 
       /* Panels */
       .panel-card {
-        padding: 12px;
-        border-radius: 10px;
-        margin-bottom: 12px;
+        padding: 8px 9px !important;
+        border-radius: 8px !important;
+        margin-bottom: 8px !important;
       }
       .panel-title {
-        font-size: 0.85rem;
+        font-size: 0.78rem !important;
+        gap: 5px !important;
+      }
+      .panel-sub {
+        display: none !important;
       }
       .panel-card-header {
-        margin-bottom: 10px;
-        gap: 6px;
+        margin-bottom: 6px !important;
+        gap: 4px !important;
       }
 
-      /* Filter Toolbar */
+      /* Filter Toolbar - Compact 2-column inline grid */
       .filter-bar {
-        padding: 8px 10px;
-        gap: 6px;
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        gap: 4px !important;
+        padding: 5px 6px !important;
+        margin-bottom: 8px !important;
+        border-radius: 6px !important;
       }
-      .filter-input, .filter-select {
-        font-size: 0.75rem;
-        padding: 6px 8px;
-        width: 100%;
+      .filter-input {
+        grid-column: 1 / -1 !important;
+        font-size: 0.72rem !important;
+        padding: 4px 7px !important;
+        height: 28px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+      }
+      .filter-select {
+        font-size: 0.7rem !important;
+        padding: 3px 6px !important;
+        height: 28px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+      }
+
+      /* Dense Tables */
+      .stats-table {
+        font-size: 0.72rem !important;
+      }
+      .stats-table th {
+        padding: 5px 6px !important;
+        font-size: 0.66rem !important;
+      }
+      .stats-table td {
+        padding: 5px 6px !important;
+        font-size: 0.7rem !important;
+      }
+      .stats-table .badge {
+        padding: 1px 4px !important;
+        font-size: 0.62rem !important;
       }
       
       /* Progress bars */
+      .chart-grid {
+        gap: 8px !important;
+        margin-bottom: 10px !important;
+      }
+      .hourly-bar-container {
+        height: 120px !important;
+        padding-bottom: 18px !important;
+      }
       .progress-label {
-        width: 85px;
-        font-size: 0.72rem;
+        width: 75px !important;
+        font-size: 0.68rem !important;
       }
       .progress-val {
-        width: 45px;
-        font-size: 0.7rem;
+        width: 40px !important;
+        font-size: 0.66rem !important;
+      }
+      .pagination-bar {
+        margin-top: 8px !important;
+        gap: 6px !important;
+      }
+      .page-btn {
+        padding: 4px 8px !important;
+        font-size: 0.7rem !important;
       }
 
       /* Detail Modal */
       .stats-modal {
-        padding: 8px;
+        padding: 6px !important;
       }
       .stats-modal-card {
-        max-height: 92vh;
-        border-radius: 10px;
+        max-height: 94vh !important;
+        border-radius: 8px !important;
       }
       .stats-modal-header {
-        padding: 10px 14px;
+        padding: 8px 10px !important;
       }
       .stats-modal-body {
-        padding: 12px;
+        padding: 8px 10px !important;
       }
     }
   </style>
