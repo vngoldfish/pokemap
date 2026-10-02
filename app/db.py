@@ -2006,8 +2006,8 @@ def db_get_restock_predictions(
         target_hour = None
     if limit is not None and limit < 0:
         limit = 0
-
-    cache_key = f"{clean_pref}_{clean_chain}_{target_hour}_{clean_window}_{user_lat}_{user_lng}_{max_dist_km}_{min_score}_{limit}_{sort_by}_{clean_status}"
+    clean_travel_mode = (travel_mode or "car").strip().lower()
+    cache_key = f"{clean_pref}_{clean_chain}_{target_hour}_{clean_window}_{user_lat}_{user_lng}_{max_dist_km}_{min_score}_{limit}_{sort_by}_{clean_status}_{clean_travel_mode}"
     now_ts = int(time.time())
 
     if cache_key in _predictions_cache:
