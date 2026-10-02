@@ -1982,7 +1982,8 @@ def db_get_restock_predictions(
     min_score: int = 40,
     limit: int = 60,
     sort_by: str = "score",
-    status_filter: Optional[str] = "all"
+    status_filter: Optional[str] = "all",
+    travel_mode: Optional[str] = "car"
 ) -> Dict[str, Any]:
     """
     Predict stores most likely to have stock or restock today in upcoming/selected hours.
@@ -2549,43 +2550,17 @@ def db_get_restock_predictions(
         if flash_mode == "none" and not truck_en_route and total_score < min_score:
             continue
 
-        # Proximity, Estimated Road Distance & Realistic Travel Time calculation
+        # Proximity calculation
         dist_km = None
         dist_m = None
-        dist_str = ""
-        road_km = None
-        road_str = ""
-        travel_time_str = ""
-        walk_min = None
         if user_lat is not None and user_lng is not None and d["lat"] is not None and d["lng"] is not None:
             try:
                 dist_km = _calc_haversine_dist(user_lat, user_lng, float(d["lat"]), float(d["lng"]))
                 if max_dist_km and dist_km > max_dist_km:
                     continue
                 dist_m = int(round(dist_km * 1000))
-                dist_str = f"~{dist_m}m" if dist_km < 1.0 else f"~{dist_km:.1f}km"
-                # Urban road distance is typically ~1.25x straight-line distance due to street grid
-                road_km = round(dist_km * 1.25, 1)
-                road_str = f"~{int(round(road_km * 1000))}m đường đi" if road_km < 1.0 else f"~{road_km:.1f}km đường đi"
-
-                # Realistic multimodal travel time estimate in Japanese cities
-                if dist_km < 1.2:
-                    walk_min = max(1, int(round(dist_km * 14)))
-                    travel_time_str = f"~{walk_min}p đi bộ"
-                elif dist_km < 3.5:
-                    bike_min = max(3, int(round(dist_km * 4)))
-                    walk_min = int(round(dist_km * 14))
-                    travel_time_str = f"~{bike_min}p xe đạp / ~{walk_min}p bộ"
-                elif dist_km < 8.0:
-                    transit_min = max(7, int(round(dist_km * 2.6)))
-                    travel_time_str = f"~{transit_min}p tàu/xe"
-                    walk_min = transit_min
-                else:
-                    transit_min = max(15, int(round(dist_km * 2.2)))
-                    travel_time_str = f"~{transit_min}p tàu/xe"
-                    walk_min = transit_min
             except Exception:
-                dist_km, dist_m, dist_str, road_km, road_str, travel_time_str, walk_min = None, None, "", None, "", "", None
+                dist_km, dist_m = None, None
 
         # Extract top cards/packs
         pack_counter = Counter(d["packs"])
@@ -2630,11 +2605,18 @@ def db_get_restock_predictions(
             "reasons": reasons,
             "distance_km": round(dist_km, 2) if dist_km is not None else None,
             "distance_m": dist_m,
-            "distance_str": dist_str,
-            "road_km": road_km,
-            "road_str": road_str,
-            "travel_time_str": travel_time_str,
-            "walk_time_min": walk_min
+            "distance_str": "",
+            "road_km": None,
+            "road_str": "",
+            "travel_time_str": "",
+            "walk_time_min": None,
+            "car_km": None,
+            "car_time_str": "",
+            "bike_km": None,
+            "bike_time_str": "",
+            "walk_km": None,
+            "walk_time_str": "",
+            "travel_mode": (travel_mode or "car").lower()
         })
 
     # Sort results
@@ -2673,6 +2655,50 @@ def db_get_restock_predictions(
     radius_stats["red_30m_count"] = red_30m_count
     radius_stats["truck_count"] = truck_cand_count
 
+    final_preds = candidates[:limit] if (limit is not None and limit >= 0) else ([] if limit is not None else candidates)
+    tm = (travel_mode or "car").lower()
+    for c in final_preds:
+        d_km = c.get("distance_km")
+        if d_km is not None:
+            dist_m = c.get("distance_m") or int(round(d_km * 1000))
+            dist_str = f"~{dist_m}m" if d_km < 1.0 else f"~{d_km:.1f}km"
+            car_km = round(d_km * 1.25, 1)
+            car_min = max(1, int(round((car_km / 25.0) * 60))) if d_km >= 0.05 else 0
+            car_time_str = f"~{car_min // 60}h{car_min % 60}p" if car_min >= 60 else (f"~{car_min}p" if car_min > 0 else "ngay gần")
+
+            bike_km = round(d_km * 1.18, 1)
+            bike_min = max(1, int(round((bike_km / 15.0) * 60))) if d_km >= 0.05 else 0
+            bike_time_str = f"~{bike_min // 60}h{bike_min % 60}p" if bike_min >= 60 else (f"~{bike_min}p" if bike_min > 0 else "ngay gần")
+
+            walk_km = round(d_km * 1.12, 1)
+            walk_min = max(1, int(round((walk_km / 4.8) * 60))) if d_km >= 0.05 else 0
+            walk_time_str = f"~{walk_min // 60}h{walk_min % 60}p" if walk_min >= 60 else (f"~{walk_min}p" if walk_min > 0 else "ngay gần")
+
+            if tm in ("bicycle", "bike"):
+                road_km = bike_km
+                travel_time_str = f"{bike_time_str} xe đạp"
+            elif tm in ("walking", "walk"):
+                road_km = walk_km
+                travel_time_str = f"{walk_time_str} đi bộ"
+            else:
+                road_km = car_km
+                travel_time_str = f"{car_time_str} ô tô"
+
+            road_str = f"~{int(round(road_km * 1000))}m đường đi" if road_km < 1.0 else f"~{road_km:.1f}km đường đi"
+
+            c["distance_str"] = dist_str
+            c["road_km"] = road_km
+            c["road_str"] = road_str
+            c["travel_time_str"] = travel_time_str
+            c["walk_time_min"] = walk_min
+            c["car_km"] = car_km
+            c["car_time_str"] = car_time_str
+            c["bike_km"] = bike_km
+            c["bike_time_str"] = bike_time_str
+            c["walk_km"] = walk_km
+            c["walk_time_str"] = walk_time_str
+            c["travel_mode"] = tm
+
     result_payload = {
         "server_time_jst": now_dt.strftime("%H:%M %d/%m/%Y"),
         "current_hour": current_hour,
@@ -2682,7 +2708,7 @@ def db_get_restock_predictions(
         "radius_stats": radius_stats,
         "hourly_distribution": hourly_distribution,
         "total_candidates": len(candidates),
-        "predictions": candidates[:limit] if (limit is not None and limit >= 0) else ([] if limit is not None else candidates)
+        "predictions": final_preds
     }
 
     _predictions_cache[cache_key] = (now_ts, result_payload)

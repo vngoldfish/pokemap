@@ -1257,6 +1257,23 @@ SHARED_MODALS_HTML = """
                 </button>
               </div>
             </div>
+
+            <!-- E. PHƯƠNG TIỆN DI CHUYỂN & TÍNH KM -->
+            <div>
+              <div class="filter-group-title">🚲 Phương tiện di chuyển &amp; Tính km (移動手段)</div>
+              <input type="hidden" id="tg-cfg-travel-mode" value="car">
+              <div class="filter-options-grid" id="tg-modal-travel-mode-group">
+                <button type="button" class="filter-option-btn active" data-val="car" onclick="selectTgModalTravelMode('car')">
+                  🚗 Ô tô (~25km/h - Đoạn đường lái xe)
+                </button>
+                <button type="button" class="filter-option-btn" data-val="bicycle" onclick="selectTgModalTravelMode('bicycle')">
+                  🚲 Xe đạp / Xe máy (~15km/h - Đi hẻm, phố)
+                </button>
+                <button type="button" class="filter-option-btn" data-val="walking" onclick="selectTgModalTravelMode('walking')">
+                  🚶 Đi bộ (~4.8km/h - Chuẩn 80m/phút)
+                </button>
+              </div>
+            </div>
           </div>
 
           <div id="tg-test-result" style="display:none; padding:10px 12px; border-radius:8px; font-size:0.75rem; font-weight:700; margin-top:4px;"></div>
@@ -1281,6 +1298,22 @@ SHARED_MODALS_HTML = """
               <span>🔊 Âm thanh khi phát hiện có hàng</span>
               <input type="checkbox" id="set-sound-check" onchange="updateSettings('soundEnabled', this.checked)">
             </label>
+          </div>
+
+          <!-- SECTION 2.5: PHƯƠNG TIỆN DI CHUYỂN MẶC ĐỊNH -->
+          <div>
+            <div class="filter-group-title">🚲 Phương tiện di chuyển &amp; Tính km (移動手段)</div>
+            <div class="filter-options-grid" id="sys-travel-mode-group">
+              <button type="button" class="filter-option-btn active" data-val="car" onclick="selectTgModalTravelMode('car')">
+                🚗 Ô tô (Đoạn đường lái xe)
+              </button>
+              <button type="button" class="filter-option-btn" data-val="bicycle" onclick="selectTgModalTravelMode('bicycle')">
+                🚲 Xe đạp / Xe máy (Đi hẻm, phố)
+              </button>
+              <button type="button" class="filter-option-btn" data-val="walking" onclick="selectTgModalTravelMode('walking')">
+                🚶 Đi bộ (Chuẩn 80m/phút)
+              </button>
+            </div>
           </div>
 
           <!-- SECTION 3: VÙNG DỮ LIỆU HIỂN THỊ -->
@@ -2138,6 +2171,33 @@ def render_map_page() -> str:
       return km < 1 ? `${Math.round(km * 1000)}m` : `${km.toFixed(1)}km`;
     }
 
+    let currentTravelMode = localStorage.getItem('poketan_travel_mode') || (configData && configData.travelMode) || 'car';
+
+    function calcTravelEstimate(distKm, mode) {
+      const tm = (mode || currentTravelMode || 'car').toLowerCase();
+      let factor = 1.25, speed = 25.0, icon = '🚗', label = 'ô tô', gmapsMode = 'driving';
+      if (tm === 'bicycle' || tm === 'bike') {
+        factor = 1.18; speed = 15.0; icon = '🚲'; label = 'xe đạp'; gmapsMode = 'bicycling';
+      } else if (tm === 'walking' || tm === 'walk') {
+        factor = 1.12; speed = 4.8; icon = '🚶'; label = 'đi bộ'; gmapsMode = 'walking';
+      }
+      const roadKm = distKm * factor;
+      const mins = distKm >= 0.05 ? Math.max(1, Math.round((roadKm / speed) * 60)) : 0;
+      let timeStr = 'ngay gần';
+      if (mins >= 60) {
+        const h = Math.floor(mins / 60);
+        const m = mins % 60;
+        timeStr = m > 0 ? `${h}h${m}p` : `${h}h`;
+      } else if (mins > 0) {
+        timeStr = `${mins} phút`;
+      }
+      const roadDistStr = roadKm < 1.0 ? `${Math.round(roadKm * 1000)}m` : `${roadKm.toFixed(1)}km`;
+      const straightStr = distKm < 1.0 ? `${Math.round(distKm * 1000)}m` : `${distKm.toFixed(1)}km`;
+      return {
+        mode: tm, icon, label, roadKm, roadDistStr, straightStr, timeStr, gmapsMode
+      };
+    }
+
     function escapeHtml(str) {
       if (!str) return '';
       return String(str).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]);
@@ -2384,12 +2444,12 @@ def render_map_page() -> str:
 
     function createPopupHtml(store, info) {
       let distHtml = '';
+      let gmapsMode = 'driving';
       if (userLat !== null && userLng !== null) {
         const d = calcDistanceKm(userLat, userLng, store.lat, store.lng);
-        const roadD = d * 1.22;
-        const dStr = formatDist(d);
-        const roadStr = formatDist(roadD);
-        distHtml = `<div style="font-size:0.75rem; color:#2563eb; font-weight:700; margin-top:2px;">📍 Cách bạn: ~${roadStr} đường đi (${dStr} thẳng)</div>`;
+        const est = calcTravelEstimate(d, currentTravelMode);
+        gmapsMode = est.gmapsMode;
+        distHtml = `<div style="font-size:0.75rem; color:#2563eb; font-weight:700; margin-top:2px;">📍 Cách bạn: ${est.icon} ~${est.roadDistStr} ${est.label} (~${est.timeStr}) • ${est.straightStr} thẳng</div>`;
       }
       let statusBg = '#f1f5f9', statusColor = '#64748b', statusText = '⚪ Chưa có báo cáo (未確認)';
       if (info.code === 'i') {
@@ -2403,7 +2463,7 @@ def render_map_page() -> str:
       const packs = info.packs.length ? `<div style="font-size:0.74rem; margin-top:4px;"><b>📦 Gói:</b> ${escapeHtml(info.packs.join(', '))}</div>` : '';
       const time = (info.timestamp > 0 && info.timeAgo) ? `<div style="font-size:0.72rem; color:#64748b; margin-top:3px;">🕒 Báo: <b class="popup-time-ago" data-timestamp="${info.timestamp}">${escapeHtml(info.timeAgo)}</b> (${escapeHtml(info.reported_at)})</div>` : '';
       const chain = (configData.chainNames && configData.chainNames[store.chain]) || store.chain || 'Cửa hàng';
-      const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent((store.name || '') + ' ' + (store.address || ''))}`;
+      const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent((store.name || '') + ' ' + (store.address || ''))}&travelmode=${gmapsMode}`;
 
       let counts = storeCountsCache[store.id];
       if (!counts && storeHistoryCache[store.id]) {
@@ -3108,6 +3168,11 @@ def render_map_page() -> str:
       const chain = chainEl ? chainEl.value : (configData.telegramChain || 'all');
       const time = timeEl ? String(timeEl.value) : String(configData.telegramTime || '24');
       const radius = radiusEl ? radiusEl.value : (configData.telegramRadius || 'all');
+      const travelModeEl = document.getElementById('tg-cfg-travel-mode');
+      const travelMode = travelModeEl ? travelModeEl.value : (configData.travelMode || (configData.notifications && configData.notifications.travelMode) || currentTravelMode || 'car');
+      if (travelModeEl) travelModeEl.value = travelMode;
+      currentTravelMode = travelMode;
+      try { localStorage.setItem('poketan_travel_mode', travelMode); } catch(e) {}
 
       document.querySelectorAll('#tg-modal-region-group .filter-option-btn').forEach(btn => {
         btn.classList.toggle('active', btn.getAttribute('data-val') === region);
@@ -3121,11 +3186,44 @@ def render_map_page() -> str:
       document.querySelectorAll('#tg-modal-radius-group .filter-option-btn').forEach(btn => {
         btn.classList.toggle('active', btn.getAttribute('data-val') === String(radius));
       });
+      document.querySelectorAll('#tg-modal-travel-mode-group .filter-option-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-val') === travelMode);
+      });
+      document.querySelectorAll('#sys-travel-mode-group .filter-option-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-val') === travelMode);
+      });
       const autoSyncEl = document.getElementById('tg-cfg-autosync-gps');
       if (autoSyncEl) {
         autoSyncEl.checked = !!configData.telegramAutoSyncGps;
       }
       updateTelegramAnchorWarning();
+    }
+
+    function selectTgModalTravelMode(val) {
+      currentTravelMode = val;
+      try { localStorage.setItem('poketan_travel_mode', val); } catch(e) {}
+      const el = document.getElementById('tg-cfg-travel-mode');
+      if (el) el.value = val;
+      if (!configData.notifications) configData.notifications = {};
+      configData.notifications.travelMode = val;
+      configData.travelMode = val;
+      document.querySelectorAll('#tg-modal-travel-mode-group .filter-option-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-val') === val);
+      });
+      document.querySelectorAll('#sys-travel-mode-group .filter-option-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-val') === val);
+      });
+      try {
+        fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            notifications: { travelMode: val },
+            travelMode: val
+          })
+        }).catch(() => {});
+      } catch(e) {}
+      if (typeof renderMapMarkers === 'function') renderMapMarkers();
     }
 
     function selectTgModalRegion(val) {
@@ -3223,6 +3321,10 @@ def render_map_page() -> str:
       if (locNameEl) locNameEl.value = configData.telegramLocationName || 'Ga Imamiya';
       if (latEl) latEl.value = (typeof configData.telegramLat !== 'undefined' && configData.telegramLat !== null) ? configData.telegramLat : 34.6540;
       if (lngEl) lngEl.value = (typeof configData.telegramLng !== 'undefined' && configData.telegramLng !== null) ? configData.telegramLng : 135.4925;
+      const travelModeEl = document.getElementById('tg-cfg-travel-mode');
+      const travelMode = (configData.notifications && configData.notifications.travelMode) || configData.travelMode || localStorage.getItem('poketan_travel_mode') || 'car';
+      if (travelModeEl) travelModeEl.value = travelMode;
+      currentTravelMode = travelMode;
 
       const rad = document.querySelector(`input[name="set-region-radio"][value="${currentRegion}"]`);
       if (rad) rad.checked = true;
@@ -3265,6 +3367,7 @@ def render_map_page() -> str:
       const locName = (document.getElementById('tg-cfg-loc-name') ? document.getElementById('tg-cfg-loc-name').value : (configData.telegramLocationName || 'Ga Imamiya')).trim();
       const latVal = (document.getElementById('tg-cfg-lat') && document.getElementById('tg-cfg-lat').value !== '') ? parseFloat(document.getElementById('tg-cfg-lat').value) : (configData.telegramLat || 34.6540);
       const lngVal = (document.getElementById('tg-cfg-lng') && document.getElementById('tg-cfg-lng').value !== '') ? parseFloat(document.getElementById('tg-cfg-lng').value) : (configData.telegramLng || 135.4925);
+      const travelMode = (document.getElementById('tg-cfg-travel-mode') ? document.getElementById('tg-cfg-travel-mode').value : currentTravelMode) || 'car';
 
       configData.telegramBotToken = token;
       configData.telegramChatId = chatId;
@@ -3278,6 +3381,9 @@ def render_map_page() -> str:
       configData.telegramLocationName = locName;
       configData.telegramLat = latVal;
       configData.telegramLng = lngVal;
+      configData.travelMode = travelMode;
+      if (!configData.notifications) configData.notifications = {};
+      configData.notifications.travelMode = travelMode;
 
       try {
         await fetch('/api/settings', {
@@ -3288,8 +3394,10 @@ def render_map_page() -> str:
               telegramBotToken: token, telegramChatId: chatId, telegramEnabled: enabled,
               telegramStatus: status, telegramChain: chain, telegramTime: time, telegramRegion: region,
               telegramRadius: radius, telegramAutoSyncGps: autoSync,
-              telegramLocationName: locName, telegramLat: latVal, telegramLng: lngVal
-            }
+              telegramLocationName: locName, telegramLat: latVal, telegramLng: lngVal,
+              travelMode: travelMode
+            },
+            travelMode: travelMode
           })
         });
       } catch(e) {}
@@ -3355,6 +3463,7 @@ def render_map_page() -> str:
       const locName = (document.getElementById('tg-cfg-loc-name') ? document.getElementById('tg-cfg-loc-name').value : 'Ga Imamiya').trim();
       const latVal = (document.getElementById('tg-cfg-lat') && document.getElementById('tg-cfg-lat').value !== '') ? parseFloat(document.getElementById('tg-cfg-lat').value) : 34.6540;
       const lngVal = (document.getElementById('tg-cfg-lng') && document.getElementById('tg-cfg-lng').value !== '') ? parseFloat(document.getElementById('tg-cfg-lng').value) : 135.4925;
+      const travelMode = (document.getElementById('tg-cfg-travel-mode') ? document.getElementById('tg-cfg-travel-mode').value : currentTravelMode) || 'car';
 
       configData.telegramBotToken = token;
       configData.telegramChatId = chatId;
@@ -3368,6 +3477,9 @@ def render_map_page() -> str:
       configData.telegramLocationName = locName;
       configData.telegramLat = latVal;
       configData.telegramLng = lngVal;
+      configData.travelMode = travelMode;
+      if (!configData.notifications) configData.notifications = {};
+      configData.notifications.travelMode = travelMode;
 
       const resEl = document.getElementById('tg-test-result');
       if (resEl) {
@@ -3386,8 +3498,10 @@ def render_map_page() -> str:
               telegramBotToken: token, telegramChatId: chatId, telegramEnabled: enabled,
               telegramStatus: status, telegramChain: chain, telegramTime: time, telegramRegion: region,
               telegramRadius: radius, telegramAutoSyncGps: autoSync,
-              telegramLocationName: locName, telegramLat: latVal, telegramLng: lngVal
-            }
+              telegramLocationName: locName, telegramLat: latVal, telegramLng: lngVal,
+              travelMode: travelMode
+            },
+            travelMode: travelMode
           })
         });
         const d = await res.json();
@@ -4979,6 +5093,33 @@ def render_thongbao_page() -> str:
       return km < 1 ? `${Math.round(km * 1000)}m` : `${km.toFixed(1)}km`;
     }
 
+    let currentTravelMode = localStorage.getItem('poketan_travel_mode') || (configData && configData.travelMode) || 'car';
+
+    function calcTravelEstimate(distKm, mode) {
+      const tm = (mode || currentTravelMode || 'car').toLowerCase();
+      let factor = 1.25, speed = 25.0, icon = '🚗', label = 'ô tô', gmapsMode = 'driving';
+      if (tm === 'bicycle' || tm === 'bike') {
+        factor = 1.18; speed = 15.0; icon = '🚲'; label = 'xe đạp'; gmapsMode = 'bicycling';
+      } else if (tm === 'walking' || tm === 'walk') {
+        factor = 1.12; speed = 4.8; icon = '🚶'; label = 'đi bộ'; gmapsMode = 'walking';
+      }
+      const roadKm = distKm * factor;
+      const mins = distKm >= 0.05 ? Math.max(1, Math.round((roadKm / speed) * 60)) : 0;
+      let timeStr = 'ngay gần';
+      if (mins >= 60) {
+        const h = Math.floor(mins / 60);
+        const m = mins % 60;
+        timeStr = m > 0 ? `${h}h${m}p` : `${h}h`;
+      } else if (mins > 0) {
+        timeStr = `${mins} phút`;
+      }
+      const roadDistStr = roadKm < 1.0 ? `${Math.round(roadKm * 1000)}m` : `${roadKm.toFixed(1)}km`;
+      const straightStr = distKm < 1.0 ? `${Math.round(distKm * 1000)}m` : `${distKm.toFixed(1)}km`;
+      return {
+        mode: tm, icon, label, roadKm, roadDistStr, straightStr, timeStr, gmapsMode
+      };
+    }
+
     function escapeHtml(str) {
       if (!str) return '';
       return String(str).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]);
@@ -5178,8 +5319,11 @@ def render_thongbao_page() -> str:
         const chain = (configData.chainNames && configData.chainNames[store.chain]) || store.chain || 'Cửa hàng';
         const distLabel = isRealUserGps ? 'Cách bạn' : `Cách TT ${regName}`;
         const distGpsNotice = !isRealUserGps ? ' (chưa có GPS)' : '';
-        const roadDist = dist !== null ? dist * 1.22 : null;
-        const distStr = dist !== null ? ` • 📍 ${distLabel} ~${formatDist(roadDist)} đi (${formatDist(dist)} thẳng)${distGpsNotice}` : '';
+        let distStr = '';
+        if (dist !== null) {
+          const est = calcTravelEstimate(dist, currentTravelMode);
+          distStr = ` • 📍 ${distLabel}: ${est.icon} ~${est.roadDistStr} ${est.label} (~${est.timeStr}) • ${est.straightStr}${distGpsNotice}`;
+        }
         
         let timeReportHtml = '';
         if (info.timestamp > 0) {
@@ -5798,6 +5942,11 @@ def render_thongbao_page() -> str:
       const chain = chainEl ? chainEl.value : (configData.telegramChain || 'all');
       const time = timeEl ? String(timeEl.value) : String(configData.telegramTime || '24');
       const radius = radiusEl ? radiusEl.value : (configData.telegramRadius || 'all');
+      const travelModeEl = document.getElementById('tg-cfg-travel-mode');
+      const travelMode = travelModeEl ? travelModeEl.value : (configData.travelMode || (configData.notifications && configData.notifications.travelMode) || currentTravelMode || 'car');
+      if (travelModeEl) travelModeEl.value = travelMode;
+      currentTravelMode = travelMode;
+      try { localStorage.setItem('poketan_travel_mode', travelMode); } catch(e) {}
 
       document.querySelectorAll('#tg-modal-region-group .filter-option-btn').forEach(btn => {
         btn.classList.toggle('active', btn.getAttribute('data-val') === region);
@@ -5811,11 +5960,45 @@ def render_thongbao_page() -> str:
       document.querySelectorAll('#tg-modal-radius-group .filter-option-btn').forEach(btn => {
         btn.classList.toggle('active', btn.getAttribute('data-val') === String(radius));
       });
+      document.querySelectorAll('#tg-modal-travel-mode-group .filter-option-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-val') === travelMode);
+      });
+      document.querySelectorAll('#sys-travel-mode-group .filter-option-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-val') === travelMode);
+      });
       const autoSyncEl = document.getElementById('tg-cfg-autosync-gps');
       if (autoSyncEl) {
         autoSyncEl.checked = !!configData.telegramAutoSyncGps;
       }
       updateTelegramAnchorWarning();
+    }
+
+    function selectTgModalTravelMode(val) {
+      currentTravelMode = val;
+      try { localStorage.setItem('poketan_travel_mode', val); } catch(e) {}
+      const el = document.getElementById('tg-cfg-travel-mode');
+      if (el) el.value = val;
+      if (!configData.notifications) configData.notifications = {};
+      configData.notifications.travelMode = val;
+      configData.travelMode = val;
+      document.querySelectorAll('#tg-modal-travel-mode-group .filter-option-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-val') === val);
+      });
+      document.querySelectorAll('#sys-travel-mode-group .filter-option-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-val') === val);
+      });
+      try {
+        fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            notifications: { travelMode: val },
+            travelMode: val
+          })
+        }).catch(() => {});
+      } catch(e) {}
+      const searchVal = document.getElementById('list-search-input') ? document.getElementById('list-search-input').value : '';
+      renderStoreList(searchVal);
     }
 
     function selectTgModalRegion(val) {
@@ -5953,6 +6136,10 @@ def render_thongbao_page() -> str:
       if (locNameEl) locNameEl.value = configData.telegramLocationName || 'Ga Imamiya';
       if (latEl) latEl.value = (typeof configData.telegramLat !== 'undefined' && configData.telegramLat !== null) ? configData.telegramLat : 34.6540;
       if (lngEl) lngEl.value = (typeof configData.telegramLng !== 'undefined' && configData.telegramLng !== null) ? configData.telegramLng : 135.4925;
+      const travelModeEl = document.getElementById('tg-cfg-travel-mode');
+      const travelMode = (configData.notifications && configData.notifications.travelMode) || configData.travelMode || localStorage.getItem('poketan_travel_mode') || 'car';
+      if (travelModeEl) travelModeEl.value = travelMode;
+      currentTravelMode = travelMode;
 
       const rad = document.querySelector(`input[name="set-region-radio"][value="${currentRegion}"]`);
       if (rad) rad.checked = true;
@@ -5997,6 +6184,7 @@ def render_thongbao_page() -> str:
       const locName = (document.getElementById('tg-cfg-loc-name') ? document.getElementById('tg-cfg-loc-name').value : (configData.telegramLocationName || 'Ga Imamiya')).trim();
       const latVal = (document.getElementById('tg-cfg-lat') && document.getElementById('tg-cfg-lat').value !== '') ? parseFloat(document.getElementById('tg-cfg-lat').value) : (configData.telegramLat || 34.6540);
       const lngVal = (document.getElementById('tg-cfg-lng') && document.getElementById('tg-cfg-lng').value !== '') ? parseFloat(document.getElementById('tg-cfg-lng').value) : (configData.telegramLng || 135.4925);
+      const travelMode = (document.getElementById('tg-cfg-travel-mode') ? document.getElementById('tg-cfg-travel-mode').value : currentTravelMode) || 'car';
 
       configData.telegramBotToken = token;
       configData.telegramChatId = chatId;
@@ -6010,6 +6198,9 @@ def render_thongbao_page() -> str:
       configData.telegramLocationName = locName;
       configData.telegramLat = latVal;
       configData.telegramLng = lngVal;
+      configData.travelMode = travelMode;
+      if (!configData.notifications) configData.notifications = {};
+      configData.notifications.travelMode = travelMode;
 
       try {
         await fetch('/api/settings', {
@@ -6020,8 +6211,10 @@ def render_thongbao_page() -> str:
               telegramBotToken: token, telegramChatId: chatId, telegramEnabled: enabled,
               telegramStatus: status, telegramChain: chain, telegramTime: time, telegramRegion: region,
               telegramRadius: radius, telegramAutoSyncGps: autoSync,
-              telegramLocationName: locName, telegramLat: latVal, telegramLng: lngVal
-            }
+              telegramLocationName: locName, telegramLat: latVal, telegramLng: lngVal,
+              travelMode: travelMode
+            },
+            travelMode: travelMode
           })
         });
       } catch(e) {}
@@ -6083,6 +6276,7 @@ def render_thongbao_page() -> str:
       const locName = (document.getElementById('tg-cfg-loc-name') ? document.getElementById('tg-cfg-loc-name').value : 'Ga Imamiya').trim();
       const latVal = (document.getElementById('tg-cfg-lat') && document.getElementById('tg-cfg-lat').value !== '') ? parseFloat(document.getElementById('tg-cfg-lat').value) : 34.6540;
       const lngVal = (document.getElementById('tg-cfg-lng') && document.getElementById('tg-cfg-lng').value !== '') ? parseFloat(document.getElementById('tg-cfg-lng').value) : 135.4925;
+      const travelMode = (document.getElementById('tg-cfg-travel-mode') ? document.getElementById('tg-cfg-travel-mode').value : currentTravelMode) || 'car';
 
       configData.telegramBotToken = token;
       configData.telegramChatId = chatId;
@@ -6096,6 +6290,9 @@ def render_thongbao_page() -> str:
       configData.telegramLocationName = locName;
       configData.telegramLat = latVal;
       configData.telegramLng = lngVal;
+      configData.travelMode = travelMode;
+      if (!configData.notifications) configData.notifications = {};
+      configData.notifications.travelMode = travelMode;
 
       const resEl = document.getElementById('tg-test-result');
       if (resEl) {
@@ -6114,8 +6311,10 @@ def render_thongbao_page() -> str:
               telegramBotToken: token, telegramChatId: chatId, telegramEnabled: enabled,
               telegramStatus: status, telegramChain: chain, telegramTime: time, telegramRegion: region,
               telegramRadius: radius, telegramAutoSyncGps: autoSync,
-              telegramLocationName: locName, telegramLat: latVal, telegramLng: lngVal
-            }
+              telegramLocationName: locName, telegramLat: latVal, telegramLng: lngVal,
+              travelMode: travelMode
+            },
+            travelMode: travelMode
           })
         });
         const d = await res.json();

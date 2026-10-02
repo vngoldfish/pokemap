@@ -31,6 +31,7 @@
     "telegramLocationName": "Vị trí của bạn (GPS)",
     "telegramRadius": "all",
     "telegramAutoSyncGps": true,
+    "travelMode": "car",
     "notifyPrefs": [
       "osaka"
     ],
@@ -52,6 +53,7 @@
   "showExpired": false,
   "currentRegion": "all",
   "stockPinEffectHours": "24",
+  "travelMode": "car",
   "feedFreshnessHours": 9999,
   "feedChain": "",
   "feedSortMode": "newest",

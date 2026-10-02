@@ -1405,6 +1405,11 @@ __SHARED_BASE_CSS__
             <option value="nagoya">📍 Ga Nagoya (Aichi)</option>
             <option value="yokohama">📍 Ga Yokohama (Kanagawa)</option>
           </select>
+          <select id="travel-mode-select" class="radar-select" onchange="onTravelModeSelectChange()" style="font-size:0.7rem; padding:4px 8px;">
+            <option value="car" selected>🚗 Ô tô</option>
+            <option value="bicycle">🚲 Xe đạp</option>
+            <option value="walking">🚶 Đi bộ</option>
+          </select>
         </div>
       </div>
 
@@ -1802,11 +1807,30 @@ __SHARED_BASE_CSS__
       loadPredictions();
     }
 
+    function onTravelModeSelectChange() {
+      const sel = document.getElementById('travel-mode-select');
+      if (sel) {
+        localStorage.setItem('poketan_travel_mode', sel.value);
+        try {
+          fetch('/api/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              notifications: { travelMode: sel.value },
+              travelMode: sel.value
+            })
+          }).catch(() => {});
+        } catch(e) {}
+      }
+      loadPredictions();
+    }
+
     async function loadPredictions() {
       const pref = document.getElementById('filter-pref').value;
       const chain = document.getElementById('filter-chain').value;
       const sort = document.getElementById('filter-sort').value;
       const scoreFilter = document.getElementById('filter-score') ? document.getElementById('filter-score').value : '0';
+      const currentTravelMode = (document.getElementById('travel-mode-select') ? document.getElementById('travel-mode-select').value : null) || localStorage.getItem('poketan_travel_mode') || 'car';
 
       const listEl = document.getElementById('prediction-list');
       listEl.innerHTML = `
@@ -1820,7 +1844,7 @@ __SHARED_BASE_CSS__
       if (scoreFilter === '70') minScoreParam = 70;
       else if (scoreFilter === '85') minScoreParam = 85;
 
-      let url = `/api/stats/predictions?pref=${encodeURIComponent(pref)}&chain=${encodeURIComponent(chain)}&sort=${encodeURIComponent(sort)}&status=${encodeURIComponent(currentStatusFilter)}&min_score=${minScoreParam}`;
+      let url = `/api/stats/predictions?pref=${encodeURIComponent(pref)}&chain=${encodeURIComponent(chain)}&sort=${encodeURIComponent(sort)}&status=${encodeURIComponent(currentStatusFilter)}&min_score=${minScoreParam}&travel_mode=${encodeURIComponent(currentTravelMode)}`;
       if (currentTargetHour !== null) {
         url += `&hour=${currentTargetHour}`;
       } else if (currentWindow) {
@@ -2005,12 +2029,22 @@ __SHARED_BASE_CSS__
 
         const anchorSel = document.getElementById('anchor-select');
         const anchorName = isGpsActive ? 'bạn' : (anchorSel && anchorSel.options[anchorSel.selectedIndex] ? anchorSel.options[anchorSel.selectedIndex].text.replace(/\\s*\\([^)]*\\)/, '') : 'mốc');
-        const travelText = p.travel_time_str || (p.walk_time_min ? `~${p.walk_time_min}p đi bộ` : '');
-        const displayDist = p.road_str ? `${p.road_str} (${p.distance_str} thẳng)` : p.distance_str;
+        const currentTm = (document.getElementById('travel-mode-select') ? document.getElementById('travel-mode-select').value : null) || localStorage.getItem('poketan_travel_mode') || 'car';
+
+        let tmIcon = '🚗', tmName = 'ô tô', tmTime = p.car_time_str || p.travel_time_str, tmKm = p.car_km || p.road_km, gmapsMode = 'driving';
+        if (currentTm === 'bicycle') {
+          tmIcon = '🚲'; tmName = 'xe đạp'; tmTime = p.bike_time_str || p.travel_time_str; tmKm = p.bike_km || p.road_km; gmapsMode = 'bicycling';
+        } else if (currentTm === 'walking') {
+          tmIcon = '🚶'; tmName = 'đi bộ'; tmTime = p.walk_time_str || p.travel_time_str; tmKm = p.walk_km || p.road_km; gmapsMode = 'walking';
+        }
+
+        const roadStrFormatted = tmKm !== null ? (tmKm < 1.0 ? `~${Math.round(tmKm * 1000)}m` : `~${tmKm.toFixed(1)}km`) : (p.road_str || p.distance_str);
+        const timeFormatted = tmTime ? ` (~${tmTime})` : '';
+        const displayDist = `${tmIcon} ${roadStrFormatted} ${tmName}${timeFormatted} • ${p.distance_str} thẳng`;
 
         const distHtml = p.distance_str ? `
-          <span class="dist-badge" title="Khoảng cách tính từ ${anchorName}: quãng đường đi ${p.road_str || p.distance_str}, đường chim bay ${p.distance_str}">
-            📍 ${displayDist} • ${anchorName} ${travelText ? `• ${travelText}` : ''}
+          <span class="dist-badge" title="Khoảng cách tính từ ${anchorName}: quãng đường đi ${tmName} ${roadStrFormatted}, đường chim bay ${p.distance_str}">
+            📍 ${displayDist} • ${anchorName}
           </span>
         ` : '';
 
@@ -2026,7 +2060,7 @@ __SHARED_BASE_CSS__
 
         const encodedQuery = encodeURIComponent(p.name + ' ' + (p.address || ''));
         const gmapsWalkingUrl = (p.lat && p.lng) 
-          ? `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}`
+          ? `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}&travelmode=${gmapsMode}`
           : `https://www.google.com/maps/search/?api=1&query=${encodedQuery}`;
 
         return `
@@ -2368,6 +2402,12 @@ __SHARED_BASE_CSS__
 
     // Auto-boot on load with immediate GPS check if available
     document.addEventListener('DOMContentLoaded', () => {
+      const tmSel = document.getElementById('travel-mode-select');
+      const savedTm = localStorage.getItem('poketan_travel_mode');
+      if (tmSel && savedTm) {
+        tmSel.value = savedTm;
+      }
+
       if (navigator.geolocation && !isGpsActive) {
         navigator.geolocation.getCurrentPosition(
           (pos) => {

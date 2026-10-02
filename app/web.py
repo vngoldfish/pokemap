@@ -119,6 +119,7 @@ DEFAULT_SETTINGS = {
         "telegramLocationName": "Ga Imamiya", # Tên vị trí neo cho Telegram
         "telegramRadius": "all",      # Bán kính lọc cảnh báo Telegram: 'all', '1', '3', '5', '10', '20' (km)
         "telegramAutoSyncGps": True,  # Tự động cập nhật toạ độ Telegram theo GPS khi mở app
+        "travelMode": "car",          # Phương tiện di chuyển: 'car' (ô tô), 'bicycle' (xe đạp), 'walking' (đi bộ)
         "notifyPrefs": ["osaka", "aichi", "kanagawa", "gifu", "mie"]  # Các tỉnh nhận thông báo
     },
 
@@ -133,7 +134,8 @@ DEFAULT_SETTINGS = {
     "sortMode": "newest",
     "showExpired": False,
     "currentRegion": "all",
-    "stockPinEffectHours": "24"
+    "stockPinEffectHours": "24",
+    "travelMode": "car"
 }
 
 
@@ -200,7 +202,7 @@ async def update_settings(request: Request):
         # If client passes telegram fields at root or inside notifications, ensure they are stored under notifications
         if not isinstance(data.get("notifications"), dict):
             data["notifications"] = {}
-        for tg_key in ("telegramLat", "telegramLng", "telegramLocationName", "telegramAutoSyncGps", "telegramRadius", "telegramEnabled"):
+        for tg_key in ("telegramLat", "telegramLng", "telegramLocationName", "telegramAutoSyncGps", "telegramRadius", "telegramEnabled", "travelMode"):
             if tg_key in data:
                 data["notifications"][tg_key] = data.pop(tg_key)
             if tg_key in current:
@@ -232,18 +234,51 @@ REGION_PREFS = {
 
 _recent_notified_keys = {}
 
-def format_distance_pair(dist_km: float) -> Tuple[str, str]:
+def format_distance_pair(dist_km: float, travel_mode: Optional[str] = None) -> Tuple[str, str]:
     """
     Standard PokéTan distance formatting:
-    Road distance = dist_km * 1.22
-    - If road_km < 1.0: formatted road distance is '~{road_m}m đường đi'
-    - If road_km >= 1.0: formatted road distance is '~{road_km:.1f}km đường đi'
-    - Straight distance: '< 1.0 km' formatted in meters ('{dist_m}m'),
-                         '>= 1.0 km' formatted in km ('{dist_km:.1f}km').
-    Returns (road_str, straight_str).
+    - If travel_mode is None or 'legacy': maintains exact backward compatibility:
+      road = dist_km * 1.22
+      returns (~{m}m đường đi / ~{km}km đường đi, {m}m / {km}km)
+    - If travel_mode is provided ('car', 'bicycle', 'walking'):
+      returns multimodal formatted pair with vehicle icon and travel time.
     """
-    road_km = dist_km * 1.22
-    road_str = f"~{int(round(road_km * 1000))}m đường đi" if road_km < 1.0 else f"~{road_km:.1f}km đường đi"
+    if not travel_mode or travel_mode == "legacy":
+        road_km = dist_km * 1.22
+        road_str = f"~{int(round(road_km * 1000))}m đường đi" if road_km < 1.0 else f"~{road_km:.1f}km đường đi"
+        straight_str = f"{int(round(dist_km * 1000))}m" if dist_km < 1.0 else f"{dist_km:.1f}km"
+        return road_str, straight_str
+
+    tm = travel_mode.lower()
+    if tm in ("bicycle", "bike"):
+        factor = 1.18
+        speed = 15.0
+        icon = "🚲"
+        label = "xe đạp"
+    elif tm in ("walking", "walk"):
+        factor = 1.12
+        speed = 4.8
+        icon = "🚶"
+        label = "đi bộ"
+    else:
+        factor = 1.25
+        speed = 25.0
+        icon = "🚗"
+        label = "ô tô"
+
+    road_km = dist_km * factor
+    travel_mins = max(1, int(round((road_km / speed) * 60))) if dist_km >= 0.05 else 0
+    if travel_mins >= 60:
+        time_str = f"{travel_mins // 60}h{travel_mins % 60}p" if travel_mins % 60 > 0 else f"{travel_mins // 60}h"
+    elif travel_mins > 0:
+        time_str = f"{travel_mins}p"
+    else:
+        time_str = "ngay gần"
+
+    if road_km < 1.0:
+        road_str = f"{icon} ~{int(round(road_km * 1000))}m đường đi {label} ({time_str})"
+    else:
+        road_str = f"{icon} ~{road_km:.1f}km đường đi {label} ({time_str})"
     straight_str = f"{int(round(dist_km * 1000))}m" if dist_km < 1.0 else f"{dist_km:.1f}km"
     return road_str, straight_str
 
@@ -254,7 +289,7 @@ def send_telegram_alert(store: dict, info: dict, notif_cfg: dict, is_test: bool 
     1. Tên cửa hàng (Chuỗi)
     2. Thời gian có báo cáo (JST)
     3. Trạng thái (Có hàng / Hết hàng...)
-    4. Khoảng cách (từ ga JR Imamiya hoặc định vị)
+    4. Khoảng cách (từ ga JR Imamiya hoặc định vị) theo phương tiện (Ô tô / Xe đạp / Đi bộ)
     5. Địa chỉ kèm link mở vị trí trên PokéMap
     """
     import urllib.request
@@ -286,10 +321,40 @@ def send_telegram_alert(store: dict, info: dict, notif_cfg: dict, is_test: bool 
             dist_km = 6371 * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
             loc_label = (notif_cfg.get("telegramLocationName") or "").strip()
             loc_suffix = f" ({loc_label})" if loc_label else " (mốc Ga Imamiya)"
-            road_km = dist_km * 1.22
-            road_str = f"~{int(round(road_km * 1000))}m đường đi" if road_km < 1.0 else f"~{road_km:.1f}km đường đi"
+
+            tm = (notif_cfg.get("travelMode") or "car").lower()
+            if tm in ("bicycle", "bike"):
+                factor = 1.18
+                speed = 15.0
+                mode_icon = "🚲"
+                mode_label = "xe đạp"
+            elif tm in ("walking", "walk"):
+                factor = 1.12
+                speed = 4.8
+                mode_icon = "🚶"
+                mode_label = "đi bộ"
+            else:
+                factor = 1.25
+                speed = 25.0
+                mode_icon = "🚗"
+                mode_label = "ô tô"
+
+            road_km = dist_km * factor
+            travel_mins = max(1, int(round((road_km / speed) * 60))) if dist_km >= 0.05 else 0
+            if travel_mins >= 60:
+                time_str = f"{travel_mins // 60}h{travel_mins % 60}p" if travel_mins % 60 > 0 else f"{travel_mins // 60}h"
+            elif travel_mins > 0:
+                time_str = f"{travel_mins}p"
+            else:
+                time_str = "ngay gần"
+
+            if road_km < 1.0:
+                road_str = f"~{int(round(road_km * 1000))}m đường đi {mode_label} ({time_str})"
+            else:
+                road_str = f"~{road_km:.1f}km đường đi {mode_label} ({time_str})"
+
             straight_str = f"{int(round(dist_km * 1000))}m" if dist_km < 1.0 else f"{dist_km:.1f}km"
-            dist_str = f"{road_str} • {straight_str}{loc_suffix}"
+            dist_str = f"{mode_icon} {road_str} • {straight_str}{loc_suffix}"
         except Exception:
             dist_str = "~?km"
 
@@ -1023,7 +1088,8 @@ def get_stats_predictions_route(
     limit: int = 60,
     sort: str = "score",
     status: Optional[str] = "all",
-    with_ai: bool = False
+    with_ai: bool = False,
+    travel_mode: Optional[str] = "car"
 ):
     try:
         from .db import db_get_restock_predictions
@@ -1038,7 +1104,8 @@ def get_stats_predictions_route(
             min_score=min_score,
             limit=limit,
             sort_by=sort,
-            status_filter=status
+            status_filter=status,
+            travel_mode=travel_mode
         )
         if with_ai:
             from .services.ai_service import generate_store_prediction_explanation
@@ -1330,6 +1397,7 @@ def get_config():
         "telegramLocationName": str(notif.get("telegramLocationName") or "Ga Imamiya"),
         "telegramRadius": str(notif.get("telegramRadius", "all")),
         "telegramAutoSyncGps": bool(notif.get("telegramAutoSyncGps", False)),
+        "travelMode": str(notif.get("travelMode", user_settings.get("travelMode", "car"))),
         "currentRegion": user_settings.get("currentRegion", "all"),
         "activeFilter": user_settings.get("activeFilter", "all"),
         "activeTime": user_settings.get("activeTime", "all"),
